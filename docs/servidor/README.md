@@ -80,22 +80,44 @@ Respostas atrasadas não voltam a mudar a tela: cada login, saída ou troca de s
 
 No site de teste, que é HTTPS, o Chrome pode perguntar se o site pode acessar dispositivos da rede local quando o endereço é `http://127.0.0.1:8090`. É preciso permitir. Com o Funnel isso não acontece, porque o endereço também é HTTPS.
 
+## No ar com o Tailscale Funnel
+
+O PocketBase escuta só em `127.0.0.1:8090`. O Tailscale Funnel publica essa porta na internet com um endereço HTTPS fixo, como `https://nome-do-pc.tailXXXX.ts.net`, e os amigos só abrem o site. No PC que hospeda, uma vez só:
+
+1. Criar uma conta grátis no Tailscale, com login do Google ou do GitHub, e instalar o Tailscale para Windows.
+2. No ícone do Tailscale, perto do relógio: **Preferences**, depois **Run unattended**. Assim ele continua ligado depois de reiniciar o PC, mesmo antes de alguém entrar no Windows.
+3. Dar ao PC um nome neutro no painel do Tailscale. O nome aparece no endereço e fica em registros públicos de certificados.
+4. No Prompt de Comando: `tailscale funnel --bg 8090`. Na primeira vez, ele pede para ativar o HTTPS e o Funnel no navegador. O `--bg` deixa o Funnel ligado até alguém desligar, inclusive depois de reiniciar.
+5. `tailscale funnel status` mostra o endereço público.
+
+Depois disso, o servidor fica no ar sempre que o `iniciar.bat` estiver aberto e o PC acordado. Para tirar do ar sem desligar o PocketBase: `tailscale funnel reset`.
+
+Proteções que valem atrás do Funnel (migração `1795321002_hospedagem.js`):
+
+- **IP de cada pessoa.** O Tailscale avisa o IP de quem acessou no cabeçalho `X-Forwarded-For`, e o PocketBase usa o último IP da lista, que é o que o Tailscale acrescentou. Assim o limite de tentativas vale por pessoa, e não para o grupo inteiro.
+- **Painel de administrador só no PC do servidor.** A configuração "Superuser IPs" aceita o administrador só de `127.0.0.1` e `::1`. Pela internet, nem a senha nem uma sessão roubada funcionam. Para desfazer, se um dia for preciso: `pocketbase.exe superuser ips`, sem nada depois, limpa a lista.
+- **Convite:** na aba Campanha, entrando pelo endereço do Funnel, o botão "Copiar link para os amigos" copia o link do site com o servidor já preenchido (`?servidor=`).
+
+## Backup
+
+- O PocketBase faz um backup por hora enquanto está ligado e guarda os 24 mais novos em `pocketbase/pb_data/backups`.
+- Para guardar uma cópia fora do PC, crie o arquivo `pocketbase/copia-backup.txt` com uma linha só: o caminho de uma pasta sincronizada com a nuvem (Google Drive, OneDrive), por exemplo `C:\Users\pedro\Google Drive\DiscordVtt`. O `iniciar.bat` lê esse arquivo, e o hook `pb_hooks/backup.pb.js` copia cada backup para lá, guardando os 48 mais novos. O arquivo fica fora do Git.
+- Backup na hora: painel, **Settings**, **Backups**, **Initialize new backup**. A cópia para a pasta de fora também acontece.
+- **Restaurar no Windows:** o botão de restaurar do painel só funciona em Linux e macOS. No Windows, feche o `iniciar.bat`, renomeie a pasta `pb_data` para `pb_data-antiga`, crie uma `pb_data` vazia, extraia nela o zip do backup e ligue o servidor de novo.
+
 ## Testar as regras
 
 ```
 node pocketbase/testar-regras.mjs caminho/do/pocketbase
 ```
 
-O script sobe um PocketBase com dados temporários, cria contas de teste e confere 45 situações: quem vê, cria, altera e apaga o quê. No fim, apaga tudo. Ele nunca toca no `pb_data` de verdade. Sem caminho, usa o executável da pasta `pocketbase`. O Claude roda o script antes de entregar qualquer mudança de regra ou hook.
+O script sobe um PocketBase com dados temporários, cria contas de teste e confere 53 situações: quem vê, cria, altera e apaga o quê, o limite de tentativas por pessoa, o administrador barrado vindo de fora e a cópia do backup. No fim, apaga tudo. Ele nunca toca no `pb_data` de verdade. Sem caminho, usa o executável da pasta `pocketbase`. O Claude roda o script antes de entregar qualquer mudança de regra ou hook.
 
 ## Próximos passos
 
 1. ~~Base: contas, campanhas e participantes, com migrações e regras.~~ Pronto.
 2. ~~Login no app e escolha da campanha, com o endereço do servidor configurável.~~ Pronto.
-3. **Hospedagem com Tailscale Funnel e backup**, testados com um amigo. Conferir nesse passo:
-   - Atrás do Funnel, todos podem chegar ao PocketBase com o mesmo IP, e o limite de tentativas contaria o grupo inteiro como uma pessoa. Configurar o proxy confiável (`trustedProxy`) ou ajustar o limite.
-   - Backup agendado do `pb_data`, com cópia fora do PC. O painel do PocketBase só restaura backups em Linux e macOS, então no Windows a restauração é trocar a pasta `pb_data` com o servidor desligado.
-   - Endereço do app (`appURL`) nas configurações.
+3. **Hospedagem com Tailscale Funnel e backup.** O código está pronto (seções acima). Falta ligar o Funnel no PC do Pedro e testar com um amigo pelo 4G, conferindo no painel (**Logs**) que cada pessoa aparece com o próprio IP.
 4. **`RepositorioPocketBase` para o mapa**, combinado com o GrifoCaolho. Proposta:
    - O tempo real do PocketBase avisa registro por registro, e o contrato do mapa pede lotes inteiros na ordem do servidor. Uma coleção `lotes`, com um registro por lote e número de ordem dado pelo servidor, resolve as duas coisas. Um hook atualiza os hexágonos na mesma gravação.
    - Hexágonos guardam `rios` e `estradas`. O token do grupo fica numa coleção própria, com um registro por mapa.

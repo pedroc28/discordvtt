@@ -3,6 +3,7 @@
 
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { conexao, useServidor } from './conexao'
+import { ehEnderecoLocal, linkDeConvite } from './endereco'
 import { NOME_PAPEL, ehUnicoMestre, usuariosDisponiveis } from './operacoes'
 import type { EstadoServidor, MinhaCampanha, Papel, ParticipanteVisivel } from './tipos'
 import { ehPapel } from './validacao'
@@ -116,9 +117,44 @@ function Conectado({ estado }: { estado: EstadoServidor }) {
         )}
         <Mensagens estado={estado} />
       </div>
+      <Convite endereco={estado.endereco} />
       <Campanhas estado={estado} />
       {atual && <CampanhaAberta key={atual.id} estado={estado} campanha={atual} />}
     </>
+  )
+}
+
+/** Link do site que já abre com este servidor preenchido, para mandar aos amigos. */
+function Convite({ endereco }: { endereco: string }) {
+  const [resultado, setResultado] = useState('')
+
+  if (ehEnderecoLocal(endereco)) {
+    return (
+      <p className="servidor__dica">
+        Este endereço só funciona neste PC. Para chamar amigos, entre pelo endereço do Tailscale Funnel, e aqui aparece o link para mandar a eles.
+      </p>
+    )
+  }
+
+  const copiar = async () => {
+    const link = linkDeConvite(window.location.href, endereco)
+    try {
+      await navigator.clipboard.writeText(link)
+      setResultado('Link copiado. Mande aos amigos junto com o e-mail e a senha de cada um.')
+    } catch {
+      setResultado(`Não consegui copiar sozinho. Copie este link: ${link}`)
+    }
+  }
+
+  return (
+    <div className="servidor__linha">
+      <button type="button" className="botao-topo" onClick={() => void copiar()}>
+        Copiar link para os amigos
+      </button>
+      <p className="servidor__dica servidor__convite" role="status">
+        {resultado}
+      </p>
+    </div>
   )
 }
 

@@ -22,6 +22,13 @@ if not "%INSTALADA%"=="%VERSAO%" (
   pause
 )
 
+rem Pasta para a cópia dos backups, de preferência sincronizada com a nuvem.
+rem Fica no arquivo copia-backup.txt, que não vai para o Git. Ver docs/servidor/README.md.
+set DISCORDVTT_COPIA_BACKUP=
+if exist copia-backup.txt set /p DISCORDVTT_COPIA_BACKUP=<copia-backup.txt
+if defined DISCORDVTT_COPIA_BACKUP echo Cópia dos backups em: %DISCORDVTT_COPIA_BACKUP%
+if not defined DISCORDVTT_COPIA_BACKUP echo Os backups ficam só neste PC, em pb_data\backups.
+
 echo Servidor do DiscordVtt ligado. Para desligar, feche esta janela.
 pocketbase.exe serve --http=127.0.0.1:8090
 pause

@@ -144,6 +144,28 @@ export class RepositorioLocal implements RepositorioMapa {
     return normalizarToken(reg?.token)
   }
 
+  async exportarTudo(): Promise<{ hexagonos: Hexagono[]; regioes: Regiao[] }> {
+    const db = await this.db()
+    // Todos os registros deste mapa: os chunks, as regiões e o token ficam na mesma loja, com o id começando pelo id do mapa.
+    const faixa = IDBKeyRange.bound(`${this.mapaId}|`, `${this.mapaId}|\uffff`)
+    const registros = await pedido<unknown[]>(db.transaction(LOJA, 'readonly').objectStore(LOJA).getAll(faixa))
+    const hexagonos: Hexagono[] = []
+    let regioes: Regiao[] = []
+    for (const reg of registros) {
+      if (typeof reg !== 'object' || reg === null) continue
+      const r = reg as Partial<RegistroChunk & RegistroRegioes>
+      if (Array.isArray(r.hexagonos)) {
+        for (const h of r.hexagonos) {
+          const ok = normalizarHexagono(h)
+          if (ok) hexagonos.push(ok)
+        }
+      } else if (Array.isArray(r.regioes)) {
+        regioes = r.regioes.map(normalizarRegiao).filter((x): x is Regiao => !!x)
+      }
+    }
+    return { hexagonos, regioes }
+  }
+
   async gravarToken(token: TokenGrupo | null): Promise<void> {
     const db = await this.db()
     const tx = db.transaction(LOJA, 'readwrite')

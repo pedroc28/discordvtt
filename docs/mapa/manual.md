@@ -27,6 +27,8 @@ Aba **Mapa**, no topo do app.
 | Medir distância | ferramenta Régua (L): toque no começo e no fim, e o mapa mostra a distância em hexágonos. Um terceiro toque recomeça, Esc limpa | idem |
 | Esconder as cores das regiões | botão do olho | idem |
 | Tamanho do pincel | 1, 7 ou 19 hexágonos (teclas `[` e `]`) | idem |
+| Exportar o mapa | botão de seta para baixo na barra: baixa um arquivo `mapa-<nome>-<data>.json` com o mapa inteiro | idem |
+| Importar um mapa | botão de seta para cima: escolhe um arquivo `.json`, mostra o resumo e pergunta se **mescla** ou **substitui** | idem |
 | Desfazer, refazer | Ctrl+Z, Ctrl+Shift+Z | botões |
 | Grade, início | G, 0 | botões |
 
@@ -52,6 +54,8 @@ Desfazer é **por jogador**: só desfaz o que você fez, e pula hexágonos que o
 
 **Digitação.** Nome, nota e descrição só gravam quando a pessoa para de digitar (700 ms) ou sai do campo, e edições seguidas do mesmo campo viram um passo só no desfazer (`grupo`, janela de 2 s).
 
+**Exportar e importar.** O arquivo é um JSON (`arquivo.ts`) com `formato: "mapa-hex"`, `versao`, `meta` (nome, tileset e escala), `exportadoEm`, `hexagonos` (os mesmos objetos do `Hexagono`, em ordem fixa de fileira e coluna), `regioes` e `token`. Leva o mapa inteiro, inclusive chunks que ninguém abriu (o repositório lista tudo por `exportarTudo`, opcional). Na importação o arquivo é validado: itens quebrados são descartados e contados, hexágono repetido vale o último, versão mais nova que a do app é recusada com mensagem, e terrenos que a arte atual não tem são avisados (aparecem em cinza). Há dois modos: **mesclar** põe o arquivo por cima e mantém o resto, e **substituir** deixa o mapa igual ao arquivo, apagando o que não estiver nele e movendo o token (exige `exportarTudo`). A importação é **um passo só no desfazer**, nos dois modos, e a revisão dos hexágonos sobe acima das duas para ordenar certo. Importar o arquivo que acabou de exportar não muda nada.
+
 **Segredo do mestre.** Quando existir a camada privada do mestre (notas e hexágonos ocultos), ela deve ficar em **coleções separadas, protegidas no servidor** (regras de acesso do PocketBase). Esconder só na tela deixaria o dado exposto na rede.
 
 ## Organização
@@ -69,6 +73,7 @@ tileset.ts           carrega o tileset (manifesto + imagens)
 renderizador.ts      desenha no canvas 2D
 entrada.ts           mouse, toque e caneta (Pointer Events)
 regua.ts             régua de distância (pura)
+arquivo.ts           arquivo de exportação: montar, ler com validação e planejar a importação (puro)
 paleta.ts            pastas e pesquisa por tag da paleta de terrenos (pura)
 PaletaTerrenos.tsx   paleta de terrenos com pastas e pesquisa
 armazenamento.ts     validação de dados externos e preferências locais
@@ -99,6 +104,8 @@ interface RepositorioMapa {
   carregarRegioes(): Promise<Regiao[]>
   aplicar(lote: Lote): Promise<void>
   assinar(ouvinte: (lote: Lote) => void): () => void
+  // opcional, para exportar o mapa inteiro e para o modo substituir da importação
+  exportarTudo?(): Promise<{ hexagonos: Hexagono[]; regioes: Regiao[] }>
   // opcionais, para o token do grupo
   carregarToken?(): Promise<TokenGrupo | null>
   gravarToken?(token: TokenGrupo | null): Promise<void>

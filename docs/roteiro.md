@@ -9,6 +9,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Mapa hexagonal: nome e nota por hexágono, regiões com hierarquia e marcadores (fase 2)
 - [x] Mapa hexagonal: rios, estradas, token do grupo e régua de distância (fase 3)
 - [x] Reorganização do repositório: áreas, telas automáticas, regras para os Claudes, entrega automática e site de teste
+- [x] Base do servidor no PocketBase: contas, campanhas, mestres e jogadores
 
 ## Mapa (GrifoCaolho)
 
@@ -20,10 +21,11 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 
 ## Servidor (Pedro)
 
-- [ ] Base no PocketBase: login, campanhas, mestre e jogadores
+- [x] Base no PocketBase: contas, campanhas, mestres e jogadores, com regras de acesso testadas
+- [ ] Login no app e escolha da campanha
+- [ ] Hospedagem: deixar no ar para o grupo, de graça, com Tailscale Funnel no PC de quem hospeda, e backup
 - [ ] `RepositorioPocketBase` para o mapa
 - [ ] Fichas sincronizadas: todos editando e vendo a mesma ficha em tempo real
-- [ ] Hospedagem: deixar no ar para o grupo, de graça, com Cloudflare Tunnel ou Tailscale
 
 ## Fichas (os dois, congelada)
 

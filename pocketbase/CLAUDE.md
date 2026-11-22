@@ -8,3 +8,6 @@ Dono: Pedro (pedroc28). Aqui ficam as migrações (`pb_migrations/`) e os hooks 
 - Regras de acesso de cada coleção ficam na migração e são revisadas com cuidado: o repositório é público e o servidor fica na internet.
 - Dado secreto do mestre fica em coleção própria, que jogadores não conseguem ler.
 - Senha de administrador, tokens e chaves nunca entram no Git.
+- A versão do PocketBase é fixa e fica em `VERSAO`. Mudar de versão é uma tarefa própria, porque o PocketBase ainda muda a API entre versões.
+- Toda mudança de regra ou hook ganha verificação em `testar-regras.mjs`, e o script passa antes da entrega: `node pocketbase/testar-regras.mjs caminho/do/pocketbase`. O executável da versão certa está nas versões do PocketBase no GitHub.
+- Handlers de hook rodam isolados e não enxergam nada declarado fora deles. Funções auxiliares ficam em arquivos sem `.pb` (como `pb_hooks/campanhas.js`) e entram com `require` dentro do handler.

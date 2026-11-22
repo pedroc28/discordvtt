@@ -4,6 +4,11 @@ Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em ci
 
 ## 2026-11-22
 
+- **Servidor no PC de quem hospeda, com Tailscale Funnel.** É de graça, dá um endereço HTTPS fixo, funciona atrás de CGNAT e não precisa de domínio. Os amigos só abrem o site. O Cloudflare saiu do plano: o túnel grátis não tem Server-Sent Events, que o tempo real do PocketBase usa, e o túnel com nome exige um domínio pago. Nuvem grátis (Oracle) e hospedagem paga (PocketBase Cloud, PocketHost) ficam para depois, se o PC ligado virar problema. Mudar é copiar a pasta `pb_data`.
+- **Sem P2P.** Os dados só passariam entre quem está online ao mesmo tempo, o segredo do mestre e as permissões ficariam sem garantia, e a sincronia do mapa teria de ser refeita.
+- **Contas com cadastro fechado e login por e-mail e senha.** O administrador cria cada conta pelo painel, e uma conta vale para todas as campanhas. Com o servidor na internet, ninguém de fora consegue se cadastrar. E-mail é o padrão do PocketBase e permite ligar o "esqueci a senha" no futuro.
+- **Vários mestres por campanha, e nunca nenhum.** O servidor recusa tirar ou rebaixar o último mestre.
+- **PocketBase 0.40.6 fixo.** A versão fica em `pocketbase/VERSAO` e só muda numa tarefa própria, porque o PocketBase ainda muda a API entre versões.
 - **Rios e estradas moram no hexágono dono da aresta.** Mesma razão dos marcadores: lotes, chunks e desfazer funcionam sem código novo. O preço: só se liga onde os dois hexágonos da aresta existem. O contrato `Hexagono` ganhou os campos `rios` e `estradas` (Pedro: a coleção de hexágonos do servidor precisa guardá-los).
 - **Token do grupo fora dos lotes.** É um estado só, muito mutável, e vale o mais recente. Entra no `RepositorioMapa` como três métodos opcionais (`carregarToken`, `gravarToken`, `assinarToken`), então a implementação do servidor continua compilando sem eles. Quando existir o PocketBase, vale uma coleção própria com um registro por mapa.
 - **Régua só local.** Cada jogador mede o que quiser, sem sincronizar.

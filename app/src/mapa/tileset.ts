@@ -41,6 +41,8 @@ export interface DefTileset {
   /** Arte em pixel art: as imagens são ampliadas sem suavizar, para os pixels ficarem nítidos. */
   pixelart: boolean
   pastas: DefPasta[]
+  /** Imagem do token do grupo, relativa à pasta do tileset.json. Sem ela o mapa desenha um alfinete. */
+  token: string | null
   terrenos: DefTerreno[]
   marcadores: DefMarcador[]
 }
@@ -106,6 +108,7 @@ export function normalizarTileset(bruto: unknown): DefTileset | null {
     altura: positivo(bruto.altura, 296),
     pixelart: bruto.pixelart === true,
     pastas,
+    token: typeof bruto.token === 'string' && bruto.token ? bruto.token : null,
     terrenos,
     marcadores,
   }
@@ -124,6 +127,7 @@ export class Tileset {
   private fontes = new Map<string, CanvasImageSource[]>()
   private porId = new Map<string, DefTerreno>()
   private fontesMarcadores = new Map<string, CanvasImageSource>()
+  private fonteToken: CanvasImageSource | null = null
   private marcadoresPorId = new Map<string, DefMarcador>()
 
   readonly def: DefTileset
@@ -164,6 +168,11 @@ export class Tileset {
     return m ? this.base + m.arquivo : null
   }
 
+  /** Imagem do token do grupo, ou null se o tileset não tem (ou não carregou). */
+  imagemToken(): CanvasImageSource | null {
+    return this.fonteToken
+  }
+
   imagemMarcador(id: string): CanvasImageSource | null {
     return this.fontesMarcadores.get(id) ?? null
   }
@@ -190,8 +199,25 @@ export class Tileset {
           // ícone ausente: o marcador aparece como um círculo simples
         }
       }),
+      this.carregarToken(),
       this.carregarTerrenos(),
     ])
+  }
+
+  private async carregarToken() {
+    if (!this.def.token) return
+    try {
+      const img = new Image()
+      img.src = this.base + this.def.token
+      await img.decode()
+      const c = document.createElement('canvas')
+      c.width = img.naturalWidth || 64
+      c.height = img.naturalHeight || 64
+      c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+      this.fonteToken = c
+    } catch {
+      // sem a imagem: o mapa desenha o alfinete de reserva
+    }
   }
 
   private async carregarTerrenos() {

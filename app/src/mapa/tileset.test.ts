@@ -12,4 +12,11 @@ describe('tileset', () => {
     expect(normalizarTileset({ ...base, pixelart: true })?.pixelart).toBe(true)
     expect(normalizarTileset({ ...base, pixelart: 'sim' })?.pixelart).toBe(false)
   })
+
+  it('token vem do tileset.json ou fica nulo', () => {
+    expect(normalizarTileset(base)?.token).toBeNull()
+    expect(normalizarTileset({ ...base, token: 'token.png' })?.token).toBe('token.png')
+    expect(normalizarTileset({ ...base, token: 3 })?.token).toBeNull()
+    expect(normalizarTileset({ ...base, token: '' })?.token).toBeNull()
+  })
 })

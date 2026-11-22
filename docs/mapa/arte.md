@@ -233,11 +233,16 @@ A paleta de terrenos do mapa divide os tiles em **pastas** e tem **pesquisa por 
 - **Terreno novo fora da lista:** acrescente primeiro ao catálogo (pasta existente e pelo menos 3 tags, reaproveitando as tags já usadas antes de criar uma nova) e depois ao `tileset.json`. Tag nova só se nenhuma existente serve.
 - A pesquisa ignora acento e maiúsculas, aceita várias palavras (todas precisam casar com o nome, o nome da pasta ou uma tag) e há chips de tag clicáveis, que combinam entre si (o terreno precisa ter todas as tags marcadas).
 
+## 11. Token do grupo, rios e estradas
+
+- **Token:** `app/public/tilesets/pixel/token.png`, 64 × 64, três aventureiros (cavaleiro, maga e ladino) sobre uma base de terra e grama. Gerado com `create_image_pixen` (job `a10b0dcd-cf3e-4794-aad8-ddcd4a66c9ca`), escolhido entre 4 candidatos (bandeira, peão de herói, o grupo e um alfinete de mapa). O alfinete saiu com paisagem de fundo e foi descartado. Para trocar, basta substituir o PNG e manter o nome, ou apontar outro em `token` no `tileset.json`. O sprite é desenhado com a base logo abaixo do centro do hexágono.
+- **Rios e estradas** não são imagens: o mapa os desenha pixel a pixel no estilo da arte (ver o manual). As cores ficam em `desenharLinhasPixel`, em `renderizador.ts`: rio `#1f4f86` (contorno), `#3b86c6` (água), `#79c4ec` (meio) e `#e6f7ff` (brilho), estrada `#4a3520` (contorno), `#c9a56b` (terra), `#e3c98f` e `#8a6a3b` (salpicos).
+
 ## 9. Depois dos 43
 
 - **Transições.** Hoje, onde dois terrenos se encontram há um corte seco na borda do hexágono. O PixelLab tem `tile_feature="tileset"` com `hex_pointy`, que gera um conjunto de 32 tiles de costa que se encaixam (por exemplo grama para água). Vale testar para a costa, que é a emenda mais visível.
 - **Objetos que passam do hexágono.** Montanhas e árvores altas podem ganhar `extra` (pixels a mais no topo da imagem) para os picos subirem por cima do hexágono de cima. Hoje todos ficam dentro do hexágono.
-- **Peças do mapa em pixel art:** o token do grupo e os desenhos de rio e estrada (hoje feitos em canvas) ainda não têm arte em pixel art. Os ícones de marcador já têm, ver a seção 10.
+- **Peças do mapa em pixel art:** os ícones de marcador (seção 10), o token do grupo e os rios e estradas (seção 11) já estão em pixel art.
 
 ## 10. Ícones de marcador
 

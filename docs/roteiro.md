@@ -16,7 +16,8 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Fase 3: rios, estradas, token do grupo e régua
 - [ ] Fase 4: mapa no servidor, papéis, camada privada do mestre e presença (depende da base no PocketBase)
 - [x] Paleta de terrenos com pastas e pesquisa por tag (mínimo 3 tags por terreno)
-- [ ] Arte final dos terrenos em pixel art (PixelLab): 44 de 45 feitos (teste e lotes 1 a 13), guia e lista em `docs/mapa/arte.md`
+- [x] Arte final dos terrenos em pixel art (PixelLab): os 45 terrenos feitos, guia e lista em `docs/mapa/arte.md`
+- [ ] Arte dos ícones de marcador (cidade, castelo, masmorra...) em pixel art, hoje ainda em SVG
 - [ ] Mesa com tokens ligados às fichas e névoa de guerra
 
 ## Servidor (Pedro)

@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Configuração local (pode ter endereços e chaves de cada um)
+.env
+.env.*
+!.env.example

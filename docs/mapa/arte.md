@@ -2,7 +2,7 @@
 
 Guia para quem gera a arte dos terrenos do mapa com o PixelLab (o agente de arte, ou uma pessoa). É autossuficiente: com este arquivo e o `docs/mapa/manual.md` dá para fazer todos os tiles sem perguntar nada. O formato técnico do tileset está no manual, na seção "Tilesets". Aqui está o que desenhar, como pedir ao PixelLab, como conferir e onde guardar.
 
-Estado: **9 de 43 tiles feitos**: água, planície e montanha (teste), lote 1 (`campo`, `colina`, `savana`) e lote 2 (`estepe`, `charneca`, `pomar`). Faltam 34 da lista da seção 7.
+Estado: **12 de 43 tiles feitos**: água, planície e montanha (teste) e os lotes 1 a 3 (`campo`, `colina`, `savana`, `estepe`, `charneca`, `pomar`, `floresta`, `floresta-densa`, `bosque`). Faltam 31 da lista da seção 7.
 
 ## 1. Estilo
 
@@ -61,6 +61,9 @@ Ferramenta: `create_tiles_pro`. Configuração que funcionou:
 
 - Descrever **um objeto só** ("one large acacia tree") faz o PixelLab desenhar o objeto solto, sem chão e sem hexágono. Sempre diga `ground fully covering the whole hexagon`.
 - **Não use `style_images` com `hex_pointy`.** O modo de estilo ignora a forma, devolve `square_topdown` e acrescenta uma laje escura embaixo do hexágono, que não serve para o mapa. O estilo se mantém repetindo no prompt a cor e a luz das âncoras (seção 1).
+- **Florestas e qualquer terreno cheio de árvores:** a descrição "a cluster of tree crowns" gerou copas soltas sem chão (4 de 6 imagens) e, nas florestas densas, um bloco com laterais (laje). O que funcionou foi pedir `flat hexagonal terrain tile, top-down terrain texture completely filled edge to edge with ...` e `flat tile with no thickness and no side walls`. Para terreno com chão e poucas árvores, descreva o chão primeiro (`bright mid-green grass ground completely filling the hexagon edge to edge, with sparse small trees`).
+- Floresta "densa" sem dizer `broadleaf oak and beech, NOT pine trees` sai de pinheiros, e isso se confunde com a taiga. Pinheiros ficam para `taiga`.
+- Cuidado com trilhas: uma variante de bosque saiu com um caminho de pedra de lado a lado e foi descartada, porque o mapa já desenha estradas por cima.
 - Sombras azul-esverdeadas fortes demais fazem relevo parecer lago (aconteceu nas colinas). Peça `gentle darker green shadows`.
 
 Frases de borda e luz que devem aparecer sempre:
@@ -204,7 +207,7 @@ Marque aqui ao aprovar (`[x]`) e anote o job do PixelLab.
 - [x] Teste: `oceano`, `planicie`, `montanha` (2 variantes cada), job `d2d59d22-b0f4-4ed8-96f5-3ff232ecc1e5`
 - [x] Lote 1: `campo` (3 variantes), `colina` (3), `savana` (6). Jobs `8ec2399c-36ab-48e3-b990-04fd7f42799c` (campo), `85eca2ec-a1df-4e09-b0ca-80b536d0ff7e` (colina) e `b623aeb6-9cd0-4937-acb9-d0409fe86a9a` (savana). Pontos fracos: o chão verde do `campo` é liso e as colinas ainda têm pouco relevo
 - [x] Lote 2: `estepe` (5 variantes), `charneca` (5), `pomar` (2). Jobs `561500e6-6639-4cc6-b93c-a78641d30135` (os três) e `1dd001e5-585b-4718-90e5-ebb5f9246a72` (variantes extras de estepe e charneca). Receita que funcionou: pedir os três terrenos e, se algum sair com poucas variantes, uma segunda chamada com descrições do mesmo terreno mudando o detalhe (poça congelada, sem pedras grandes, arbustos amarelos)
-- [ ] Lote 3: `floresta`, `floresta-densa`, `bosque`
+- [x] Lote 3: `floresta` (5 variantes), `floresta-densa` (2), `bosque` (2). Jobs `c198dde2-cc18-4e38-80c5-5e8880f95a4c` e `978b3710-1498-4330-a3de-da0022773c33`. A primeira tentativa (job `e3809673-c29c-48e5-9a98-ddc95b9fc459`) foi descartada. As duas florestas de pinheiros que saíram na primeira rodada (job `c198dde2-...`, imagens 1 e 4) servem de ponto de partida para a `taiga`
 - [ ] Lote 4: `taiga`, `floresta-outono`, `floresta-nevada`
 - [ ] Lote 5: `selva`, `floresta-morta`, `pico-nevado`
 - [ ] Lote 6: `rochoso`, `planalto`, `canion`

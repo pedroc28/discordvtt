@@ -1,9 +1,9 @@
 // Tela do mapa hexagonal: barra de ferramentas, paletas, canvas e painéis.
 // A lógica fica em controlador.ts, renderizador.ts e entrada.ts. Aqui só se junta tudo.
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useAparencia } from '../nucleo/aparencia'
-import { carregarCamera, autorLocal, salvarCamera, metaPadrao, CAMERA_INICIAL } from './armazenamento'
+import { carregarCamera, autorLocal, salvarCamera, metaPadrao, carregarViagem, salvarViagem, carregarPainelAberto, salvarPainelAberto, CAMERA_INICIAL } from './armazenamento'
 import { lerArquivo, nomeDoArquivo, terrenosDesconhecidos, type ArquivoMapa, type ModoImportacao, type ResumoLeitura } from './arquivo'
 import { zoomEm } from './camera'
 import { ControladorMapa, novoId } from './controlador'
@@ -12,6 +12,8 @@ import type { Hex } from './hex'
 import { Icone, type NomeIcone } from './Icones'
 import { InspetorHexagono } from './InspetorHexagono'
 import { PaletaTerrenos } from './PaletaTerrenos'
+import { PainelViagem, type ResultadoDaRota } from './PainelViagem'
+import { resumirViagem, rotaPorPontos, terrenosDaRota, type ConfigViagem } from './viagem'
 import { CORES_REGIAO } from './operacoes'
 import { medirRegua, textoDaMedida } from './regua'
 import { EditorDeRegiao, ListaDeRegioes } from './Regioes'
@@ -52,6 +54,7 @@ const FERRAMENTAS: { id: Ferramenta; rotulo: string; icone: NomeIcone; tecla: st
   { id: 'estrada', rotulo: 'Estrada', icone: 'estrada', tecla: 'D' },
   { id: 'token', rotulo: 'Token', icone: 'token', tecla: 'T' },
   { id: 'regua', rotulo: 'Régua', icone: 'regua', tecla: 'L' },
+  { id: 'rota', rotulo: 'Rota', icone: 'rota', tecla: 'P' },
 ]
 
 const PINCEIS = [
@@ -78,6 +81,7 @@ const NOME_PALETA: Partial<Record<Ferramenta, string>> = {
   estrada: 'Estrada',
   token: 'Token do grupo',
   regua: 'Régua',
+  rota: 'Rota de viagem',
 }
 
 export function MapaHex() {
@@ -114,6 +118,11 @@ export function MapaHex() {
   const [hover, setHover] = useState<Hex | null>(null)
   const [selecionado, setSelecionado] = useState<Hex | null>(null)
   const [zoom, setZoom] = useState(CAMERA_INICIAL.zoom)
+  // Aba lateral de viagem e provisões.
+  const [painelAberto, setPainelAberto] = useState(carregarPainelAberto)
+  const [configViagem, setConfigViagem] = useState<ConfigViagem>(carregarViagem)
+  const [pontosRota, setPontosRota] = useState<Hex[]>([])
+  const [comecarNoToken, setComecarNoToken] = useState(true)
 
   // ----- ações que mexem na seleção e nos painéis -----
   const limparSelecao = useCallback(() => {
@@ -142,6 +151,7 @@ export function MapaHex() {
       if (f === 'pintar' || f === 'apagar' || f === 'regiao' || f === 'rio' || f === 'estrada') limparSelecao()
       if (f !== 'regiao') setRegiaoEditando(null)
       if (f !== 'regua' && motor?.render.regua) motor.render.definirRegua(null)
+      if (f === 'rota') setPainelAberto(true)
     },
     [limparSelecao, motor],
   )
@@ -204,6 +214,13 @@ export function MapaHex() {
         entrada.aoPassar = setHover
         entrada.aoMarcar = (h) => aoMarcarRef.current(h)
         entrada.aoMoverToken = (h) => ctrl.moverToken(h)
+        entrada.aoRota = (h) => {
+          if (!ctrl.armazem.ler(h.q, h.r)) {
+            setAviso('Marque a rota sobre hexágonos que já têm terreno.')
+            return
+          }
+          setPontosRota((ps) => (ps.length && ps[ps.length - 1].q === h.q && ps[ps.length - 1].r === h.r ? ps : [...ps, h]))
+        }
         entrada.aoMudarRegua = () => setVersaoRegua((v) => v + 1)
         entrada.aoSelecionar = (h) => aoSelecionarRef.current(h)
 
@@ -237,7 +254,7 @@ export function MapaHex() {
     () => motor?.ctrl.versaoHistorico ?? 0,
   )
   // Redesenha quando qualquer hexágono muda: o texto de status e a dica de mapa vazio dependem disso.
-  useSyncExternalStore(
+  const versaoMapa = useSyncExternalStore(
     useCallback((cb: () => void) => (motor ? motor.ctrl.armazem.ouvir(() => cb()) : () => {}), [motor]),
     () => motor?.ctrl.armazem.versao ?? 0,
   )
@@ -246,6 +263,39 @@ export function MapaHex() {
     () => motor?.ctrl.token ?? null,
   )
   const total = motor?.ctrl.armazem.total ?? 0
+
+  // ----- viagem: a rota vale para o mapa e o token como estão agora -----
+  const tokenQ = token?.q
+  const tokenR = token?.r
+  const pontosDaRota = useMemo(
+    () => (comecarNoToken && tokenQ !== undefined && tokenR !== undefined ? [{ q: tokenQ, r: tokenR }, ...pontosRota] : pontosRota),
+    [comecarNoToken, tokenQ, tokenR, pontosRota],
+  )
+  const calculoRota = useMemo(() => {
+    if (!motor || pontosDaRota.length < 2) return null
+    // versaoMapa entra na conta de propósito: mudou o terreno, mudou a rota.
+    void versaoMapa
+    return rotaPorPontos(motor.ctrl.armazem, pontosDaRota)
+  }, [motor, pontosDaRota, versaoMapa])
+  const resultadoRota: ResultadoDaRota | null = useMemo(() => {
+    if (!motor || !calculoRota) return null
+    if (!calculoRota.ok) return calculoRota
+    const nomes = new Map(motor.tileset.def.terrenos.map((t) => [t.id, t.nome]))
+    return {
+      ok: true,
+      resumo: resumirViagem(calculoRota.rota, configViagem),
+      terrenos: terrenosDaRota(motor.ctrl.armazem, calculoRota.rota).map((t) => ({ ...t, nome: nomes.get(t.terreno) ?? t.terreno })),
+      pontos: pontosDaRota.length,
+    }
+  }, [motor, calculoRota, configViagem, pontosDaRota.length])
+  useEffect(() => {
+    if (!motor) return
+    motor.render.definirRota(
+      pontosDaRota.length ? { pontos: pontosDaRota, caminho: calculoRota?.ok ? calculoRota.rota.caminho : [] } : null,
+    )
+  }, [motor, pontosDaRota, calculoRota])
+  useEffect(() => salvarViagem(configViagem), [configViagem])
+  useEffect(() => salvarPainelAberto(painelAberto), [painelAberto])
   const versaoRegioes = useSyncExternalStore(
     useCallback((cb: () => void) => (motor ? motor.ctrl.armazem.ouvirRegioes(cb) : () => {}), [motor]),
     () => motor?.ctrl.armazem.versaoRegioes ?? 0,
@@ -410,6 +460,7 @@ export function MapaHex() {
       else if (k === 'd') escolherFerramenta('estrada')
       else if (k === 't') escolherFerramenta('token')
       else if (k === 'l') escolherFerramenta('regua')
+      else if (k === 'p') escolherFerramenta('rota')
       else if (k === 'g') setGrade((g) => !g)
       else if (k === '[') setRaio((r) => Math.max(0, r - 1))
       else if (k === ']') setRaio((r) => Math.min(2, r + 1))
@@ -513,6 +564,9 @@ export function MapaHex() {
           </button>
         </div>
         <div className="grupo-botoes">
+          <button type="button" className="botao-icone" title="Aba de viagem e provisões" aria-label="Aba de viagem e provisões" aria-pressed={painelAberto} onClick={() => setPainelAberto((v) => !v)}>
+            <Icone nome="lateral" />
+          </button>
           <button type="button" className="botao-icone" title="Exportar o mapa para um arquivo" aria-label="Exportar mapa" disabled={!motor || ocupado} onClick={exportarMapa}>
             <Icone nome="baixar" />
           </button>
@@ -561,6 +615,18 @@ export function MapaHex() {
               </button>
               <button type="button" className="botao-topo" disabled={!token} onClick={() => motor?.ctrl.tirarToken()}>
                 Tirar o token
+              </button>
+            </div>
+          ) : ferramenta === 'rota' ? (
+            <div className="mapa-ferramenta">
+              <p className="mapa-painel__dica">
+                Toque nos hexágonos na ordem da viagem. O caminho mais barato entre os pontos aparece tracejado, e a duração e as provisões ficam na aba lateral.
+              </p>
+              <button type="button" className="botao-topo" disabled={pontosRota.length === 0} onClick={() => setPontosRota((ps) => ps.slice(0, -1))}>
+                Tirar o último ponto
+              </button>
+              <button type="button" className="botao-topo" disabled={pontosRota.length === 0} onClick={() => setPontosRota([])}>
+                Limpar a rota
               </button>
             </div>
           ) : ferramenta === 'regua' ? (
@@ -667,6 +733,22 @@ export function MapaHex() {
           <InspetorHexagono key={`${selecionado.q},${selecionado.r}`} ctrl={motor.ctrl} tileset={motor.tileset} hex={selecionado} aoFechar={limparSelecao} />
         )}
         {motor && regiaoEditando && <EditorDeRegiao key={regiaoEditando} ctrl={motor.ctrl} id={regiaoEditando} aoFechar={() => setRegiaoEditando(null)} />}
+
+        <PainelViagem
+          aberto={painelAberto}
+          aoAlternar={() => setPainelAberto((v) => !v)}
+          config={configViagem}
+          aoMudarConfig={setConfigViagem}
+          rota={resultadoRota}
+          pontosMarcados={pontosRota.length}
+          rotaAtiva={ferramenta === 'rota'}
+          aoMarcarRota={() => escolherFerramenta('rota')}
+          aoDesfazerPonto={() => setPontosRota((ps) => ps.slice(0, -1))}
+          aoLimparRota={() => setPontosRota([])}
+          comecarNoToken={comecarNoToken}
+          aoMudarComecarNoToken={setComecarNoToken}
+          temToken={!!token}
+        />
       </div>
     </div>
   )

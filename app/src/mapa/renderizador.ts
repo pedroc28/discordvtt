@@ -65,6 +65,10 @@ export class Renderizador {
   previa: Previa | null = null
   /** Aresta que a ferramenta Rio vai pegar no próximo toque. */
   previaAresta: Aresta | null = null
+  /** Onde o token vai cair enquanto alguém o arrasta. Null se ninguém está arrastando. */
+  tokenFantasma: Hex | null = null
+  /** Rota de viagem em andamento: os pontos marcados e o caminho calculado entre eles. Só local. */
+  rota: { pontos: Hex[]; caminho: Hex[] } | null = null
   /** Régua em andamento. Só local. */
   regua: Regua | null = null
   /** Onde o cursor está enquanto a régua só tem o primeiro ponto. */
@@ -155,6 +159,16 @@ export class Renderizador {
 
   definirCores(cores: CoresMapa) {
     this.cores = cores
+    this.pedirQuadro()
+  }
+
+  definirFantasmaToken(h: Hex | null) {
+    this.tokenFantasma = h
+    this.pedirQuadro()
+  }
+
+  definirRota(rota: { pontos: Hex[]; caminho: Hex[] } | null) {
+    this.rota = rota
     this.pedirQuadro()
   }
 
@@ -346,7 +360,8 @@ export class Renderizador {
     // 6. rótulos das regiões
     if (this.mostrarRegioes) this.desenharRotulos(lim, z)
 
-    // 7. régua
+    // 7. rota de viagem e régua
+    this.desenharRota(z)
     this.desenharRegua(z)
 
     // 8. prévia do pincel
@@ -609,9 +624,64 @@ export class Renderizador {
   }
 
   /** Alfinete framboesa com a ponta no centro do hexágono onde o grupo está. */
+  /** Linha tracejada pelo caminho da rota, com um selo numerado em cada ponto marcado. */
+  private desenharRota(z: number) {
+    const rota = this.rota
+    if (!rota || !rota.pontos.length) return
+    const { ctx, R } = this
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+    if (rota.caminho.length > 1) {
+      const pts = rota.caminho.map((h) => hexParaPixel(h, R))
+      ctx.setLineDash([R * 0.22, R * 0.16])
+      for (const [cor, largura] of [['#1a1a1a', 6], ['#ff8a1f', 3]] as const) {
+        ctx.strokeStyle = cor
+        ctx.lineWidth = largura / z
+        ctx.beginPath()
+        ctx.moveTo(pts[0].x, pts[0].y)
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
+        ctx.stroke()
+      }
+      ctx.setLineDash([])
+    }
+    const raio = Math.max(R * 0.14, 9 / z)
+    ctx.font = `800 ${raio * 1.2}px ${FONTE}`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    rota.pontos.forEach((h, i) => {
+      const { x, y } = hexParaPixel(h, R)
+      ctx.fillStyle = '#ff8a1f'
+      ctx.strokeStyle = '#1a1a1a'
+      ctx.lineWidth = 2 / z
+      ctx.beginPath()
+      ctx.arc(x, y, raio, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+      ctx.fillStyle = '#1a1a1a'
+      ctx.fillText(String(i + 1), x, y + raio * 0.05)
+    })
+  }
+
+  /** Desenha o token do grupo. Enquanto alguém o arrasta, o lugar de origem fica apagado e a peça aparece no destino. */
   private desenharToken(z: number) {
     const t = this.ctrl.token
-    if (!t) return
+    const f = this.tokenFantasma
+    if (f) {
+      if (t) this.desenharPeca(z, t, 0.35)
+      this.desenharPeca(z, f, 0.95)
+    } else if (t) {
+      this.desenharPeca(z, t, 1)
+    }
+  }
+
+  private desenharPeca(z: number, t: Hex, alfa: number) {
+    const { ctx } = this
+    ctx.globalAlpha = alfa
+    this.desenharFormaDoToken(z, t)
+    ctx.globalAlpha = 1
+  }
+
+  private desenharFormaDoToken(z: number, t: Hex) {
     const { ctx, R } = this
     const { x, y } = hexParaPixel(t, R)
     const sprite = this.tileset.imagemToken()

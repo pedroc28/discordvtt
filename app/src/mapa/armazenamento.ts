@@ -4,6 +4,7 @@
 import type { Camera } from './camera'
 import { limitarZoom } from './camera'
 import type { Hexagono, MapaMeta, Marcador, Regiao, TokenGrupo } from './tipos'
+import { normalizarConfig, type ConfigViagem } from './viagem'
 
 type Obj = Record<string, unknown>
 const ehObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -105,6 +106,24 @@ export function autorLocal(): string {
   }
   return id
 }
+
+const CHAVE_VIAGEM = 'mapa:viagem'
+const CHAVE_PAINEL = 'mapa:painel-viagem'
+
+/** Ajustes do painel de viagem e provisões, guardados neste navegador. */
+export function carregarViagem(): ConfigViagem {
+  try {
+    return normalizarConfig(JSON.parse(ler(CHAVE_VIAGEM) ?? 'null'))
+  } catch {
+    return normalizarConfig(null)
+  }
+}
+
+export const salvarViagem = (c: ConfigViagem) => gravar(CHAVE_VIAGEM, JSON.stringify(c))
+
+/** O painel de viagem começa aberto, e o app lembra se a pessoa o recolheu. */
+export const carregarPainelAberto = () => ler(CHAVE_PAINEL) !== 'fechado'
+export const salvarPainelAberto = (aberto: boolean) => gravar(CHAVE_PAINEL, aberto ? 'aberto' : 'fechado')
 
 export const CAMERA_INICIAL: Camera = { x: 0, y: 0, zoom: 0.6 }
 

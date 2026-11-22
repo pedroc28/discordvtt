@@ -2,7 +2,7 @@
 
 Guia para quem gera a arte dos terrenos do mapa com o PixelLab (o agente de arte, ou uma pessoa). É autossuficiente: com este arquivo e o `docs/mapa/manual.md` dá para fazer todos os tiles sem perguntar nada. O formato técnico do tileset está no manual, na seção "Tilesets". Aqui está o que desenhar, como pedir ao PixelLab, como conferir e onde guardar.
 
-Estado: **12 de 43 tiles feitos**: água, planície e montanha (teste) e os lotes 1 a 3 (`campo`, `colina`, `savana`, `estepe`, `charneca`, `pomar`, `floresta`, `floresta-densa`, `bosque`). Faltam 31 da lista da seção 7.
+Estado: **15 de 43 tiles feitos**: água, planície e montanha (teste) e os lotes 1 a 4 (`campo`, `colina`, `savana`, `estepe`, `charneca`, `pomar`, `floresta`, `floresta-densa`, `bosque`, `taiga`, `floresta-outono`, `floresta-nevada`). Faltam 28 da lista da seção 7.
 
 ## 1. Estilo
 
@@ -208,7 +208,7 @@ Marque aqui ao aprovar (`[x]`) e anote o job do PixelLab.
 - [x] Lote 1: `campo` (3 variantes), `colina` (3), `savana` (6). Jobs `8ec2399c-36ab-48e3-b990-04fd7f42799c` (campo), `85eca2ec-a1df-4e09-b0ca-80b536d0ff7e` (colina) e `b623aeb6-9cd0-4937-acb9-d0409fe86a9a` (savana). Pontos fracos: o chão verde do `campo` é liso e as colinas ainda têm pouco relevo
 - [x] Lote 2: `estepe` (5 variantes), `charneca` (5), `pomar` (2). Jobs `561500e6-6639-4cc6-b93c-a78641d30135` (os três) e `1dd001e5-585b-4718-90e5-ebb5f9246a72` (variantes extras de estepe e charneca). Receita que funcionou: pedir os três terrenos e, se algum sair com poucas variantes, uma segunda chamada com descrições do mesmo terreno mudando o detalhe (poça congelada, sem pedras grandes, arbustos amarelos)
 - [x] Lote 3: `floresta` (5 variantes), `floresta-densa` (2), `bosque` (2). Jobs `c198dde2-cc18-4e38-80c5-5e8880f95a4c` e `978b3710-1498-4330-a3de-da0022773c33`. A primeira tentativa (job `e3809673-c29c-48e5-9a98-ddc95b9fc459`) foi descartada. As duas florestas de pinheiros que saíram na primeira rodada (job `c198dde2-...`, imagens 1 e 4) servem de ponto de partida para a `taiga`
-- [ ] Lote 4: `taiga`, `floresta-outono`, `floresta-nevada`
+- [x] Lote 4: `taiga` (2 variantes), `floresta-outono` (2), `floresta-nevada` (2). Job `f600b8f5-93cb-4457-ab3c-064415f2426c`, uma chamada só (15 gerações), usando a receita de floresta do lote 3. Ponto fraco: o outono mostra uma fina borda escura nas arestas de baixo, que desenha o contorno do hexágono quando há muitos juntos
 - [ ] Lote 5: `selva`, `floresta-morta`, `pico-nevado`
 - [ ] Lote 6: `rochoso`, `planalto`, `canion`
 - [ ] Lote 7: `vulcao`, `campo-de-lava`, `deserto`

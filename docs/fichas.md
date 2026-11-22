@@ -16,7 +16,7 @@ Tudo roda no navegador e salva no `localStorage` por enquanto. A área está **c
 - Exportar e importar modelo e personagem em JSON
 - Modo escuro (Sistema, Claro ou Escuro). A folha também escurece trocando papel e tinta do modelo, com opção de manter a folha clara
 
-Tipos de campo: texto, texto longo (com linhas de caderno opcionais), número, atual/máximo (no estilo 19/20, com barra e botões − e +, ou no estilo barra de vida dividida em partes), relógio do Apocalypse World (ou com partes iguais), caixa de marcar, marcadores (espaços de magia, testes contra a morte), lista de opções, tabela com colunas configuráveis, imagem, texto fixo e moldura.
+Tipos de campo: texto, texto longo (com linhas de caderno opcionais), número, atual/máximo (no estilo 19/20, com barra e botões − e +, ou no estilo barra de vida dividida em partes), relógio do Apocalypse World (ou com partes iguais), marcação (sim ou não), marcadores (espaços de magia, testes contra a morte), lista de opções, tabela com colunas configuráveis, imagem, texto fixo e moldura.
 
 ## Organização
 

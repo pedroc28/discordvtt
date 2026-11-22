@@ -5,10 +5,11 @@
 //   RepositorioLocal    IndexedDB do navegador, com aviso entre abas (ver repositorio-local.ts)
 // Na etapa do servidor entra uma terceira, que fala com o PocketBase, e nada acima muda.
 
-import type { Hexagono, Lote, Mudanca, MudancaRegiao, Regiao } from './tipos'
+import type { Hexagono, Lote, Mudanca, MudancaRegiao, Regiao, TokenGrupo } from './tipos'
 import { chave, chaveChunk } from './hex'
 
 export type OuvinteLote = (lote: Lote) => void
+export type OuvinteToken = (token: TokenGrupo | null) => void
 
 export interface RepositorioMapa {
   /** Hexágonos de um chunk. Chunk que ninguém construiu devolve lista vazia. */
@@ -19,6 +20,13 @@ export interface RepositorioMapa {
   aplicar(lote: Lote): Promise<void>
   /** Recebe lotes feitos por outros clientes. Retorna a função que cancela. */
   assinar(ouvinte: OuvinteLote): () => void
+  // O token do grupo é opcional: sem estes três métodos ele vive só na memória deste cliente.
+  /** Posição atual do token do grupo, ou null se não há. */
+  carregarToken?(): Promise<TokenGrupo | null>
+  /** Grava a posição do token (null tira o token). Vale o mais recente. Avisa os outros clientes. */
+  gravarToken?(token: TokenGrupo | null): Promise<void>
+  /** Recebe o token gravado por outros clientes. Retorna a função que cancela. */
+  assinarToken?(ouvinte: OuvinteToken): () => void
 }
 
 /** Aplica as mudanças de hexágonos de um lote a um mapa de chunks. Compartilhado pelas implementações. */
@@ -44,6 +52,8 @@ export class RepositorioMemoria implements RepositorioMapa {
   private chunks = new Map<string, Map<string, Hexagono>>()
   private regioes = new Map<string, Regiao>()
   private ouvintes = new Set<OuvinteLote>()
+  private ouvintesToken = new Set<OuvinteToken>()
+  private token: TokenGrupo | null = null
   private atraso: number
 
   /** Atraso artificial em ms, para simular rede nos testes. */
@@ -75,5 +85,21 @@ export class RepositorioMemoria implements RepositorioMapa {
   assinar(ouvinte: OuvinteLote): () => void {
     this.ouvintes.add(ouvinte)
     return () => this.ouvintes.delete(ouvinte)
+  }
+
+  async carregarToken(): Promise<TokenGrupo | null> {
+    await this.esperar()
+    return this.token ? { ...this.token } : null
+  }
+
+  async gravarToken(token: TokenGrupo | null): Promise<void> {
+    await this.esperar()
+    this.token = token ? { ...token } : null
+    for (const o of [...this.ouvintesToken]) o(token ? { ...token } : null)
+  }
+
+  assinarToken(ouvinte: OuvinteToken): () => void {
+    this.ouvintesToken.add(ouvinte)
+    return () => this.ouvintesToken.delete(ouvinte)
   }
 }

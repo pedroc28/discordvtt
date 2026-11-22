@@ -2,10 +2,10 @@
 // as outras abas do mesmo mapa, que se comportam como outros jogadores. Isso já exercita
 // o caminho de sincronização (lote recebido de outro cliente) antes de existir servidor.
 
-import { normalizarHexagono, normalizarRegiao } from './armazenamento'
-import { aplicarNosChunks, aplicarNasRegioes, type OuvinteLote, type RepositorioMapa } from './repositorio'
+import { normalizarHexagono, normalizarRegiao, normalizarToken } from './armazenamento'
+import { aplicarNosChunks, aplicarNasRegioes, type OuvinteLote, type OuvinteToken, type RepositorioMapa } from './repositorio'
 import { chaveChunk } from './hex'
-import type { Hexagono, Lote, Regiao } from './tipos'
+import type { Hexagono, Lote, Regiao, TokenGrupo } from './tipos'
 
 const NOME_BANCO = 'discordvtt-mapa'
 const LOJA = 'chunks'
@@ -36,10 +36,18 @@ interface RegistroRegioes {
   regioes: Regiao[]
 }
 
+/** O token do grupo também é um registro só. */
+interface RegistroToken {
+  id: string
+  token: TokenGrupo | null
+}
+
 export class RepositorioLocal implements RepositorioMapa {
   private banco: Promise<IDBDatabase> | null = null
   private ouvintes = new Set<OuvinteLote>()
   private canal: BroadcastChannel | null = null
+  private canalToken: BroadcastChannel | null = null
+  private ouvintesToken = new Set<OuvinteToken>()
   private mapaId: string
 
   constructor(mapaId: string) {
@@ -48,6 +56,12 @@ export class RepositorioLocal implements RepositorioMapa {
       this.canal = new BroadcastChannel(`discordvtt-mapa:${mapaId}`)
       this.canal.onmessage = (e: MessageEvent<Lote>) => {
         for (const o of [...this.ouvintes]) o(e.data)
+      }
+      // Canal à parte: o do mapa só carrega lotes.
+      this.canalToken = new BroadcastChannel(`discordvtt-mapa:${mapaId}:token`)
+      this.canalToken.onmessage = (e: MessageEvent<TokenGrupo | null>) => {
+        const token = normalizarToken(e.data)
+        for (const o of [...this.ouvintesToken]) o(token)
       }
     }
   }
@@ -62,6 +76,10 @@ export class RepositorioLocal implements RepositorioMapa {
 
   private idRegioes() {
     return `${this.mapaId}|regioes`
+  }
+
+  private idToken() {
+    return `${this.mapaId}|token`
   }
 
   async carregarChunk(chaveDoChunk: string): Promise<Hexagono[]> {
@@ -118,7 +136,34 @@ export class RepositorioLocal implements RepositorioMapa {
     return () => this.ouvintes.delete(ouvinte)
   }
 
+  async carregarToken(): Promise<TokenGrupo | null> {
+    const db = await this.db()
+    const reg = await pedido<RegistroToken | undefined>(
+      db.transaction(LOJA, 'readonly').objectStore(LOJA).get(this.idToken()),
+    )
+    return normalizarToken(reg?.token)
+  }
+
+  async gravarToken(token: TokenGrupo | null): Promise<void> {
+    const db = await this.db()
+    const tx = db.transaction(LOJA, 'readwrite')
+    const concluida = new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+      tx.onabort = () => reject(tx.error ?? new Error('Gravação cancelada'))
+    })
+    tx.objectStore(LOJA).put({ id: this.idToken(), token } satisfies RegistroToken)
+    await concluida
+    this.canalToken?.postMessage(token)
+  }
+
+  assinarToken(ouvinte: OuvinteToken): () => void {
+    this.ouvintesToken.add(ouvinte)
+    return () => this.ouvintesToken.delete(ouvinte)
+  }
+
   fechar() {
     this.canal?.close()
+    this.canalToken?.close()
   }
 }

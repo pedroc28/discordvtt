@@ -2,7 +2,7 @@
 
 Registro do projeto do mapa hexagonal infinito e compartilhado do DiscordVtt. Serve para quem chegar depois (inclusive nós dois, daqui a umas semanas) entender de onde saímos, o que existe, por que foi feito assim e o que falta.
 
-Última atualização: 21/11/2026. Estado: **fases 0, 1 e 2 prontas** e enviadas ao GitHub. Fases 3 e 4 pendentes.
+Última atualização: 22/11/2026. Estado: **fases 0, 1, 2 e 3 prontas**. Fase 4 pendente.
 
 Para o detalhe técnico do código (padrões, fluxo de uma edição, formato do tileset, como ligar o servidor), leia [`manual.md`](manual.md). Este documento é o **diário e o mapa do caminho**; aquele é o **manual do módulo**.
 
@@ -59,11 +59,20 @@ Mudanças em relação ao plano inicial, decididas durante a construção:
 - Texto digitado (nome, nota, descrição) só grava ao parar de digitar, e edições seguidas viram um passo só no desfazer.
 - 62 testes.
 
+### Fase 3: rios, estradas, token do grupo e régua (branch `mapa/fase-3`)
+
+- **Rios e estradas** pelas arestas, guardados no hexágono dono (decisão: ver `docs/decisoes.md`). Ferramentas Rio e Estrada, com modo "Tirar". O rio vai pela borda do hexágono, a estrada liga os centros. Só liga onde os dois hexágonos existem. Uma risca é um passo no desfazer.
+- **Token do grupo:** alfinete framboesa que qualquer jogador leva a um hexágono com a ferramenta Token. Fora do desfazer, vale o mais recente, sincroniza entre abas. O `RepositorioMapa` ganhou três métodos opcionais, então nada quebra para quem não os implementa.
+- **Régua de distância** local, em hexágonos, com linha tracejada, hexágonos do caminho marcados e etiqueta com a distância.
+- `Hexagono` ganhou `rios` e `estradas`. Dados antigos continuam válidos (lista vazia).
+- 89 testes (27 novos).
+
 ## 4. Como foi verificado
 
 - **Automático:** `npm test` (62 testes), `npx tsc -b`, `npx oxlint` e `npm run build` passam nas duas branches.
 - **No navegador, fase 1:** pintar, desfazer, pincel de 7, zoom, arrastar, selecionar, persistência depois de recarregar, layout de celular e **duas abas sincronizando**.
 - **No navegador, fase 2:** criar e renomear região, trocar cor, pintar região, colocar marcador, nome e nota, persistência depois de recarregar, painel que sobe da base no celular.
+- **No navegador, fase 3:** desenhar rio e estrada arrastando, levar o token, medir com a régua, persistência depois de recarregar (rios, estradas e token voltam) e a paleta no celular emulado. **Não conferido à mão:** o token sincronizando entre duas abas (coberto por testes automáticos) e rio e estrada com toque real.
 - **Não conferido à mão na fase 2:** a sincronia entre duas abas com regiões e marcadores. Ela é coberta por testes automáticos (dois clientes no mesmo repositório), mas ninguém testou clicando. Vale fazer uma vez.
 - **Nunca testado:** celular de verdade (toque real, pinça real). Só a emulação do navegador.
 
@@ -84,18 +93,9 @@ Mudanças em relação ao plano inicial, decididas durante a construção:
 
 ## 7. Próximos passos
 
-### Fase 3: rios, estradas, token do grupo e régua
+### Fase 3: feita
 
-Não depende de servidor.
-
-1. **Rios e estradas.** A matemática de arestas já existe e está testada (`arestaCanonica`: só leste, sudeste e sudoeste "são donos" da aresta). Falta decidir **onde guardar**:
-   - *Dentro do hexágono dono* (um campo novo, como o dos marcadores): simples e já funciona com lotes e desfazer, mas só existe se o hexágono dono existir.
-   - *Lista global de segmentos* (como as regiões): independe dos hexágonos, mas precisa de carregamento próprio e de um destino claro quando o hexágono é apagado.
-   - Recomendação: dentro do hexágono dono, pelo mesmo motivo dos marcadores. Confirmar com vocês antes de começar.
-   - Desenho: rio pela borda do hexágono, estrada ligando os centros. Ferramenta nova na barra, com pincel de traço.
-2. **Token do grupo.** Um marcador de posição do grupo, movido no mapa e visível para todos. É estado pequeno e muito mutável, melhor numa coleção própria que não entra no histórico de desfazer.
-3. **Régua.** Mede a distância em hexágonos entre dois pontos (`distancia` e `linha` já existem). Pode começar só local, sem sincronizar.
-4. Testes, documentação e conferir no navegador, como nas fases anteriores.
+Ver a seção 3. Ideias que ficaram para depois: arrastar o token em vez de tocar, nome e cor do token, vários tokens, rio e estrada com curvas, régua com custo de terreno e conversão para quilômetros.
 
 ### Fase 4: servidor (depende da base do projeto)
 
@@ -119,15 +119,14 @@ Depende de seu amigo montar o PocketBase, o login e os papéis por mesa (mestre 
 
 ## 8. Perguntas em aberto
 
-1. **Rios e estradas:** guardar dentro do hexágono dono ou numa lista global? (Seção 7, fase 3.)
-2. **Quando começa o PocketBase?** A fase 4 só anda depois do login e dos papéis por mesa.
-3. **Arte final:** quem faz, em que formato e quando? Define o que precisamos preparar no tileset (mais variantes, `extra` maior, ícones).
-4. **Mestre:** o que exatamente é privado? Só nota e hexágonos ocultos, ou também regiões e marcadores?
+1. **Quando começa o PocketBase?** A fase 4 só anda depois do login e dos papéis por mesa.
+2. **Arte final:** quem faz, em que formato e quando? Define o que precisamos preparar no tileset (mais variantes, `extra` maior, ícones).
+3. **Mestre:** o que exatamente é privado? Só nota e hexágonos ocultos, ou também regiões e marcadores?
 
 ## 9. Como retomar
 
-- **Branches:** `main` (editor de fichas) ‹ `mapa-hexagonal` (fases 0 e 1) ‹ `mapa-fase-2` (fase 2). Cada uma contém a anterior. Abra o PR da `mapa-fase-2` para a `main`.
+- **Fluxo:** cada tarefa vira uma branch `mapa/<nome>` criada por `scripts/comecar.sh` e entregue por `scripts/entregar.sh`. As regras estão no `CLAUDE.md` da raiz.
 - **Rodar:** `cd app`, `npm install`, `npm run dev`. Testes: `npm test`. Verificação completa: `npm run build` (inclui tipos) e `npx oxlint`.
 - **Regerar a arte padrão:** `npm run tileset`.
-- **Onde mexer sem conflito:** tudo do mapa fica em `app/src/mapa/`. Os únicos arquivos fora dessa pasta que foram tocados são `App.tsx`, `main.tsx`, `vite.config.ts`, `package.json` e o README da raiz. `app/src/ficha/` não foi alterada.
+- **Onde mexer:** tudo do mapa fica em `app/src/mapa/`, `app/public/tilesets/`, `app/tools/gerar-tileset.mjs` e `docs/mapa/`.
 - **Testando o mapa no navegador:** em desenvolvimento, `window.__mapa` expõe o controlador, o renderizador e o tileset no console.

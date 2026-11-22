@@ -166,3 +166,54 @@ export function ladosDaAresta(a: Aresta): [Hex, Hex] {
     vizinho({ q: a.q, r: a.r }, a.d),
   ]
 }
+
+/** Aresta do hexágono `h` cujo ponto médio está mais perto do ponto (x, y) do mundo. Serve ao desenho de rios. */
+export function arestaMaisProxima(x: number, y: number, R: number): Aresta {
+  const h = pixelParaHex(x, y, R)
+  const c = hexParaPixel(h, R)
+  const cs = cantos(R)
+  let melhor = 0
+  let menor = Infinity
+  for (let i = 0; i < 6; i++) {
+    const a = cs[i]
+    const b = cs[(i + 1) % 6]
+    const d = Math.hypot(x - (c.x + (a.x + b.x) / 2), y - (c.y + (a.y + b.y) / 2))
+    if (d < menor) {
+      menor = d
+      melhor = i
+    }
+  }
+  return arestaCanonica(h, melhor)
+}
+
+/**
+ * Arestas por onde passa um traço de `de` até `ate` (pontos do mundo), sem repetir.
+ * Amostra o trajeto em passos curtos para um traço rápido não deixar buracos.
+ */
+export function arestasEntrePontos(de: { x: number; y: number } | null, ate: { x: number; y: number }, R: number): Aresta[] {
+  const saida = new Map<string, Aresta>()
+  const dist = de ? Math.hypot(ate.x - de.x, ate.y - de.y) : 0
+  const passos = Math.max(1, Math.ceil(dist / (R / 3)))
+  for (let i = 0; i <= passos; i++) {
+    const t = i / passos
+    const x = de ? de.x + (ate.x - de.x) * t : ate.x
+    const y = de ? de.y + (ate.y - de.y) * t : ate.y
+    const a = arestaMaisProxima(x, y, R)
+    saida.set(chaveAresta(a), a)
+  }
+  return [...saida.values()]
+}
+
+/** Arestas entre hexágonos vizinhos consecutivos de um caminho. Pares que não são vizinhos são ignorados. */
+export function arestasDoCaminho(hexes: readonly Hex[]): Aresta[] {
+  const saida = new Map<string, Aresta>()
+  for (let i = 1; i < hexes.length; i++) {
+    const a = hexes[i - 1]
+    const b = hexes[i]
+    const d = DIRECOES.findIndex((v) => a.q + v.q === b.q && a.r + v.r === b.r)
+    if (d < 0) continue
+    const aresta = arestaCanonica(a, d)
+    saida.set(chaveAresta(aresta), aresta)
+  }
+  return [...saida.values()]
+}

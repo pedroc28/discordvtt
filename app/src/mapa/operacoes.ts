@@ -2,7 +2,7 @@
 // Quem aplica (e envia, e guarda para desfazer) é o controlador.
 
 import type { Hex } from './hex'
-import { chave } from './hex'
+import { arestaCanonica, chave, ladosDaAresta, type Aresta } from './hex'
 import type {
   Hexagono,
   Leitor,
@@ -17,7 +17,7 @@ import type {
 // ---------- hexágonos ----------
 
 export function hexagonoNovo(q: number, r: number, terreno: string): Hexagono {
-  return { q, r, terreno, regiaoId: null, nome: '', nota: '', marcadores: [], rev: 1 }
+  return { q, r, terreno, regiaoId: null, nome: '', nota: '', marcadores: [], rios: [], estradas: [], rev: 1 }
 }
 
 /** Pinta o terreno. Em hexágono que já existe só troca o terreno e mantém nome, nota, região e marcadores. */
@@ -71,6 +71,43 @@ export function mudancaEditarHexagono(leitor: Leitor, q: number, r: number, patc
   if (!mudou) return null
   depois.rev = antes.rev + 1
   return { q, r, antes, depois }
+}
+
+// ---------- rios e estradas ----------
+
+export type CampoAresta = 'rios' | 'estradas'
+
+/**
+ * Liga (ou tira, com `ligar` falso) rios ou estradas nas arestas. O dado mora no hexágono dono da aresta.
+ * Para ligar, os dois hexágonos que a aresta separa precisam existir: rio e estrada sem terreno dos
+ * dois lados ficariam soltos. Tirar é sempre permitido, para limpar o que sobrou se um lado foi apagado.
+ */
+export function mudancasArestas(leitor: Leitor, arestas: readonly Aresta[], campo: CampoAresta, ligar: boolean): Mudanca[] {
+  const porDono = new Map<string, { antes: Hexagono; dirs: Set<number> }>()
+  for (const bruta of arestas) {
+    const a = arestaCanonica(bruta, bruta.d)
+    const k = chave(a.q, a.r)
+    let item = porDono.get(k)
+    if (!item) {
+      const dono = leitor.ler(a.q, a.r)
+      if (!dono) continue
+      item = { antes: dono, dirs: new Set(dono[campo]) }
+      porDono.set(k, item)
+    }
+    if (ligar) {
+      const outro = ladosDaAresta(a)[1]
+      if (leitor.ler(outro.q, outro.r)) item.dirs.add(a.d)
+    } else {
+      item.dirs.delete(a.d)
+    }
+  }
+  const saida: Mudanca[] = []
+  for (const { antes, dirs } of porDono.values()) {
+    const novas = [...dirs].sort()
+    if (igual(novas, antes[campo])) continue
+    saida.push({ q: antes.q, r: antes.r, antes, depois: { ...antes, [campo]: novas, rev: antes.rev + 1 } })
+  }
+  return saida
 }
 
 // ---------- regiões ----------

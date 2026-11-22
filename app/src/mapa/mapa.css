@@ -522,3 +522,41 @@
     min-width: 40px;
   }
 }
+
+/* ---------- ferramentas de rio, estrada, token e régua ---------- */
+
+.mapa-ferramenta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.mapa-ferramenta .modo button {
+  flex: 1;
+}
+
+.mapa-ferramenta__medida {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .mapa-ferramenta {
+    flex-direction: row;
+    align-items: center;
+    flex: none;
+  }
+
+  .mapa-ferramenta .mapa-painel__dica {
+    flex: none;
+    max-width: 230px;
+  }
+
+  .mapa-ferramenta .botao-topo {
+    flex: none;
+  }
+}

@@ -38,9 +38,15 @@ interface RepositorioMapa {
   carregarChunk(chaveDoChunk: string): Promise<Hexagono[]>
   aplicar(lote: Lote): Promise<void>
   assinar(ouvinte: (lote: Lote) => void): () => void
+  // Opcionais: sem eles o token do grupo vive só na memória de cada cliente.
+  carregarToken?(): Promise<TokenGrupo | null>
+  gravarToken?(token: TokenGrupo | null): Promise<void>
+  assinarToken?(ouvinte: (token: TokenGrupo | null) => void): () => void
 }
 ```
 
+- `Hexagono` tem `rios: number[]` e `estradas: number[]`: direções de aresta 0 (leste), 1 (sudeste) e 2 (sudoeste) em que há rio ou estrada saindo daquele hexágono. A aresta pertence ao hexágono dono (`arestaCanonica`). Dado antigo sem os campos vale como lista vazia.
+- `TokenGrupo` é `{ q, r, ts, autor }`. Vale o `ts` mais recente. Não passa por `aplicar` nem entra no desfazer.
 - O servidor implementa `RepositorioPocketBase` em `app/src/servidor/`.
 - `aplicar` é atômico por lote. `assinar` entrega lotes de outros clientes, e o próprio eco é ignorado pelo `id` do lote.
 - A ordem em que os lotes chegam do servidor é a verdade.

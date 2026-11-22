@@ -8,14 +8,17 @@
 
 import { arrastar, zoomEm } from './camera'
 import type { ControladorMapa, Traco } from './controlador'
-import { disco, linha, mesmoHex, type Hex } from './hex'
+import { arestasDoCaminho, arestasEntrePontos, disco, linha, mesmoHex, type Hex } from './hex'
 import type { Renderizador } from './renderizador'
+import { tocarRegua } from './regua'
 
 /**
- * Pintar, Apagar e Região usam o pincel (arrastando). Navegar e Marcador movem o mapa arrastando
- * e agem num toque rápido: Navegar seleciona o hexágono, Marcador coloca um marcador nele.
+ * Pintar, Apagar e Região usam o pincel (arrastando). Rio e Estrada também riscam arrastando, mas por
+ * arestas. Navegar, Marcador, Token e Régua movem o mapa arrastando e agem num toque rápido: Navegar
+ * seleciona o hexágono, Marcador coloca um marcador nele, Token leva o token do grupo até ele e
+ * Régua marca o início e o fim da medida.
  */
-export type Ferramenta = 'navegar' | 'pintar' | 'apagar' | 'regiao' | 'marcador'
+export type Ferramenta = 'navegar' | 'pintar' | 'apagar' | 'regiao' | 'marcador' | 'rio' | 'estrada' | 'token' | 'regua'
 
 export interface OpcoesEntrada {
   ferramenta: Ferramenta
@@ -24,9 +27,12 @@ export interface OpcoesEntrada {
   regiaoId: string | null
   /** Raio do pincel: 0 = 1 hexágono, 1 = 7, 2 = 19. */
   raio: number
+  /** Rio e Estrada: tira o traço em vez de desenhar. */
+  tirarTraco: boolean
 }
 
 const usaPincel = (f: Ferramenta) => f === 'pintar' || f === 'apagar' || f === 'regiao'
+const usaTraco = (f: Ferramenta) => usaPincel(f) || f === 'rio' || f === 'estrada'
 
 const LIMITE_TOQUE_PX = 8
 const LIMITE_TOQUE_MS = 450
@@ -37,6 +43,8 @@ export class EntradaMapa {
   opcoes: OpcoesEntrada
   aoSelecionar: (h: Hex) => void = () => {}
   aoMarcar: (h: Hex) => void = () => {}
+  aoMoverToken: (h: Hex) => void = () => {}
+  aoMudarRegua: () => void = () => {}
   aoPassar: (h: Hex | null) => void = () => {}
   aoMudarPrevia: () => void = () => {}
 
@@ -44,6 +52,7 @@ export class EntradaMapa {
   private modo: Modo = 'nenhum'
   private traco: Traco | null = null
   private ultimoHex: Hex | null = null
+  private ultimoPonto: { x: number; y: number } | null = null
   private inicioToque = { x: 0, y: 0, t: 0 }
   private gesto = { dist: 0, cx: 0, cy: 0 }
   private espaco = false
@@ -84,6 +93,7 @@ export class EntradaMapa {
   atualizarPrevia() {
     const { ferramenta, terreno, regiaoId, raio } = this.opcoes
     const h = this.render.hover
+    this.render.previaAresta = null
     if (!h) {
       this.render.previa = null
     } else if (!usaPincel(ferramenta)) {
@@ -137,7 +147,7 @@ export class EntradaMapa {
       this.aoPassar(sob)
       this.atualizarPrevia()
     }
-    const arrasta = e.button === 1 || e.button === 2 || this.espaco || !usaPincel(this.opcoes.ferramenta)
+    const arrasta = e.button === 1 || e.button === 2 || this.espaco || !usaTraco(this.opcoes.ferramenta)
     if (arrasta) {
       this.modo = 'arrastar'
       return
@@ -145,7 +155,8 @@ export class EntradaMapa {
     this.modo = 'traco'
     this.traco = this.ctrl.iniciarTraco()
     this.ultimoHex = null
-    this.pincelar(this.render.hexSob(p.x, p.y))
+    this.ultimoPonto = null
+    this.pincelar(p)
   }
 
   private aoMover = (e: PointerEvent) => {
@@ -159,6 +170,8 @@ export class EntradaMapa {
       this.aoPassar(h)
       this.atualizarPrevia()
     }
+    this.acompanharRegua(h)
+    this.acompanharAresta(p)
     if (!anterior) return
 
     if (this.modo === 'gesto' && this.ponteiros.size >= 2) {
@@ -173,7 +186,7 @@ export class EntradaMapa {
     } else if (this.modo === 'arrastar') {
       this.render.definirCamera(arrastar(this.render.camera, p.x - anterior.x, p.y - anterior.y))
     } else if (this.modo === 'traco') {
-      this.pincelar(h)
+      this.pincelar(p)
     }
   }
 
@@ -192,8 +205,14 @@ export class EntradaMapa {
       this.traco = null
     } else if (eraToque) {
       const h = this.render.hexSob(p.x, p.y)
-      if (this.opcoes.ferramenta === 'marcador') this.aoMarcar(h)
-      else this.aoSelecionar(h)
+      const f = this.opcoes.ferramenta
+      if (f === 'marcador') this.aoMarcar(h)
+      else if (f === 'token') this.aoMoverToken(h)
+      else if (f === 'regua') {
+        this.render.regua = tocarRegua(this.render.regua, h)
+        this.render.pedirQuadro()
+        this.aoMudarRegua()
+      } else this.aoSelecionar(h)
     }
     if (this.ponteiros.size === 0) this.modo = 'nenhum'
     else if (this.ponteiros.size === 1) {
@@ -249,11 +268,42 @@ export class EntradaMapa {
     return { dist: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 }
   }
 
-  /** Pinta ou apaga o pincel no hexágono, ligando ao anterior para não deixar buracos em traço rápido. */
-  private pincelar(h: Hex) {
+  /** Mostra a régua até o cursor enquanto só o primeiro ponto foi marcado. */
+  private acompanharRegua(h: Hex) {
+    if (this.opcoes.ferramenta !== 'regua' || !this.render.regua || this.render.regua.b) return
+    this.render.reguaPonta = h
+    this.render.pedirQuadro()
+    this.aoMudarRegua()
+  }
+
+  /** Na ferramenta Rio, destaca a aresta que o próximo toque vai pegar. */
+  private acompanharAresta(p: { x: number; y: number }) {
+    if (this.opcoes.ferramenta !== 'rio') return
+    const m = this.render.pontoMundo(p.x, p.y)
+    this.render.previaAresta = arestasEntrePontos(null, m, this.render.R)[0]
+    this.render.pedirQuadro()
+  }
+
+  /** Aplica o pincel (ou o traço de rio e estrada) ligando ao ponto anterior, para não deixar buracos em traço rápido. */
+  private pincelar(p: { x: number; y: number }) {
     if (!this.traco) return
+    const h = this.render.hexSob(p.x, p.y)
+    const { ferramenta, terreno, regiaoId, tirarTraco } = this.opcoes
+
+    if (ferramenta === 'rio') {
+      const m = this.render.pontoMundo(p.x, p.y)
+      this.traco.rio(arestasEntrePontos(this.ultimoPonto, m, this.render.R), !tirarTraco)
+      this.ultimoPonto = m
+      return
+    }
+
     const trilha = this.ultimoHex ? linha(this.ultimoHex, h) : [h]
     this.ultimoHex = h
+    if (ferramenta === 'estrada') {
+      this.traco.estrada(arestasDoCaminho(trilha), !tirarTraco)
+      return
+    }
+
     const vistos = new Set<string>()
     const hexes: Hex[] = []
     for (const centro of trilha) {
@@ -265,7 +315,6 @@ export class EntradaMapa {
         }
       }
     }
-    const { ferramenta, terreno, regiaoId } = this.opcoes
     if (ferramenta === 'apagar') this.traco.apagar(hexes)
     else if (ferramenta === 'regiao') this.traco.regiao(hexes, regiaoId)
     else this.traco.pintar(hexes, terreno)

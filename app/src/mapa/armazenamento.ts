@@ -3,7 +3,7 @@
 
 import type { Camera } from './camera'
 import { limitarZoom } from './camera'
-import type { Hexagono, MapaMeta, Marcador, Regiao } from './tipos'
+import type { Hexagono, MapaMeta, Marcador, Regiao, TokenGrupo } from './tipos'
 
 type Obj = Record<string, unknown>
 const ehObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -23,7 +23,25 @@ export function normalizarHexagono(bruto: unknown): Hexagono | null {
     marcadores: Array.isArray(bruto.marcadores)
       ? bruto.marcadores.map(normalizarMarcador).filter((m): m is Marcador => !!m)
       : [],
+    rios: normalizarDirecoes(bruto.rios),
+    estradas: normalizarDirecoes(bruto.estradas),
     rev: inteiro(bruto.rev) && bruto.rev > 0 ? bruto.rev : 1,
+  }
+}
+
+/** Direções de aresta válidas (0, 1 ou 2), sem repetir e em ordem. Mapas antigos não têm o campo. */
+function normalizarDirecoes(bruto: unknown): number[] {
+  if (!Array.isArray(bruto)) return []
+  return [...new Set(bruto.filter((d): d is number => d === 0 || d === 1 || d === 2))].sort()
+}
+
+export function normalizarToken(bruto: unknown): TokenGrupo | null {
+  if (!ehObj(bruto) || !inteiro(bruto.q) || !inteiro(bruto.r)) return null
+  return {
+    q: bruto.q,
+    r: bruto.r,
+    ts: typeof bruto.ts === 'number' && Number.isFinite(bruto.ts) ? bruto.ts : 0,
+    autor: str(bruto.autor, ''),
   }
 }
 

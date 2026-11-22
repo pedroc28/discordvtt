@@ -2,14 +2,16 @@
 //
 // Mundo: unidades de tela com zoom 1. R (centro ao canto do hexágono) vem da largura do tile,
 // para a imagem encaixar exatamente. Camadas de baixo para cima: fundo, terrenos, regiões (cor e
-// bordas), grade, marcadores e nomes, rótulos de região, prévia, seleção.
+// bordas), grade, rios, estradas, marcadores e nomes, rótulos de região, régua, prévia, seleção
+// e token do grupo.
 // Por enquanto tudo é redesenhado a cada quadro; se um dia pesar, o próximo passo é guardar
 // cada chunk num bitmap (ver README do mapa).
 
 import type { ControladorMapa } from './controlador'
 import { limitarZoom, mundoParaTela, telaParaMundo, type Camera } from './camera'
-import { RAIZ3, TAMANHO_CHUNK, cantos, chave, hexParaPixel, pixelParaHex, vizinho, type Hex } from './hex'
+import { RAIZ3, TAMANHO_CHUNK, cantos, chave, hexParaPixel, pixelParaHex, vizinho, type Aresta, type Hex } from './hex'
 import { raizDaRegiao } from './operacoes'
+import { medirRegua, textoDaMedida, type Regua } from './regua'
 import type { Regiao } from './tipos'
 import type { Tileset } from './tileset'
 
@@ -33,6 +35,8 @@ interface HexVisivel {
   terreno: string
   nome: string
   marcadores: { tipo: string }[]
+  rios: number[]
+  estradas: number[]
   regiao: Regiao | null
 }
 
@@ -56,6 +60,12 @@ export class Renderizador {
   hover: Hex | null = null
   selecionado: Hex | null = null
   previa: Previa | null = null
+  /** Aresta que a ferramenta Rio vai pegar no próximo toque. */
+  previaAresta: Aresta | null = null
+  /** Régua em andamento. Só local. */
+  regua: Regua | null = null
+  /** Onde o cursor está enquanto a régua só tem o primeiro ponto. */
+  reguaPonta: Hex | null = null
   mostrarGrade = true
   mostrarRegioes = true
   cores: CoresMapa
@@ -71,6 +81,7 @@ export class Renderizador {
   private extraMax: number
   private sair: () => void
   private sairRegioes: () => void
+  private sairToken: () => void
   private canvas: HTMLCanvasElement
   private ctrl: ControladorMapa
   private tileset: Tileset
@@ -88,11 +99,13 @@ export class Renderizador {
     this.ctx = canvas.getContext('2d', { alpha: false })!
     this.sair = ctrl.armazem.ouvir(() => this.pedirQuadro())
     this.sairRegioes = ctrl.armazem.ouvirRegioes(() => this.pedirQuadro())
+    this.sairToken = ctrl.ouvirToken(() => this.pedirQuadro())
   }
 
   destruir() {
     this.sair()
     this.sairRegioes()
+    this.sairToken()
     if (this.quadro) cancelAnimationFrame(this.quadro)
   }
 
@@ -142,6 +155,13 @@ export class Renderizador {
     this.pedirQuadro()
   }
 
+  /** Troca (ou limpa, com null) a régua e esquece o ponto do cursor. */
+  definirRegua(regua: Regua | null) {
+    this.regua = regua
+    this.reguaPonta = null
+    this.pedirQuadro()
+  }
+
   definirSelecao(h: Hex | null) {
     this.selecionado = h
     this.pedirQuadro()
@@ -157,6 +177,11 @@ export class Renderizador {
 
   get tamanhoTela() {
     return { largura: this.largura, altura: this.altura }
+  }
+
+  /** Ponto da tela em coordenadas do mundo. */
+  pontoMundo(sx: number, sy: number) {
+    return telaParaMundo(this.camera, this.largura, this.altura, sx, sy)
   }
 
   hexSob(sx: number, sy: number): Hex {
@@ -256,6 +281,8 @@ export class Renderizador {
             terreno: h.terreno,
             nome: h.nome,
             marcadores: h.marcadores,
+            rios: h.rios,
+            estradas: h.estradas,
             regiao: h.regiaoId ? armazem.lerRegiao(h.regiaoId) : null,
           })
         }
@@ -297,13 +324,20 @@ export class Renderizador {
       }
     }
 
-    // 4. marcadores e nomes dos hexágonos
+    // 4. rios e estradas (a estrada passa por cima do rio, como uma ponte)
+    this.desenharRios(visiveis, z)
+    this.desenharEstradas(visiveis, z)
+
+    // 5. marcadores e nomes dos hexágonos
     if (z >= ZOOM_SO_COR) this.desenharMarcadoresENomes(visiveis, z)
 
-    // 5. rótulos das regiões
+    // 6. rótulos das regiões
     if (this.mostrarRegioes) this.desenharRotulos(lim, z)
 
-    // 6. prévia do pincel
+    // 7. régua
+    this.desenharRegua(z)
+
+    // 8. prévia do pincel
     if (this.previa && this.previa.hexes.length) {
       if (this.previa.preenchimento) {
         ctx.fillStyle = this.previa.preenchimento
@@ -327,8 +361,20 @@ export class Renderizador {
       }
       ctx.stroke()
     }
+    if (this.previaAresta) {
+      const a = this.previaAresta
+      const { x, y } = hexParaPixel(a, R)
+      ctx.lineCap = 'round'
+      ctx.strokeStyle = this.cores.destaque
+      ctx.lineWidth = Math.max(R * 0.2, 4 / z)
+      ctx.beginPath()
+      ctx.moveTo(x + this.cantosRel[a.d].x, y + this.cantosRel[a.d].y)
+      ctx.lineTo(x + this.cantosRel[a.d + 1].x, y + this.cantosRel[a.d + 1].y)
+      ctx.stroke()
+      ctx.lineCap = 'butt'
+    }
 
-    // 7. seleção
+    // 9. seleção
     if (this.selecionado) {
       const { x, y } = hexParaPixel(this.selecionado, R)
       this.caminhoHex(x, y)
@@ -340,6 +386,150 @@ export class Renderizador {
       ctx.lineWidth = 3.5 / z
       ctx.stroke()
     }
+
+    // 10. token do grupo, por cima de tudo
+    this.desenharToken(z)
+  }
+
+  /** Rio pela borda do hexágono dono. Só aparece se os dois lados existem (se um foi apagado, o dado fica guardado). */
+  private desenharRios(visiveis: HexVisivel[], z: number) {
+    const { ctx, R } = this
+    if (!visiveis.some((v) => v.rios.length)) return
+    const armazem = this.ctrl.armazem
+    ctx.beginPath()
+    for (const v of visiveis) {
+      for (const d of v.rios) {
+        const o = vizinho(v, d)
+        if (!armazem.ler(o.q, o.r)) continue
+        const a = this.cantosRel[d]
+        const b = this.cantosRel[(d + 1) % 6]
+        ctx.moveTo(v.x + a.x, v.y + a.y)
+        ctx.lineTo(v.x + b.x, v.y + b.y)
+      }
+    }
+    const largura = Math.max(R * 0.15, 3 / z)
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = '#2b66a6'
+    ctx.lineWidth = largura
+    ctx.stroke()
+    ctx.strokeStyle = '#8fd0f2'
+    ctx.lineWidth = largura * 0.55
+    ctx.stroke()
+    ctx.lineCap = 'butt'
+  }
+
+  /** Estrada ligando o centro do hexágono dono ao do vizinho, em linha reta. */
+  private desenharEstradas(visiveis: HexVisivel[], z: number) {
+    const { ctx, R } = this
+    if (!visiveis.some((v) => v.estradas.length)) return
+    const armazem = this.ctrl.armazem
+    ctx.beginPath()
+    for (const v of visiveis) {
+      for (const d of v.estradas) {
+        const o = vizinho(v, d)
+        if (!armazem.ler(o.q, o.r)) continue
+        const p = hexParaPixel(o, R)
+        ctx.moveTo(v.x, v.y)
+        ctx.lineTo(p.x, p.y)
+      }
+    }
+    const largura = Math.max(R * 0.12, 2.5 / z)
+    ctx.lineCap = 'round'
+    ctx.strokeStyle = '#4e3a20'
+    ctx.lineWidth = largura
+    ctx.stroke()
+    ctx.strokeStyle = '#dcc088'
+    ctx.lineWidth = largura * 0.55
+    ctx.stroke()
+    ctx.lineCap = 'butt'
+  }
+
+  /** Linha reta entre os dois pontos, hexágonos do caminho levemente marcados e a distância no meio. */
+  private desenharRegua(z: number) {
+    const regua = this.regua
+    if (!regua) return
+    const fim = regua.b ?? this.reguaPonta
+    const { ctx, R } = this
+    const a = hexParaPixel(regua.a, R)
+    ctx.lineJoin = 'round'
+    ctx.lineCap = 'round'
+    const ponto = (p: { x: number; y: number }, cor: string) => {
+      ctx.fillStyle = cor
+      ctx.strokeStyle = '#1a1a1a'
+      ctx.lineWidth = 2 / z
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, Math.max(R * 0.13, 5 / z), 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+    }
+    if (!fim) {
+      ponto(a, '#ffd24a')
+      return
+    }
+    const medida = medirRegua(regua.a, fim)
+    ctx.fillStyle = 'rgba(255,210,74,0.22)'
+    for (const h of medida.caminho) {
+      const p = hexParaPixel(h, R)
+      this.caminhoHex(p.x, p.y)
+      ctx.fill()
+    }
+    const b = hexParaPixel(fim, R)
+    ctx.setLineDash([R * 0.25, R * 0.18])
+    for (const [cor, largura] of [['#1a1a1a', 5], ['#ffd24a', 2.5]] as const) {
+      ctx.strokeStyle = cor
+      ctx.lineWidth = largura / z
+      ctx.beginPath()
+      ctx.moveTo(a.x, a.y)
+      ctx.lineTo(b.x, b.y)
+      ctx.stroke()
+    }
+    ctx.setLineDash([])
+    ponto(a, '#ffd24a')
+    ponto(b, regua.b ? '#ffd24a' : '#ffffff')
+
+    // Etiqueta com a distância, no meio da linha.
+    const px = 14 / z
+    const texto = textoDaMedida(medida.passos)
+    ctx.font = `700 ${px}px ${FONTE}`
+    const mx = (a.x + b.x) / 2
+    const my = (a.y + b.y) / 2
+    const w = ctx.measureText(texto).width + px
+    ctx.fillStyle = 'rgba(20,20,20,0.88)'
+    ctx.beginPath()
+    ctx.roundRect(mx - w / 2, my - px * 0.85, w, px * 1.7, px * 0.5)
+    ctx.fill()
+    ctx.fillStyle = '#ffd24a'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(texto, mx, my + px * 0.04)
+  }
+
+  /** Alfinete framboesa com a ponta no centro do hexágono onde o grupo está. */
+  private desenharToken(z: number) {
+    const t = this.ctrl.token
+    if (!t) return
+    const { ctx, R } = this
+    const { x, y } = hexParaPixel(t, R)
+    const raio = R * 0.27
+    const cy = y - R * 0.4
+    const ponta = y + R * 0.12
+    const alfa = Math.acos(raio / (ponta - cy))
+    ctx.beginPath()
+    ctx.moveTo(x, ponta)
+    ctx.lineTo(x + Math.sin(alfa) * raio, cy + Math.cos(alfa) * raio)
+    ctx.arc(x, cy, raio, Math.PI / 2 - alfa, Math.PI / 2 + alfa, true)
+    ctx.closePath()
+    ctx.lineJoin = 'round'
+    ctx.fillStyle = COR_PADRAO_MARCADOR
+    ctx.fill()
+    ctx.strokeStyle = '#ffffff'
+    ctx.lineWidth = Math.max(R * 0.07, 2.5 / z)
+    ctx.stroke()
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    ctx.arc(x, cy, raio * 0.4, 0, Math.PI * 2)
+    ctx.fill()
   }
 
   private desenharRegioes(visiveis: HexVisivel[], z: number) {

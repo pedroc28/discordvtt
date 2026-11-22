@@ -6,6 +6,10 @@ export type NomeIcone =
   | 'borracha'
   | 'regiao'
   | 'marcador'
+  | 'rio'
+  | 'estrada'
+  | 'token'
+  | 'regua'
   | 'olho'
   | 'fechar'
   | 'lixeira'
@@ -27,6 +31,15 @@ const desenhos: Record<NomeIcone, ReactNode> = {
       <circle cx="8" cy="6.5" r="1.6" />
     </>
   ),
+  rio: <path d="M2 6c2-2.5 3.5 2.5 6 0s4 2.5 6 0M2 11c2-2.5 3.5 2.5 6 0s4 2.5 6 0" />,
+  estrada: <path d="M5.2 14.5 6.6 1.5M10.8 14.5 9.4 1.5M8 3v1.8M8 7.1v1.8M8 11.2v1.8" />,
+  token: (
+    <>
+      <circle cx="8" cy="4.6" r="2.2" />
+      <path d="M5.6 13.5 6.9 8h2.2l1.3 5.5zM4.5 13.5h7" />
+    </>
+  ),
+  regua: <path d="M2 10.5 10.5 2l3.5 3.5L5.5 14zM5 8.5l1.6 1.6M7.4 6.1 9 7.7M9.8 3.7l1.6 1.6" />,
   olho: (
     <>
       <path d="M1.5 8S4 3.8 8 3.8 14.5 8 14.5 8 12 12.2 8 12.2 1.5 8 1.5 8z" />

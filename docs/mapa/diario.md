@@ -81,6 +81,7 @@ Mudanças em relação ao plano inicial, decididas durante a construção:
 - **Lote 9** (pântano, manguezal, água rasa) feito: 6 variantes em uma chamada (15 gerações).
 - **Lote 10** (recife, tundra, geleira) feito: 6 variantes em uma chamada (15 gerações).
 - **Lote 11** (mar congelado, praia, falésia) feito, e o **manguezal foi refeito** com tiles que se encaixam (3 chamadas, 45 gerações, 15 delas na tentativa que saiu em arbustos soltos).
+- **Lote 12** (delta, cidade murada, ruínas) feito, mais `praia-inteira` e `falesia-inteira` (sem lado do mar fixo). Cidade e ruínas foram compostas por script sobre a planície, porque o PixelLab só devolve esses objetos soltos.
 - **Paleta com pastas e pesquisa por tag.** Cada terreno do `tileset.json` tem `pasta` e `tags` (3 a 5), e o tileset tem a lista `pastas`. O catálogo dos 43 terrenos previstos fica em `app/tools/catalogo-terrenos.json` e o gerador do tileset padrão lê dele.
 - **A arte em pixel art virou o padrão do mapa** (antes só aparecia com `?tileset=pixel`, e por isso parecia que as imagens não tinham sido aplicadas). O tileset gerado por script continua em `?tileset=padrao`.
 - O tileset ganhou a opção `pixelart` (amplia sem suavizar) e o mapa aceita `?tileset=<pasta>` no endereço para testar arte sem mexer no código.

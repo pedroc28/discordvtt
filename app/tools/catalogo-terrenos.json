@@ -1,66 +1,491 @@
 {
   "pastas": [
-    { "id": "terra-aberta", "nome": "Terra aberta" },
-    { "id": "florestas", "nome": "Florestas" },
-    { "id": "altos", "nome": "Montanhas e rochas" },
-    { "id": "aridos", "nome": "Desertos e áridos" },
-    { "id": "aguas", "nome": "Águas e pântanos" },
-    { "id": "gelo", "nome": "Gelo e frio" },
-    { "id": "costa", "nome": "Costa" },
-    { "id": "humano", "nome": "Obra humana" },
-    { "id": "fantasia", "nome": "Fantasia e perigo" }
+    {
+      "id": "terra-aberta",
+      "nome": "Terra aberta"
+    },
+    {
+      "id": "florestas",
+      "nome": "Florestas"
+    },
+    {
+      "id": "altos",
+      "nome": "Montanhas e rochas"
+    },
+    {
+      "id": "aridos",
+      "nome": "Desertos e áridos"
+    },
+    {
+      "id": "aguas",
+      "nome": "Águas e pântanos"
+    },
+    {
+      "id": "gelo",
+      "nome": "Gelo e frio"
+    },
+    {
+      "id": "costa",
+      "nome": "Costa"
+    },
+    {
+      "id": "humano",
+      "nome": "Obra humana"
+    },
+    {
+      "id": "fantasia",
+      "nome": "Fantasia e perigo"
+    }
   ],
   "terrenos": {
-    "planicie": { "pasta": "terra-aberta", "tags": ["planície", "grama", "campo aberto", "temperado", "fértil"] },
-    "campo": { "pasta": "terra-aberta", "tags": ["cultivo", "fazenda", "trigo", "civilizado", "fértil"] },
-    "colina": { "pasta": "terra-aberta", "tags": ["colinas", "relevo suave", "grama", "temperado"] },
-    "savana": { "pasta": "terra-aberta", "tags": ["savana", "seco", "quente", "grama alta", "acácia"] },
-    "estepe": { "pasta": "terra-aberta", "tags": ["estepe", "frio", "seco", "grama baixa", "ventoso"] },
-    "charneca": { "pasta": "terra-aberta", "tags": ["charneca", "urze", "úmido", "sombrio", "frio"] },
-    "pomar": { "pasta": "terra-aberta", "tags": ["pomar", "vinhedo", "cultivo", "civilizado", "fruta"] },
-
-    "floresta": { "pasta": "florestas", "tags": ["floresta", "árvores", "temperado", "folhas largas", "caça"] },
-    "floresta-densa": { "pasta": "florestas", "tags": ["floresta", "árvores", "denso", "escuro", "perigoso"] },
-    "bosque": { "pasta": "florestas", "tags": ["bosque", "árvores", "aberto", "temperado", "caça"] },
-    "taiga": { "pasta": "florestas", "tags": ["taiga", "coníferas", "pinheiros", "frio", "floresta"] },
-    "floresta-outono": { "pasta": "florestas", "tags": ["outono", "árvores", "laranja", "temperado", "floresta"] },
-    "floresta-nevada": { "pasta": "florestas", "tags": ["neve", "coníferas", "frio", "inverno", "floresta"] },
-    "selva": { "pasta": "florestas", "tags": ["selva", "tropical", "quente", "úmido", "denso"] },
-    "floresta-morta": { "pasta": "florestas", "tags": ["morta", "assombrada", "sombrio", "perigoso", "árvores"] },
-
-    "montanha": { "pasta": "altos", "tags": ["montanha", "rocha", "alto", "neve", "difícil"] },
-    "pico-nevado": { "pasta": "altos", "tags": ["montanha", "neve", "gelo", "alto", "difícil"] },
-    "rochoso": { "pasta": "altos", "tags": ["rocha", "pedras", "árido", "difícil", "relevo"] },
-    "planalto": { "pasta": "altos", "tags": ["planalto", "mesa", "penhasco", "rocha", "alto"] },
-    "canion": { "pasta": "altos", "tags": ["cânion", "penhasco", "rocha", "árido", "passagem"] },
-    "vulcao": { "pasta": "altos", "tags": ["vulcão", "fogo", "lava", "montanha", "perigoso"] },
-    "campo-de-lava": { "pasta": "altos", "tags": ["lava", "fogo", "rocha", "perigoso", "árido"] },
-
-    "deserto": { "pasta": "aridos", "tags": ["deserto", "areia", "quente", "seco", "árido"] },
-    "dunas": { "pasta": "aridos", "tags": ["dunas", "areia", "quente", "seco", "deserto"] },
-    "oasis": { "pasta": "aridos", "tags": ["oásis", "água", "palmeiras", "deserto", "descanso"] },
-    "salar": { "pasta": "aridos", "tags": ["sal", "seco", "planície", "branco", "árido"] },
-
-    "pantano": { "pasta": "aguas", "tags": ["pântano", "lama", "úmido", "sombrio", "difícil"] },
-    "mangue": { "pasta": "aguas", "tags": ["mangue", "lama", "raso", "tropical", "úmido"] },
-    "agua-rasa": { "pasta": "aguas", "tags": ["água", "raso", "vau", "navegável", "claro"] },
-    "oceano": { "pasta": "aguas", "tags": ["água", "oceano", "profundo", "navegável", "mar"] },
-    "recife": { "pasta": "aguas", "tags": ["recife", "coral", "raso", "tropical", "mar"] },
-
-    "tundra": { "pasta": "gelo", "tags": ["tundra", "frio", "neve", "musgo", "inverno"] },
-    "geleira": { "pasta": "gelo", "tags": ["geleira", "gelo", "frio", "azul", "difícil"] },
-    "mar-congelado": { "pasta": "gelo", "tags": ["gelo", "mar", "frio", "banquisa", "inverno"] },
-
-    "praia": { "pasta": "costa", "tags": ["praia", "areia", "costa", "mar", "quente"] },
-    "falesia": { "pasta": "costa", "tags": ["falésia", "penhasco", "costa", "rocha", "mar"] },
-    "delta": { "pasta": "costa", "tags": ["delta", "rio", "costa", "lama", "raso"] },
-
-    "cidade": { "pasta": "humano", "tags": ["cidade", "muralha", "civilizado", "casas", "comércio"] },
-    "ruinas": { "pasta": "humano", "tags": ["ruínas", "antigo", "pedra", "abandonado", "mistério"] },
-
-    "terra-arrasada": { "pasta": "fantasia", "tags": ["arrasada", "queimada", "cinzas", "perigoso", "guerra"] },
-    "floresta-encantada": { "pasta": "fantasia", "tags": ["encantada", "magia", "floresta", "fadas", "brilho"] },
-    "cogumelos": { "pasta": "fantasia", "tags": ["cogumelos", "fungos", "magia", "escuro", "estranho"] },
-    "cristais": { "pasta": "fantasia", "tags": ["cristais", "magia", "brilho", "estranho", "rocha"] }
+    "planicie": {
+      "pasta": "terra-aberta",
+      "tags": [
+        "planície",
+        "grama",
+        "campo aberto",
+        "temperado",
+        "fértil"
+      ]
+    },
+    "campo": {
+      "pasta": "terra-aberta",
+      "tags": [
+        "cultivo",
+        "fazenda",
+        "trigo",
+        "civilizado",
+        "fértil"
+      ]
+    },
+    "colina": {
+      "pasta": "terra-aberta",
+      "tags": [
+        "colinas",
+        "relevo suave",
+        "grama",
+        "temperado"
+      ]
+    },
+    "savana": {
+      "pasta": "terra-aberta",
+      "tags": [
+        "savana",
+        "seco",
+        "quente",
+        "grama alta",
+        "acácia"
+      ]
+    },
+    "estepe": {
+      "pasta": "terra-aberta",
+      "tags": [
+        "estepe",
+        "frio",
+        "seco",
+        "grama baixa",
+        "ventoso"
+      ]
+    },
+    "charneca": {
+      "pasta": "terra-aberta",
+      "tags": [
+        "charneca",
+        "urze",
+        "úmido",
+        "sombrio",
+        "frio"
+      ]
+    },
+    "pomar": {
+      "pasta": "terra-aberta",
+      "tags": [
+        "pomar",
+        "vinhedo",
+        "cultivo",
+        "civilizado",
+        "fruta"
+      ]
+    },
+    "floresta": {
+      "pasta": "florestas",
+      "tags": [
+        "floresta",
+        "árvores",
+        "temperado",
+        "folhas largas",
+        "caça"
+      ]
+    },
+    "floresta-densa": {
+      "pasta": "florestas",
+      "tags": [
+        "floresta",
+        "árvores",
+        "denso",
+        "escuro",
+        "perigoso"
+      ]
+    },
+    "bosque": {
+      "pasta": "florestas",
+      "tags": [
+        "bosque",
+        "árvores",
+        "aberto",
+        "temperado",
+        "caça"
+      ]
+    },
+    "taiga": {
+      "pasta": "florestas",
+      "tags": [
+        "taiga",
+        "coníferas",
+        "pinheiros",
+        "frio",
+        "floresta"
+      ]
+    },
+    "floresta-outono": {
+      "pasta": "florestas",
+      "tags": [
+        "outono",
+        "árvores",
+        "laranja",
+        "temperado",
+        "floresta"
+      ]
+    },
+    "floresta-nevada": {
+      "pasta": "florestas",
+      "tags": [
+        "neve",
+        "coníferas",
+        "frio",
+        "inverno",
+        "floresta"
+      ]
+    },
+    "selva": {
+      "pasta": "florestas",
+      "tags": [
+        "selva",
+        "tropical",
+        "quente",
+        "úmido",
+        "denso"
+      ]
+    },
+    "floresta-morta": {
+      "pasta": "florestas",
+      "tags": [
+        "morta",
+        "assombrada",
+        "sombrio",
+        "perigoso",
+        "árvores"
+      ]
+    },
+    "montanha": {
+      "pasta": "altos",
+      "tags": [
+        "montanha",
+        "rocha",
+        "alto",
+        "neve",
+        "difícil"
+      ]
+    },
+    "pico-nevado": {
+      "pasta": "altos",
+      "tags": [
+        "montanha",
+        "neve",
+        "gelo",
+        "alto",
+        "difícil"
+      ]
+    },
+    "rochoso": {
+      "pasta": "altos",
+      "tags": [
+        "rocha",
+        "pedras",
+        "árido",
+        "difícil",
+        "relevo"
+      ]
+    },
+    "planalto": {
+      "pasta": "altos",
+      "tags": [
+        "planalto",
+        "mesa",
+        "penhasco",
+        "rocha",
+        "alto"
+      ]
+    },
+    "canion": {
+      "pasta": "altos",
+      "tags": [
+        "cânion",
+        "penhasco",
+        "rocha",
+        "árido",
+        "passagem"
+      ]
+    },
+    "vulcao": {
+      "pasta": "altos",
+      "tags": [
+        "vulcão",
+        "fogo",
+        "lava",
+        "montanha",
+        "perigoso"
+      ]
+    },
+    "campo-de-lava": {
+      "pasta": "altos",
+      "tags": [
+        "lava",
+        "fogo",
+        "rocha",
+        "perigoso",
+        "árido"
+      ]
+    },
+    "deserto": {
+      "pasta": "aridos",
+      "tags": [
+        "deserto",
+        "areia",
+        "quente",
+        "seco",
+        "árido"
+      ]
+    },
+    "dunas": {
+      "pasta": "aridos",
+      "tags": [
+        "dunas",
+        "areia",
+        "quente",
+        "seco",
+        "deserto"
+      ]
+    },
+    "oasis": {
+      "pasta": "aridos",
+      "tags": [
+        "oásis",
+        "água",
+        "palmeiras",
+        "deserto",
+        "descanso"
+      ]
+    },
+    "salar": {
+      "pasta": "aridos",
+      "tags": [
+        "sal",
+        "seco",
+        "planície",
+        "branco",
+        "árido"
+      ]
+    },
+    "pantano": {
+      "pasta": "aguas",
+      "tags": [
+        "pântano",
+        "lama",
+        "úmido",
+        "sombrio",
+        "difícil"
+      ]
+    },
+    "mangue": {
+      "pasta": "aguas",
+      "tags": [
+        "mangue",
+        "lama",
+        "raso",
+        "tropical",
+        "úmido"
+      ]
+    },
+    "agua-rasa": {
+      "pasta": "aguas",
+      "tags": [
+        "água",
+        "raso",
+        "vau",
+        "navegável",
+        "claro"
+      ]
+    },
+    "oceano": {
+      "pasta": "aguas",
+      "tags": [
+        "água",
+        "oceano",
+        "profundo",
+        "navegável",
+        "mar"
+      ]
+    },
+    "recife": {
+      "pasta": "aguas",
+      "tags": [
+        "recife",
+        "coral",
+        "raso",
+        "tropical",
+        "mar"
+      ]
+    },
+    "tundra": {
+      "pasta": "gelo",
+      "tags": [
+        "tundra",
+        "frio",
+        "neve",
+        "musgo",
+        "inverno"
+      ]
+    },
+    "geleira": {
+      "pasta": "gelo",
+      "tags": [
+        "geleira",
+        "gelo",
+        "frio",
+        "azul",
+        "difícil"
+      ]
+    },
+    "mar-congelado": {
+      "pasta": "gelo",
+      "tags": [
+        "gelo",
+        "mar",
+        "frio",
+        "banquisa",
+        "inverno"
+      ]
+    },
+    "praia": {
+      "pasta": "costa",
+      "tags": [
+        "praia",
+        "areia",
+        "costa",
+        "mar",
+        "quente"
+      ]
+    },
+    "falesia": {
+      "pasta": "costa",
+      "tags": [
+        "falésia",
+        "penhasco",
+        "costa",
+        "rocha",
+        "mar"
+      ]
+    },
+    "praia-inteira": {
+      "pasta": "costa",
+      "tags": [
+        "praia",
+        "areia",
+        "costa",
+        "sem direção",
+        "quente"
+      ]
+    },
+    "falesia-inteira": {
+      "pasta": "costa",
+      "tags": [
+        "falésia",
+        "penhasco",
+        "rocha",
+        "costa",
+        "sem direção"
+      ]
+    },
+    "delta": {
+      "pasta": "costa",
+      "tags": [
+        "delta",
+        "rio",
+        "costa",
+        "lama",
+        "raso"
+      ]
+    },
+    "cidade": {
+      "pasta": "humano",
+      "tags": [
+        "cidade",
+        "muralha",
+        "civilizado",
+        "casas",
+        "comércio"
+      ]
+    },
+    "ruinas": {
+      "pasta": "humano",
+      "tags": [
+        "ruínas",
+        "antigo",
+        "pedra",
+        "abandonado",
+        "mistério"
+      ]
+    },
+    "terra-arrasada": {
+      "pasta": "fantasia",
+      "tags": [
+        "arrasada",
+        "queimada",
+        "cinzas",
+        "perigoso",
+        "guerra"
+      ]
+    },
+    "floresta-encantada": {
+      "pasta": "fantasia",
+      "tags": [
+        "encantada",
+        "magia",
+        "floresta",
+        "fadas",
+        "brilho"
+      ]
+    },
+    "cogumelos": {
+      "pasta": "fantasia",
+      "tags": [
+        "cogumelos",
+        "fungos",
+        "magia",
+        "escuro",
+        "estranho"
+      ]
+    },
+    "cristais": {
+      "pasta": "fantasia",
+      "tags": [
+        "cristais",
+        "magia",
+        "brilho",
+        "estranho",
+        "rocha"
+      ]
+    }
   }
 }

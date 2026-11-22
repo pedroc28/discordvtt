@@ -303,6 +303,9 @@ export class Renderizador {
       if (img) ctx.drawImage(img, v.x - largTile / 2, v.y - R - def!.extra, largTile, 2 * R + def!.extra)
     }
 
+    // 1b. transição entre terrenos: pixels do vizinho misturados na borda (por pontilhado)
+    if (this.tileset.def.transicoes && comImagem) this.desenharTransicoes(visiveis)
+
     // 2. regiões: cor suave por cima do terreno e borda onde a região muda
     if (this.mostrarRegioes) this.desenharRegioes(visiveis, z)
 
@@ -398,6 +401,22 @@ export class Renderizador {
 
     // 10. token do grupo, por cima de tudo
     this.desenharToken(z)
+  }
+
+  /** Em cada borda onde o vizinho é de outro terreno, põe a faixa de mistura com a textura dele. */
+  private desenharTransicoes(visiveis: HexVisivel[]) {
+    const { ctx, R } = this
+    const armazem = this.ctrl.armazem
+    const larg = this.tileset.def.largura
+    for (const v of visiveis) {
+      for (let d = 0; d < 6; d++) {
+        const o = vizinho(v, d)
+        const viz = armazem.ler(o.q, o.r)
+        if (!viz || viz.terreno === v.terreno) continue
+        const faixa = this.tileset.sobreposicao(viz.terreno, o.q, o.r, d)
+        if (faixa) ctx.drawImage(faixa, v.x - larg / 2, v.y - R, larg, 2 * R)
+      }
+    }
   }
 
   private camadaPixel: HTMLCanvasElement | null = null

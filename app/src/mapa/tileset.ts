@@ -1,6 +1,8 @@
 // Tileset: o conjunto de imagens dos terrenos. É só dados (uma pasta com tileset.json e imagens),
 // então trocar a arte não mexe no código. Veja o README do mapa para o formato das imagens.
 
+import { gerarSobreposicao, RESOLUCAO, type FontePixels } from './transicao'
+
 export interface DefTerreno {
   id: string
   nome: string
@@ -43,6 +45,8 @@ export interface DefTileset {
   pastas: DefPasta[]
   /** Imagem do token do grupo, relativa à pasta do tileset.json. Sem ela o mapa desenha um alfinete. */
   token: string | null
+  /** Mistura os pixels de terrenos vizinhos na borda (pontilhado). Só vale para terrenos sem `extra`. */
+  transicoes: boolean
   terrenos: DefTerreno[]
   marcadores: DefMarcador[]
 }
@@ -109,6 +113,7 @@ export function normalizarTileset(bruto: unknown): DefTileset | null {
     pixelart: bruto.pixelart === true,
     pastas,
     token: typeof bruto.token === 'string' && bruto.token ? bruto.token : null,
+    transicoes: bruto.transicoes === true,
     terrenos,
     marcadores,
   }
@@ -128,6 +133,8 @@ export class Tileset {
   private porId = new Map<string, DefTerreno>()
   private fontesMarcadores = new Map<string, CanvasImageSource>()
   private fonteToken: CanvasImageSource | null = null
+  private pixelsDe = new WeakMap<object, FontePixels>()
+  private sobreposicoes = new Map<string, HTMLCanvasElement | null>()
   private marcadoresPorId = new Map<string, DefMarcador>()
 
   readonly def: DefTileset
@@ -166,6 +173,34 @@ export class Tileset {
   urlMarcador(id: string): string | null {
     const m = this.marcadoresPorId.get(id)
     return m ? this.base + m.arquivo : null
+  }
+
+  /**
+   * Faixa de mistura da borda `d` de um hexágono, com a textura do vizinho `id` (que está em q, r). É um
+   * canvas do tamanho de um tile de arte, guardado por (terreno, variante, borda). Null se o vizinho
+   * não tem imagem ou tem `extra` (não se mistura).
+   */
+  sobreposicao(id: string, q: number, r: number, d: number): HTMLCanvasElement | null {
+    const fonte = this.fontes.get(id)
+    const def = this.porId.get(id)
+    if (!fonte?.length || !def || def.extra > 0) return null
+    const variante = variantePara(q, r, fonte.length)
+    const chave = `${id}:${variante}:${d}`
+    if (this.sobreposicoes.has(chave)) return this.sobreposicoes.get(chave) ?? null
+    const origem = fonte[variante] as HTMLCanvasElement
+    let pixels = this.pixelsDe.get(origem)
+    if (!pixels) {
+      const img = origem.getContext('2d')!.getImageData(0, 0, origem.width, origem.height)
+      pixels = { data: img.data, width: img.width, height: img.height }
+      this.pixelsDe.set(origem, pixels)
+    }
+    const dados = gerarSobreposicao(pixels, d, this.def.largura, this.def.altura)
+    const c = document.createElement('canvas')
+    c.width = RESOLUCAO
+    c.height = RESOLUCAO
+    c.getContext('2d')!.putImageData(new ImageData(dados as Uint8ClampedArray<ArrayBuffer>, RESOLUCAO, RESOLUCAO), 0, 0)
+    this.sobreposicoes.set(chave, c)
+    return c
   }
 
   /** Imagem do token do grupo, ou null se o tileset não tem (ou não carregou). */

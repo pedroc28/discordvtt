@@ -128,6 +128,7 @@ Um tileset é uma pasta em `app/public/tilesets/<id>/` com um `tileset.json` e a
   "largura": 256,           // largura do hexágono na imagem, em px
   "altura": 296,            // altura do hexágono SEM o extra, em px
   "pixelart": false,        // true: amplia as imagens sem suavizar (arte em pixel art)
+  "transicoes": true,       // mistura os pixels de terrenos vizinhos na borda (pontilhado)
   "token": "token.png",     // imagem do token do grupo (omita para o alfinete desenhado em código)
   "pastas": [               // pastas da paleta, na ordem em que aparecem
     { "id": "florestas", "nome": "Florestas" }
@@ -158,6 +159,8 @@ Um tileset é uma pasta em `app/public/tilesets/<id>/` com um `tileset.json` e a
 **Ícones de marcador.** Imagens quadradas com fundo transparente, de qualquer tamanho (o tileset gerado por script usa 128×128 em selo redondo, e a pasta `pixel` usa PNGs de 64×64 em pixel art, em pequenos blocos de terreno com a construção em cima). Um hexágono mostra até 3 marcadores lado a lado, e um "+N" se houver mais. Marcador sem imagem aparece como um círculo simples.
 
 **Pastas e tags na paleta.** A paleta de terrenos agrupa os tiles em pastas que abrem e fecham (o app lembra quais estão fechadas) e tem uma caixa de pesquisa. A pesquisa ignora acento e maiúsculas e procura em cada palavra digitada no nome do terreno, no nome da pasta e nas tags. O botão "Tags" abre os chips de todas as tags, e marcar mais de uma exige que o terreno tenha todas. Durante a pesquisa as pastas com resultado ficam abertas, e Esc limpa. No celular a faixa da paleta tem só a caixa de pesquisa e os tiles em fila. A lógica está em `paleta.ts` (pura, testada) e a tela em `PaletaTerrenos.tsx`. Os 43 terrenos previstos têm pasta e tags prontas em `app/tools/catalogo-terrenos.json`, que o gerador do tileset padrão também lê.
+
+**Transições entre terrenos.** Com `"transicoes": true`, onde dois terrenos diferentes se encontram, os pixels da borda se misturam em vez de haver um corte seco. A mistura é feita por código, para qualquer par de terrenos, sem arte nova (`transicao.ts`, `Tileset.sobreposicao` e `desenharTransicoes`): numa faixa de 13% da largura do hexágono junto da borda, uma parte dos pixels é trocada por pixels do vizinho, escolhidos por pontilhado ordenado (matriz de Bayer). O vizinho é espelhado pela borda comum, então a textura dele "continua" para dentro do hexágono. A mistura é de 50% na própria borda (dos dois lados) e cai a zero no fim da faixa. As faixas são montadas uma vez por (terreno, variante, borda) e guardadas, e o custo medido com 247 hexágonos foi de menos de 2 ms por quadro. Terrenos com `extra` maior que zero não se misturam.
 
 **Rios e estradas em pixel art.** Com `"pixelart": true`, rios e estradas são desenhados pixel a pixel (`pixellinhas.ts` e `desenharLinhasPixel` no renderizador): uma camada do tamanho da tela, em pixels do mesmo tamanho dos da arte (1/128 da largura do hexágono), ampliada sem suavizar. O rio é azul com contorno e brilho, a estrada é de terra com salpicos. Sem `pixelart`, continuam traços suaves.
 

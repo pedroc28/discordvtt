@@ -20,6 +20,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Arte final dos terrenos em pixel art (PixelLab): os 45 terrenos feitos, guia e lista em `docs/mapa/arte.md`
 - [x] Ícones de marcador em pixel art (12 ícones de 64 × 64, na pasta `pixel`)
 - [x] Token do grupo em pixel art, e rios e estradas desenhados pixel a pixel
+- [x] Transições entre terrenos: mistura por pontilhado na borda, para qualquer par
 - [ ] Mesa com tokens ligados às fichas e névoa de guerra
 
 ## Servidor (Pedro)

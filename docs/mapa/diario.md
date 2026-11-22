@@ -75,6 +75,7 @@ Mudanças em relação ao plano inicial, decididas durante a construção:
 - **Lote 3** (floresta, floresta densa, bosque) feito: 9 variantes. Foram 3 chamadas (45 gerações), porque a primeira saiu com copas soltas e blocos com laje. O prompt que funcionou para florestas está no guia.
 - **Lote 4** (taiga, floresta de outono, floresta nevada) feito: 6 variantes em uma chamada só (15 gerações). A receita de floresta do guia funcionou de primeira.
 - **Lote 5** (selva, floresta morta, picos nevados) feito: 6 variantes em uma chamada (15 gerações). Os picos nevados repetem em grade, ficam como ponto a refazer.
+- **Lote 6** (rochoso, planalto, cânion) feito: 6 variantes em uma chamada (15 gerações).
 - **Paleta com pastas e pesquisa por tag.** Cada terreno do `tileset.json` tem `pasta` e `tags` (3 a 5), e o tileset tem a lista `pastas`. O catálogo dos 43 terrenos previstos fica em `app/tools/catalogo-terrenos.json` e o gerador do tileset padrão lê dele.
 - O tileset ganhou a opção `pixelart` (amplia sem suavizar) e o mapa aceita `?tileset=<pasta>` no endereço para testar arte sem mexer no código.
 - Descoberta: o `create_tiles_pro` do PixelLab em `hex_pointy` com `tile_size` 128 entrega 128 × 128 com o hexágono achatado preenchendo o quadrado. O mapa estica para o hexágono regular. Usar `tile_height` não serve, porque acrescenta uma laje de espessura.

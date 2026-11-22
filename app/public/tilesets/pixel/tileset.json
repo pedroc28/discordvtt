@@ -364,6 +364,60 @@
       ]
     },
     {
+      "id": "rochoso",
+      "nome": "Terreno rochoso",
+      "cor": "#73665b",
+      "extra": 0,
+      "arquivos": [
+        "rochoso-1.png",
+        "rochoso-2.png"
+      ],
+      "pasta": "altos",
+      "tags": [
+        "rocha",
+        "pedras",
+        "árido",
+        "difícil",
+        "relevo"
+      ]
+    },
+    {
+      "id": "planalto",
+      "nome": "Planalto",
+      "cor": "#6c5b38",
+      "extra": 0,
+      "arquivos": [
+        "planalto-1.png",
+        "planalto-2.png"
+      ],
+      "pasta": "altos",
+      "tags": [
+        "planalto",
+        "mesa",
+        "penhasco",
+        "rocha",
+        "alto"
+      ]
+    },
+    {
+      "id": "canion",
+      "nome": "Cânion",
+      "cor": "#a0432d",
+      "extra": 0,
+      "arquivos": [
+        "canion-1.png",
+        "canion-2.png"
+      ],
+      "pasta": "altos",
+      "tags": [
+        "cânion",
+        "penhasco",
+        "rocha",
+        "árido",
+        "passagem"
+      ]
+    },
+    {
       "id": "deserto",
       "nome": "Deserto",
       "cor": "#dcc17c",

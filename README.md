@@ -7,6 +7,7 @@ Mesa virtual própria para o nosso grupo de RPG: chat de voz, chat de texto, fic
 ```
 app/         app web (Vite, React e TypeScript)
   src/ficha/ editor de fichas, já funcionando
+  src/mapa/  mapa hexagonal infinito compartilhado (leia src/mapa/README.md)
 pocketbase/  (próxima etapa) backend: login, chat, fichas e tempo real
 infra/       (próxima etapa) Docker Compose com PocketBase e LiveKit
 ```
@@ -19,6 +20,7 @@ Precisa do [Node.js](https://nodejs.org) LTS instalado.
 cd app
 npm install      # só na primeira vez
 npm run dev      # abre em http://localhost:5173
+npm test         # testes (Vitest)
 ```
 
 Para testar no celular na mesma rede Wi-Fi, use `npm run dev -- --host` e abra o endereço "Network" que aparece no terminal.
@@ -40,4 +42,8 @@ Para evitar conflitos, combinem quem mexe em quais arquivos.
 - [ ] Fórmulas, campos calculados e rolagens no chat
 - [ ] Painel do mestre
 - [ ] Chat de voz e de texto
-- [ ] Mesa com mapa e tokens
+- [x] Mapa hexagonal infinito: pintar terreno, desfazer por jogador, sincronia entre abas, toque e mouse (fases 0 e 1)
+- [ ] Mapa hexagonal: notas por hexágono, regiões e marcadores (fase 2)
+- [ ] Mapa hexagonal: rios, estradas, token do grupo e régua (fase 3)
+- [ ] Mapa hexagonal no servidor: papéis, camada privada do mestre, presença (fase 4, depende da base)
+- [ ] Mesa com tokens

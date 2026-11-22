@@ -81,7 +81,7 @@ class RepositorioPocketBase implements RepositorioMapa {
 - `aplicar` com um lote já gravado (mesmo `id`) dá certo e não aplica de novo.
 - O autor de lotes e do token é o id da conta logada, posto pelo servidor. O controlador deve usar `useServidor().usuario.id` como autor, para o desfazer e o eco baterem.
 - `carregarChunk`, `carregarRegioes`, `exportarTudo` e o token falham com um `Error` quando o servidor não responde ou recusa. A mensagem diz a causa e o que fazer, em minúscula, para vir depois do que o mapa tentava.
-- Lotes com mais de 30 dias são apagados no servidor. Se o repositório precisar de um deles, ele para de entregar lotes, fica `desatualizado`, avisa `aoDesatualizar`, e a leitura passa a falhar pedindo para recarregar o mapa. Quem usa cria um repositório e um controlador novos.
+- Lotes com mais de 7 dias são apagados no servidor. Se o repositório precisar de um deles, ele para de entregar lotes, fica `desatualizado`, avisa `aoDesatualizar`, e a leitura passa a falhar pedindo para recarregar o mapa. Quem usa cria um repositório e um controlador novos.
 - Um lote tem no máximo 20 mil hexágonos e 16 MB. O servidor recusa um item fora do formato e, com ele, o lote inteiro.
 - `gravarToken(null)` grava a hora de quem tirou o token, e um aviso de token mais velho que o último entregue é ignorado.
 

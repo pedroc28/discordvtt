@@ -25,9 +25,10 @@ const LIMITES = {
 }
 
 // Lotes mais velhos que isto são apagados pela limpeza: o estado do mapa fica nos hexágonos e nas
-// regiões, e os lotes só servem para quem está conectado buscar o que perdeu. A variável existe para o
+// regiões, e os lotes servem para quem está conectado buscar o que perdeu e para o mestre reverter.
+// Prazo combinado com o GrifoCaolho em 22/11/2026 (ver docs/decisoes.md). A variável existe para o
 // teste das regras conseguir limpar na hora. Num servidor normal ela fica vazia e vale o padrão.
-const DIAS_PADRAO_LOTES = 30
+const DIAS_PADRAO_LOTES = 7
 
 // Quanto um relógio adiantado pode passar da hora do servidor ao mover o token do grupo.
 const TOLERANCIA_RELOGIO_MS = 60 * 1000

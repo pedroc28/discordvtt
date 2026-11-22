@@ -6,7 +6,7 @@
 //   hexágonos e regiões, numa transação. Só o servidor grava hexágonos e regiões.
 // - Os lotes chegam pelo tempo real, inclusive o eco do próprio lote, e são entregues ao mapa na
 //   ordem do servidor (ver fila-lotes.ts). Se falta algum, o repositório busca no servidor.
-// - Se o lote que falta já foi apagado pela limpeza (30 dias), o mapa local não tem como ficar certo:
+// - Se o lote que falta já foi apagado pela limpeza (7 dias), o mapa local não tem como ficar certo:
 //   o repositório para de entregar lotes e avisa quem estiver ouvindo `aoDesatualizar`.
 //
 // O repositório não usa o SDK do PocketBase direto: recebe um ClienteMapa, que o conexao.ts cria para

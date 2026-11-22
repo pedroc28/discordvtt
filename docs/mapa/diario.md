@@ -67,6 +67,12 @@ Mudanças em relação ao plano inicial, decididas durante a construção:
 - `Hexagono` ganhou `rios` e `estradas`. Dados antigos continuam válidos (lista vazia).
 - 89 testes (27 novos).
 
+### Arte em pixel art (em andamento)
+
+- Guia para o agente do PixelLab e lista de 43 terrenos em [`arte.md`](arte.md). Três já feitos como teste (oceano, planície, montanha, 2 variantes cada) na pasta `app/public/tilesets/pixel/`, que é uma cópia do tileset padrão com esses três terrenos trocados.
+- O tileset ganhou a opção `pixelart` (amplia sem suavizar) e o mapa aceita `?tileset=<pasta>` no endereço para testar arte sem mexer no código.
+- Descoberta: o `create_tiles_pro` do PixelLab em `hex_pointy` com `tile_size` 128 entrega 128 × 128 com o hexágono achatado preenchendo o quadrado. O mapa estica para o hexágono regular. Usar `tile_height` não serve, porque acrescenta uma laje de espessura.
+
 ## 4. Como foi verificado
 
 - **Automático:** `npm test` (62 testes), `npx tsc -b`, `npx oxlint` e `npm run build` passam nas duas branches.

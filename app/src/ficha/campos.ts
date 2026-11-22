@@ -81,7 +81,7 @@ export const DEFINICOES: DefinicaoCampo[] = [
   },
   {
     tipo: 'checkbox',
-    nome: 'Caixa de marcar',
+    nome: 'Marcação',
     descricao: 'Sim ou não, como proficiência',
     temChave: true,
     w: 160,

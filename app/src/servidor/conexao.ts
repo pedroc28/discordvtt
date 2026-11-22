@@ -1,12 +1,14 @@
-// Conexão do app com o PocketBase: login, campanhas e participantes.
-// É o único lugar do app que fala com o servidor (ver o CLAUDE.md da área). A tela só lê
-// o estado com useServidor() e chama os métodos de `conexao`.
+// Conexão do app com o PocketBase: login, campanhas, participantes e o cliente do mapa.
+// É o único lugar do app que usa o SDK do servidor (ver o CLAUDE.md da área). A tela só lê
+// o estado com useServidor() e chama os métodos de `conexao`. O mapa recebe um RepositorioPocketBase
+// pronto, por abrirRepositorioMapa().
 
 import PocketBase, { LocalAuthStore } from 'pocketbase'
 import { useSyncExternalStore } from 'react'
 import { ENDERECO_PADRAO, enderecoDoLink, normalizarEndereco, semParametroDoServidor } from './endereco'
-import { mensagemDeErro, type Acao } from './erros'
-import { campanhaValida, limparNomeCampanha, montarCampanhas, montarParticipantes, problemaNaNovaSenha } from './operacoes'
+import { MAPA_FECHADO, mensagemDeErro, type Acao } from './erros'
+import { campanhaValida, limparNomeCampanha, mapaContinuaAberto, montarCampanhas, montarParticipantes, problemaNaNovaSenha } from './operacoes'
+import { RepositorioPocketBase, type ClienteMapa, type FiltroServidor } from './repositorio-mapa'
 import type { EstadoServidor, FaseConexao, Papel } from './tipos'
 import { emailDaConta, normalizarCampanha, normalizarLista, normalizarParticipacao, normalizarUsuario } from './validacao'
 
@@ -74,6 +76,8 @@ export class ConexaoServidor {
   private geracao = 0
   // Sobe a cada recarga. Só a mais recente pode mudar a tela.
   private ultimaCarga = 0
+  // Mapas abertos, para fechar as assinaturas deles quando a pessoa troca de campanha, sai ou troca de servidor.
+  private mapasAbertos: Array<{ repositorio: RepositorioPocketBase; geracao: number }> = []
 
   constructor() {
     // O link de convite (?servidor=) vale mais que o endereço guardado. Ele é guardado na hora
@@ -105,6 +109,7 @@ export class ConexaoServidor {
 
   private mudar(patch: Partial<EstadoServidor>) {
     this.atual = { ...this.atual, ...patch }
+    this.fecharMapasForaDaSessao()
     for (const ouvinte of [...this.ouvintes]) ouvinte()
   }
 
@@ -481,6 +486,63 @@ export class ConexaoServidor {
     }
   }
 
+  // ---------- mapa ----------
+
+  /** O mapa da campanha aberta. Null sem login ou sem campanha aberta. */
+  abrirRepositorioMapa(): RepositorioPocketBase | null {
+    const { fase, campanhaAtualId } = this.atual
+    if (fase !== 'conectado' || !campanhaAtualId) return null
+    const repositorio = new RepositorioPocketBase(this.clienteMapa(this.geracao), campanhaAtualId)
+    this.mapasAbertos.push({ repositorio, geracao: this.geracao })
+    return repositorio
+  }
+
+  private fecharMapasForaDaSessao() {
+    if (!this.mapasAbertos.length) return
+    const sessao = { fase: this.atual.fase, campanhaAtualId: this.atual.campanhaAtualId, geracao: this.geracao }
+    this.mapasAbertos = this.mapasAbertos.filter(({ repositorio, geracao }) => {
+      if (!repositorio.fechado && mapaContinuaAberto({ campanhaId: repositorio.campanhaId, geracao }, sessao)) return true
+      void repositorio.fechar()
+      return false
+    })
+  }
+
+  /**
+   * O que o RepositorioPocketBase precisa do SDK, preso à sessão atual. Resposta que chega depois de a
+   * sessão acabar (saída, troca de servidor) vira erro, para não trazer dados para a sessão nova.
+   */
+  private clienteMapa(geracao: number): ClienteMapa {
+    const pb = this.pb
+    const filtro = (f: FiltroServidor) => pb.filter(f.expressao, f.valores)
+    const daSessao = async <T>(pedido: Promise<T>): Promise<T> => {
+      const resposta = await pedido
+      if (geracao !== this.geracao) throw new Error(MAPA_FECHADO)
+      return resposta
+    }
+    return {
+      endereco: this.atual.endereco,
+      // Lotes de importação e mapas grandes: páginas do maior tamanho que o PocketBase aceita.
+      listar: (colecao, f, ordem) =>
+        daSessao(pb.collection(colecao).getFullList({ filter: filtro(f), batch: 1000, ...(ordem ? { sort: ordem } : {}) })),
+      primeiro: (colecao, f) =>
+        daSessao(pb.collection(colecao).getList(1, 1, { filter: filtro(f), skipTotal: true }).then((pagina) => pagina.items[0] ?? null)),
+      criar: (colecao, dados) => daSessao(pb.collection(colecao).create(dados)),
+      atualizar: (colecao, id, dados) => daSessao(pb.collection(colecao).update(id, dados)),
+      assinar: (colecao, f, ouvinte) =>
+        pb.collection(colecao).subscribe(
+          '*',
+          (evento) => {
+            if (geracao === this.geracao) ouvinte({ acao: evento.action, registro: evento.record })
+          },
+          { filter: filtro(f) },
+        ),
+      aoReconectar: (ouvinte) =>
+        pb.realtime.subscribe('PB_CONNECT', () => {
+          if (geracao === this.geracao) ouvinte()
+        }),
+    }
+  }
+
   /** Esconde a mensagem de erro ou de aviso. */
   limparMensagens() {
     if (this.atual.erro || this.atual.aviso) this.mudar({ erro: null, aviso: null })
@@ -490,6 +552,16 @@ export class ConexaoServidor {
 export type ResultadoSenha = { ok: true; aviso: string } | { ok: false; erro: string }
 
 export const conexao = new ConexaoServidor()
+
+/**
+ * O mapa da campanha aberta, guardado no servidor, para a área do mapa usar no lugar do RepositorioLocal.
+ * Null sem login ou sem campanha aberta. Quando a pessoa troca de campanha, sai ou troca de servidor, o
+ * repositório é fechado sozinho e passa a falhar com uma mensagem que explica: o mapa abre outro.
+ * Detalhes em docs/contratos.md.
+ */
+export function abrirRepositorioMapa(): RepositorioPocketBase | null {
+  return conexao.abrirRepositorioMapa()
+}
 
 /** Estado da conexão com o servidor. Atualiza sozinho a cada mudança. */
 export function useServidor(): EstadoServidor {

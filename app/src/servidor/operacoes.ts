@@ -1,7 +1,7 @@
 // Funções puras sobre os dados do servidor: montam o que a tela mostra a partir do que
 // o PocketBase devolveu. Não fazem pedidos nem mudam o que receberam.
 
-import type { Campanha, MinhaCampanha, Papel, Participacao, ParticipanteVisivel, Usuario } from './tipos'
+import type { Campanha, FaseConexao, MinhaCampanha, Papel, Participacao, ParticipanteVisivel, Usuario } from './tipos'
 
 const porNome = (a: { nome: string }, b: { nome: string }) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
 
@@ -64,4 +64,15 @@ export function problemaNaNovaSenha(atual: string, nova: string, confirmacao: st
 export function limparNomeCampanha(nome: string): string | null {
   const limpo = nome.trim().replace(/\s+/g, ' ')
   return limpo && limpo.length <= 80 ? limpo : null
+}
+
+/**
+ * Um mapa aberto continua valendo enquanto a pessoa está conectada, na mesma sessão e com a mesma
+ * campanha aberta. Trocar de campanha, sair ou trocar de servidor fecha as assinaturas dele.
+ */
+export function mapaContinuaAberto(
+  mapa: { campanhaId: string; geracao: number },
+  sessao: { fase: FaseConexao; campanhaAtualId: string | null; geracao: number },
+): boolean {
+  return sessao.fase === 'conectado' && sessao.geracao === mapa.geracao && sessao.campanhaAtualId === mapa.campanhaId
 }

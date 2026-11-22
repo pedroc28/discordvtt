@@ -3,6 +3,7 @@ import {
   campanhaValida,
   ehUnicoMestre,
   limparNomeCampanha,
+  mapaContinuaAberto,
   montarCampanhas,
   montarParticipantes,
   problemaNaNovaSenha,
@@ -92,5 +93,18 @@ describe('nome da campanha', () => {
     expect(limparNomeCampanha('   ')).toBeNull()
     expect(limparNomeCampanha('x'.repeat(81))).toBeNull()
     expect(limparNomeCampanha('x'.repeat(80))).toHaveLength(80)
+  })
+})
+
+describe('mapa aberto', () => {
+  const mapa = { campanhaId: 'c1', geracao: 3 }
+  it('continua aberto na mesma sessão e na mesma campanha', () => {
+    expect(mapaContinuaAberto(mapa, { fase: 'conectado', campanhaAtualId: 'c1', geracao: 3 })).toBe(true)
+  })
+  it('fecha ao trocar de campanha, sair ou trocar de servidor', () => {
+    expect(mapaContinuaAberto(mapa, { fase: 'conectado', campanhaAtualId: 'c2', geracao: 3 })).toBe(false)
+    expect(mapaContinuaAberto(mapa, { fase: 'conectado', campanhaAtualId: null, geracao: 3 })).toBe(false)
+    expect(mapaContinuaAberto(mapa, { fase: 'desconectado', campanhaAtualId: 'c1', geracao: 3 })).toBe(false)
+    expect(mapaContinuaAberto(mapa, { fase: 'conectado', campanhaAtualId: 'c1', geracao: 4 })).toBe(false)
   })
 })

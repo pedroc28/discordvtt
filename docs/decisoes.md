@@ -4,6 +4,12 @@ Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em ci
 
 ## 2026-11-22
 
+- **Mapa sincronizado por lotes numerados pelo servidor.** O app grava o lote inteiro, e um hook do servidor, numa transação, valida, dá o número de ordem e aplica nos hexágonos e regiões. Só o servidor grava hexágonos e regiões. O tempo real do PocketBase avisa registro por registro, e o contrato do mapa pede lotes inteiros na ordem do servidor: um registro por lote resolve as duas coisas, sem a API de batch. Um lote repetido responde como gravado, para o app poder reenviar sem medo.
+- **Um mapa por campanha, por enquanto, editável por quem participa.** A camada privada do mestre e quem pode editar ficam para combinar com o GrifoCaolho, junto com ligar o mapa ao servidor.
+- **Lotes apagados depois de 30 dias.** O estado do mapa fica nos hexágonos, e os lotes entrariam para sempre em todo backup. A numeração fica num contador no mapa, para não recomeçar. Um app que precise de um lote já apagado avisa que o mapa tem de ser recarregado, em vez de seguir errado.
+- **Tamanho do chunk e formato da chave viram contrato entre mapa e servidor.** O servidor calcula o chunk de cada hexágono para o app carregar por chunk. Os casos, com negativos, são conferidos pelos dois lados.
+- **Limite de pedidos próprio para lotes.** Cada pincelada é um lote, e o limite padrão do PocketBase para criar registros barraria quem pinta tocando rápido.
+
 - **Rodízio de anfitrião só depois de mapa e fichas no servidor.** O grupo ainda vai decidir se quer que qualquer membro possa hospedar. Se quiser, o rodízio entra depois de mapa e fichas estarem no servidor e testados, para não misturar problemas de sincronia com problemas de troca de anfitrião. Até lá, o servidor fica portátil: tudo no `pb_data`, mudanças por migração e nada específico de um PC no banco. O plano está em `docs/servidor/README.md`.
 - **Painel de administrador só no PC do servidor.** Com o servidor na internet, a conta de administrador é o alvo mais valioso. A configuração "Superuser IPs" aceita o administrador só de `127.0.0.1`. O preço: administrar só no próprio PC, e não pelo celular.
 - **Backup a cada hora, com cópia numa pasta sincronizada com a nuvem.** O servidor mora num notebook, que pode estragar ou sumir. A cópia usa a nuvem que a pessoa já tem, sem serviço novo.

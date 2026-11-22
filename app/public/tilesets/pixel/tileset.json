@@ -138,6 +138,60 @@
       ]
     },
     {
+      "id": "taiga",
+      "nome": "Floresta de coníferas",
+      "cor": "#48645b",
+      "extra": 0,
+      "arquivos": [
+        "taiga-1.png",
+        "taiga-2.png"
+      ],
+      "pasta": "florestas",
+      "tags": [
+        "taiga",
+        "coníferas",
+        "pinheiros",
+        "frio",
+        "floresta"
+      ]
+    },
+    {
+      "id": "floresta-outono",
+      "nome": "Floresta de outono",
+      "cor": "#9c4d23",
+      "extra": 0,
+      "arquivos": [
+        "floresta-outono-1.png",
+        "floresta-outono-2.png"
+      ],
+      "pasta": "florestas",
+      "tags": [
+        "outono",
+        "árvores",
+        "laranja",
+        "temperado",
+        "floresta"
+      ]
+    },
+    {
+      "id": "floresta-nevada",
+      "nome": "Floresta nevada",
+      "cor": "#a3b6c8",
+      "extra": 0,
+      "arquivos": [
+        "floresta-nevada-1.png",
+        "floresta-nevada-2.png"
+      ],
+      "pasta": "florestas",
+      "tags": [
+        "neve",
+        "coníferas",
+        "frio",
+        "inverno",
+        "floresta"
+      ]
+    },
+    {
       "id": "colina",
       "nome": "Colinas",
       "cor": "#88ad4e",

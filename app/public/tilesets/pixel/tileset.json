@@ -545,11 +545,12 @@
     {
       "id": "mangue",
       "nome": "Manguezal",
-      "cor": "#4b6040",
+      "cor": "#427356",
       "extra": 0,
       "arquivos": [
         "mangue-1.png",
-        "mangue-2.png"
+        "mangue-2.png",
+        "mangue-3.png"
       ],
       "pasta": "aguas",
       "tags": [
@@ -648,6 +649,62 @@
         "frio",
         "azul",
         "difícil"
+      ]
+    },
+    {
+      "id": "mar-congelado",
+      "nome": "Mar congelado",
+      "cor": "#94c5c8",
+      "extra": 0,
+      "arquivos": [
+        "mar-congelado-1.png",
+        "mar-congelado-2.png",
+        "mar-congelado-3.png"
+      ],
+      "pasta": "gelo",
+      "tags": [
+        "gelo",
+        "mar",
+        "frio",
+        "banquisa",
+        "inverno"
+      ]
+    },
+    {
+      "id": "praia",
+      "nome": "Praia",
+      "cor": "#ded0a7",
+      "extra": 0,
+      "arquivos": [
+        "praia-1.png",
+        "praia-2.png"
+      ],
+      "pasta": "costa",
+      "tags": [
+        "praia",
+        "areia",
+        "costa",
+        "mar",
+        "quente"
+      ]
+    },
+    {
+      "id": "falesia",
+      "nome": "Falésia",
+      "cor": "#798871",
+      "extra": 0,
+      "arquivos": [
+        "falesia-1.png",
+        "falesia-2.png",
+        "falesia-3.png"
+      ],
+      "pasta": "costa",
+      "tags": [
+        "falésia",
+        "penhasco",
+        "costa",
+        "rocha",
+        "mar"
       ]
     },
     {

@@ -2,7 +2,7 @@
 
 Guia para quem gera a arte dos terrenos do mapa com o PixelLab (o agente de arte, ou uma pessoa). É autossuficiente: com este arquivo e o `docs/mapa/manual.md` dá para fazer todos os tiles sem perguntar nada. O formato técnico do tileset está no manual, na seção "Tilesets". Aqui está o que desenhar, como pedir ao PixelLab, como conferir e onde guardar.
 
-Estado: **33 de 43 tiles feitos**: água, planície e montanha (teste) e os lotes 1 a 10 (`campo`, `colina`, `savana`, `estepe`, `charneca`, `pomar`, `floresta`, `floresta-densa`, `bosque`, `taiga`, `floresta-outono`, `floresta-nevada`, `selva`, `floresta-morta`, `pico-nevado`, `rochoso`, `planalto`, `canion`, `vulcao`, `campo-de-lava`, `deserto`, `dunas`, `oasis`, `salar`, `pantano`, `mangue`, `agua-rasa`, `recife`, `tundra`, `geleira`). Faltam 10 da lista da seção 7.
+Estado: **36 de 43 tiles feitos**: água, planície e montanha (teste) e os lotes 1 a 11 (`campo`, `colina`, `savana`, `estepe`, `charneca`, `pomar`, `floresta`, `floresta-densa`, `bosque`, `taiga`, `floresta-outono`, `floresta-nevada`, `selva`, `floresta-morta`, `pico-nevado`, `rochoso`, `planalto`, `canion`, `vulcao`, `campo-de-lava`, `deserto`, `dunas`, `oasis`, `salar`, `pantano`, `mangue`, `agua-rasa`, `recife`, `tundra`, `geleira`, `mar-congelado`, `praia`, `falesia`). Faltam 7 da lista da seção 7.
 
 ## 1. Estilo
 
@@ -64,6 +64,7 @@ Ferramenta: `create_tiles_pro`. Configuração que funcionou:
 - **Florestas e qualquer terreno cheio de árvores:** a descrição "a cluster of tree crowns" gerou copas soltas sem chão (4 de 6 imagens) e, nas florestas densas, um bloco com laterais (laje). O que funcionou foi pedir `flat hexagonal terrain tile, top-down terrain texture completely filled edge to edge with ...` e `flat tile with no thickness and no side walls`. Para terreno com chão e poucas árvores, descreva o chão primeiro (`bright mid-green grass ground completely filling the hexagon edge to edge, with sparse small trees`).
 - Floresta "densa" sem dizer `broadleaf oak and beech, NOT pine trees` sai de pinheiros, e isso se confunde com a taiga. Pinheiros ficam para `taiga`.
 - Cuidado com trilhas: uma variante de bosque saiu com um caminho de pedra de lado a lado e foi descartada, porque o mapa já desenha estradas por cima.
+- **Terreno que precisa se encaixar com ele mesmo** (manguezal, pântano, floresta): a primeira versão do manguezal tinha árvores grandes cortadas pela borda e lama escura, e no mapa os hexágonos ficavam feios juntos. A versão refeita pede `many small ... evenly spread across the whole tile` e `similar density everywhere`, com a água de tom único até a borda. Escrever `seamless tileable` e `small shrubs` sem descrever o chão faz o PixelLab devolver arbustos soltos, sem hexágono. Sempre teste o terreno pintado em massa antes de aprovar (seção 5, item 5).
 - Sombras azul-esverdeadas fortes demais fazem relevo parecer lago (aconteceu nas colinas). Peça `gentle darker green shadows`.
 
 Frases de borda e luz que devem aparecer sempre:
@@ -214,7 +215,7 @@ Marque aqui ao aprovar (`[x]`) e anote o job do PixelLab.
 - [x] Lote 8: `dunas` (2 variantes), `oasis` (2), `salar` (2). Job `30db8647-c146-4cee-a8bf-840b97211562`, uma chamada (15 gerações). Ponto fraco: cada tile de dunas é uma duna enorme só, então pintar vários juntos forma uma grade de curvas em S. Funciona melhor misturado com `deserto`. Vale gerar mais 3 variantes de dunas menores e de direções diferentes
 - [x] Lote 9: `pantano` (2 variantes), `mangue` (2), `agua-rasa` (2). Job `e094f1a9-3144-4909-8154-ad2558957c43`, uma chamada (15 gerações). Atenção: a arte antiga em SVG de `pantano` e `agua-rasa` foi removida da pasta `pixel`
 - [x] Lote 10: `recife` (2 variantes), `tundra` (2), `geleira` (2). Job `da2c9373-b579-4519-b9c8-5a6a5a0e79e2`, uma chamada (15 gerações). A arte antiga em SVG da `tundra` foi removida da pasta `pixel`. Ponto fraco: as rachaduras da geleira não continuam de um hexágono para o vizinho
-- [ ] Lote 11: `mar-congelado`, `praia`, `falesia`
+- [x] Lote 11: `mar-congelado` (3 variantes), `praia` (2), `falesia` (3). Jobs `12210478-cae9-4772-ae42-fa9b7f9075c2` e `ec190cd1-879a-4b33-bc20-f260709afe8e`. O `mangue` do lote 9 foi **refeito** (job `ec190cd1-...`, 3 variantes) porque as árvores grandes não se encaixavam entre hexágonos. A `praia` e a `falesia` têm o lado do mar fixo, então só encaixam bem em costas viradas para o mesmo lado, e pedem o uso com cuidado
 - [ ] Lote 12: `delta`, `cidade`, `ruinas`
 - [ ] Lote 13: `terra-arrasada`, `floresta-encantada`, `cogumelos`
 - [ ] Lote 14: `cristais`

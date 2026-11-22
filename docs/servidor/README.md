@@ -172,6 +172,14 @@ Proteções que valem atrás do Funnel (migração `1795321002_hospedagem.js`):
 - Para guardar uma cópia fora do PC, crie o arquivo `pocketbase/copia-backup.txt` com uma linha só: o caminho de uma pasta sincronizada com a nuvem (Google Drive, OneDrive), por exemplo `C:\Users\pedro\Google Drive\DiscordVtt`. O `iniciar.bat` lê esse arquivo, e o hook `pb_hooks/backup.pb.js` copia cada backup para lá, guardando os 48 mais novos. O arquivo fica fora do Git.
 - Backup na hora: painel, **Settings**, **Backups**, **Initialize new backup**. A cópia para a pasta de fora também acontece.
 - **Restaurar no Windows:** o botão de restaurar do painel só funciona em Linux e macOS. No Windows, feche o `iniciar.bat`, renomeie a pasta `pb_data` para `pb_data-antiga`, crie uma `pb_data` vazia, extraia nela o zip do backup e ligue o servidor de novo.
+- **Ensaiar a restauração** sem tocar no servidor de verdade, de vez em quando, para ter certeza de que o backup serve:
+  1. Crie uma pasta fora do repositório (por exemplo, `ensaio-restauracao` na Área de Trabalho) e copie para ela o `pocketbase.exe`.
+  2. Copie para ela o zip mais recente da pasta de cópia (a do `copia-backup.txt`), crie uma `pb_data` dentro e extraia o zip nela.
+  3. Na pasta, crie um `ensaio.bat` com `pocketbase.exe serve --http=127.0.0.1:8091 --dir=pb_data`. A porta 8091 não atrapalha o servidor de verdade, e sem `pb_hooks` na pasta a cópia não manda backups para a nuvem.
+  4. Ligue o `ensaio.bat`, entre no painel em http://127.0.0.1:8091/_/ com a conta de administrador e confira as contas, as campanhas e os participantes.
+  5. Feche a janela e apague a pasta, que tem uma cópia dos dados.
+
+  Feito em 22/11/2026 com o backup automático das 18h copiado para o Google Drive: contas, campanhas e participações voltaram completas.
 
 ## Testar as regras
 
@@ -185,7 +193,7 @@ O script sobe um PocketBase com dados temporários, cria contas de teste e confe
 
 1. ~~Base: contas, campanhas e participantes, com migrações e regras.~~ Pronto.
 2. ~~Login no app e escolha da campanha, com o endereço do servidor configurável.~~ Pronto.
-3. ~~Hospedagem com Tailscale Funnel e backup.~~ Pronto e testado em 22/11/2026: login pelo celular no 4G e de um amigo, IP público de cada pessoa nos logs e backup copiado para o Google Drive.
+3. ~~Hospedagem com Tailscale Funnel e backup.~~ Pronto e testado em 22/11/2026: login pelo celular no 4G e de um amigo, IP público de cada pessoa nos logs e backup copiado para o Google Drive. A restauração do backup do Google Drive foi ensaiada no mesmo dia (ver "Backup").
 4. **Mapa no servidor.** A base está pronta (22/11/2026): coleções, regras, sincronia por lotes, limpeza e o `RepositorioPocketBase` (ver a seção "Mapa"). Falta ligar o mapa nele e a camada privada do mestre, combinados com o GrifoCaolho (ver "Para combinar com o GrifoCaolho").
 5. **Fichas sincronizadas**, quando a ficha descongelar. Com a ficha inteira num registro só, duas pessoas editando campos diferentes apagariam a edição uma da outra. Precisa de um registro por valor ou por chave.
 6. **Rodízio de anfitrião**, se o grupo decidir. Fica para depois dos passos 4 e 5 testados em sessões reais, para não misturar problemas de sincronia com problemas de troca de anfitrião. O detalhamento está na seção abaixo.

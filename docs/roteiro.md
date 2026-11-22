@@ -32,7 +32,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 
 - [x] Base no PocketBase: contas, campanhas, mestres e jogadores, com regras de acesso testadas
 - [x] Login no app e escolha da campanha, com gerenciamento de participantes e tempo real
-- [x] Hospedagem: no ar para o grupo, de graça, com Tailscale Funnel no PC do Pedro e backup copiado para o Google Drive
+- [x] Hospedagem: no ar para o grupo, de graça, com Tailscale Funnel no PC do Pedro e backup copiado para o Google Drive, com a restauração ensaiada
 - [x] Base do mapa no servidor: um mapa por campanha, hexágonos, regiões, token e lotes, com regras testadas, limpeza de lotes antigos e o `RepositorioPocketBase`
 - [ ] Ligar o mapa ao servidor, com o GrifoCaolho (lista do que combinar em `docs/servidor/README.md`)
 - [ ] Fichas sincronizadas: todos editando e vendo a mesma ficha em tempo real

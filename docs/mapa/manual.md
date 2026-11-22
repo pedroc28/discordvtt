@@ -69,6 +69,8 @@ tileset.ts           carrega o tileset (manifesto + imagens)
 renderizador.ts      desenha no canvas 2D
 entrada.ts           mouse, toque e caneta (Pointer Events)
 regua.ts             régua de distância (pura)
+paleta.ts            pastas e pesquisa por tag da paleta de terrenos (pura)
+PaletaTerrenos.tsx   paleta de terrenos com pastas e pesquisa
 armazenamento.ts     validação de dados externos e preferências locais
 MapaHex.tsx          tela: barra de ferramentas, paletas, canvas, painéis
 InspetorHexagono.tsx painel do hexágono (nome, terreno, região, marcadores, nota)
@@ -126,12 +128,17 @@ Um tileset é uma pasta em `app/public/tilesets/<id>/` com um `tileset.json` e a
   "largura": 256,           // largura do hexágono na imagem, em px
   "altura": 296,            // altura do hexágono SEM o extra, em px
   "pixelart": false,        // true: amplia as imagens sem suavizar (arte em pixel art)
+  "pastas": [               // pastas da paleta, na ordem em que aparecem
+    { "id": "florestas", "nome": "Florestas" }
+  ],
   "terrenos": [
     {
       "id": "floresta",             // é o que fica gravado no mapa. Não renomeie depois que houver mapas
       "nome": "Floresta",
       "cor": "#5f8f45",             // cor de reserva: pinta o hexágono antes da imagem e esconde frestas
       "extra": 0,                   // px a mais no topo da imagem (montanhas, torres)
+      "pasta": "florestas",         // id de uma das `pastas` do tileset (ou omita: cai em "Outros")
+      "tags": ["floresta", "árvores", "temperado"],   // pesquisa da paleta, no mínimo 3
       "arquivos": ["floresta-1.svg", "floresta-2.svg", "floresta-3.svg"]
     }
   ],
@@ -148,6 +155,8 @@ Um tileset é uma pasta em `app/public/tilesets/<id>/` com um `tileset.json` e a
 **Formato das imagens.** PNG, WebP ou SVG. O hexágono pointy-top deve ocupar a imagem inteira de ponta a ponta: **256 px de largura por 296 de altura** (a altura é `2 × largura / √3`), com os cantos transparentes. Se o terreno tem algo que passa por cima do hexágono de cima (picos, árvores altas), some `extra` px **no topo** da imagem: a imagem fica `256 × (296 + extra)` e o hexágono continua alinhado à base. Dê mais de uma variante por terreno: cada hexágono sempre usa a mesma, escolhida pela posição, então o mapa não pisca nem repete um padrão visível.
 
 **Ícones de marcador.** Imagens quadradas com fundo transparente, de qualquer tamanho (o tileset padrão usa 128×128, em selo redondo). Um hexágono mostra até 3 marcadores lado a lado, e um "+N" se houver mais. Marcador sem imagem aparece como um círculo simples.
+
+**Pastas e tags na paleta.** A paleta de terrenos agrupa os tiles em pastas que abrem e fecham (o app lembra quais estão fechadas) e tem uma caixa de pesquisa. A pesquisa ignora acento e maiúsculas e procura em cada palavra digitada no nome do terreno, no nome da pasta e nas tags. O botão "Tags" abre os chips de todas as tags, e marcar mais de uma exige que o terreno tenha todas. Durante a pesquisa as pastas com resultado ficam abertas, e Esc limpa. No celular a faixa da paleta tem só a caixa de pesquisa e os tiles em fila. A lógica está em `paleta.ts` (pura, testada) e a tela em `PaletaTerrenos.tsx`. Os 43 terrenos previstos têm pasta e tags prontas em `app/tools/catalogo-terrenos.json`, que o gerador do tileset padrão também lê.
 
 **Pixel art e `?tileset=`.** Com `"pixelart": true`, as imagens são ampliadas sem suavização. A imagem pode ter qualquer tamanho: ela é esticada para o hexágono de `largura` × `altura`. A arte do PixelLab, por exemplo, são PNGs de 128 × 128 com o hexágono preenchendo o quadrado, e o mapa os estica para 256 × 296. Para ver outra pasta de tileset sem mexer no código, abra o mapa com `?tileset=<pasta>` no endereço (só letras minúsculas, números e hífen). O guia completo da arte nova, com a lista dos terrenos, está em [`arte.md`](arte.md).
 

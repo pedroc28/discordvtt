@@ -10,6 +10,16 @@ export interface DefTerreno {
   extra: number
   /** Variantes. Cada hexágono sempre usa a mesma, escolhida pela posição. */
   arquivos: string[]
+  /** Pasta da paleta (id de `DefTileset.pastas`), ou null para cair em "Outros". */
+  pasta: string | null
+  /** Palavras para a pesquisa da paleta, em minúsculas, sem repetir. */
+  tags: string[]
+}
+
+/** Agrupamento dos terrenos na paleta. A ordem da lista é a ordem das pastas. */
+export interface DefPasta {
+  id: string
+  nome: string
 }
 
 /** Ícone de marcador (cidade, masmorra...). Qualquer tamanho, de preferência quadrado e com fundo transparente. */
@@ -30,6 +40,7 @@ export interface DefTileset {
   altura: number
   /** Arte em pixel art: as imagens são ampliadas sem suavizar, para os pixels ficarem nítidos. */
   pixelart: boolean
+  pastas: DefPasta[]
   terrenos: DefTerreno[]
   marcadores: DefMarcador[]
 }
@@ -39,9 +50,28 @@ const ehObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !
 const texto = (v: unknown, p: string) => (typeof v === 'string' && v ? v : p)
 const positivo = (v: unknown, p: number) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : p)
 
+/** Tags em minúsculas e sem espaços sobrando, sem repetir e sem vazias. */
+export function normalizarTags(bruto: unknown): string[] {
+  if (!Array.isArray(bruto)) return []
+  const saida: string[] = []
+  for (const t of bruto) {
+    if (typeof t !== 'string') continue
+    const limpa = t.trim().toLowerCase().replace(/\s+/g, ' ')
+    if (limpa && !saida.includes(limpa)) saida.push(limpa)
+  }
+  return saida
+}
+
 export function normalizarTileset(bruto: unknown): DefTileset | null {
   if (!ehObj(bruto) || !Array.isArray(bruto.terrenos)) return null
   if (bruto.orientacao !== 'pointy') return null
+  const pastas: DefPasta[] = []
+  const pastasVistas = new Set<string>()
+  for (const p of Array.isArray(bruto.pastas) ? bruto.pastas : []) {
+    if (!ehObj(p) || typeof p.id !== 'string' || !p.id || pastasVistas.has(p.id)) continue
+    pastasVistas.add(p.id)
+    pastas.push({ id: p.id, nome: texto(p.nome, p.id) })
+  }
   const vistos = new Set<string>()
   const terrenos: DefTerreno[] = []
   for (const t of bruto.terrenos) {
@@ -54,6 +84,9 @@ export function normalizarTileset(bruto: unknown): DefTileset | null {
       cor: texto(t.cor, '#888888'),
       extra: typeof t.extra === 'number' && t.extra >= 0 ? t.extra : 0,
       arquivos,
+      // Pasta que não existe na lista conta como sem pasta, para não sumir da paleta.
+      pasta: typeof t.pasta === 'string' && pastasVistas.has(t.pasta) ? t.pasta : null,
+      tags: normalizarTags(t.tags),
     })
   }
   if (!terrenos.length) return null
@@ -72,6 +105,7 @@ export function normalizarTileset(bruto: unknown): DefTileset | null {
     largura: positivo(bruto.largura, 256),
     altura: positivo(bruto.altura, 296),
     pixelart: bruto.pixelart === true,
+    pastas,
     terrenos,
     marcadores,
   }

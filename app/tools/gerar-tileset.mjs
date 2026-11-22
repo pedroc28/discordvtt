@@ -7,7 +7,7 @@
 // Formato de cada imagem: 256 px de largura e 296 px de altura (hexágono pointy-top encaixado),
 // mais `extra` px no topo para o que passa por cima do hexágono de cima (montanhas, por exemplo).
 
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -501,12 +501,16 @@ rmSync(saida, { recursive: true, force: true })
 mkdirSync(saida, { recursive: true })
 mkdirSync(join(saida, 'marcadores'), { recursive: true })
 
+// Pastas e tags da paleta vêm do catálogo, que vale para qualquer tileset.
+const catalogo = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'catalogo-terrenos.json'), 'utf8'))
+
 const manifesto = {
   id: 'padrao',
   nome: 'Padrão (gerado por script)',
   orientacao: 'pointy',
   largura: L,
   altura: A,
+  pastas: catalogo.pastas,
   terrenos: [],
   marcadores: [],
 }
@@ -518,7 +522,8 @@ for (const t of TERRENOS) {
     writeFileSync(join(saida, nome), montarSvg(t, v - 1))
     arquivos.push(nome)
   }
-  manifesto.terrenos.push({ id: t.id, nome: t.nome, cor: t.cor, extra: t.extra, arquivos })
+  const meta = catalogo.terrenos[t.id]
+  manifesto.terrenos.push({ id: t.id, nome: t.nome, cor: t.cor, extra: t.extra, arquivos, pasta: meta.pasta, tags: meta.tags })
 }
 
 for (const m of MARCADORES) {

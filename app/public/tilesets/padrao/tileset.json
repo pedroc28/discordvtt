@@ -4,6 +4,44 @@
   "orientacao": "pointy",
   "largura": 256,
   "altura": 296,
+  "pastas": [
+    {
+      "id": "terra-aberta",
+      "nome": "Terra aberta"
+    },
+    {
+      "id": "florestas",
+      "nome": "Florestas"
+    },
+    {
+      "id": "altos",
+      "nome": "Montanhas e rochas"
+    },
+    {
+      "id": "aridos",
+      "nome": "Desertos e áridos"
+    },
+    {
+      "id": "aguas",
+      "nome": "Águas e pântanos"
+    },
+    {
+      "id": "gelo",
+      "nome": "Gelo e frio"
+    },
+    {
+      "id": "costa",
+      "nome": "Costa"
+    },
+    {
+      "id": "humano",
+      "nome": "Obra humana"
+    },
+    {
+      "id": "fantasia",
+      "nome": "Fantasia e perigo"
+    }
+  ],
   "terrenos": [
     {
       "id": "planicie",
@@ -14,6 +52,14 @@
         "planicie-1.svg",
         "planicie-2.svg",
         "planicie-3.svg"
+      ],
+      "pasta": "terra-aberta",
+      "tags": [
+        "planície",
+        "grama",
+        "campo aberto",
+        "temperado",
+        "fértil"
       ]
     },
     {
@@ -25,6 +71,14 @@
         "campo-1.svg",
         "campo-2.svg",
         "campo-3.svg"
+      ],
+      "pasta": "terra-aberta",
+      "tags": [
+        "cultivo",
+        "fazenda",
+        "trigo",
+        "civilizado",
+        "fértil"
       ]
     },
     {
@@ -36,6 +90,14 @@
         "floresta-1.svg",
         "floresta-2.svg",
         "floresta-3.svg"
+      ],
+      "pasta": "florestas",
+      "tags": [
+        "floresta",
+        "árvores",
+        "temperado",
+        "folhas largas",
+        "caça"
       ]
     },
     {
@@ -47,6 +109,14 @@
         "floresta-densa-1.svg",
         "floresta-densa-2.svg",
         "floresta-densa-3.svg"
+      ],
+      "pasta": "florestas",
+      "tags": [
+        "floresta",
+        "árvores",
+        "denso",
+        "escuro",
+        "perigoso"
       ]
     },
     {
@@ -58,6 +128,13 @@
         "colina-1.svg",
         "colina-2.svg",
         "colina-3.svg"
+      ],
+      "pasta": "terra-aberta",
+      "tags": [
+        "colinas",
+        "relevo suave",
+        "grama",
+        "temperado"
       ]
     },
     {
@@ -69,6 +146,14 @@
         "montanha-1.svg",
         "montanha-2.svg",
         "montanha-3.svg"
+      ],
+      "pasta": "altos",
+      "tags": [
+        "montanha",
+        "rocha",
+        "alto",
+        "neve",
+        "difícil"
       ]
     },
     {
@@ -80,6 +165,14 @@
         "pico-nevado-1.svg",
         "pico-nevado-2.svg",
         "pico-nevado-3.svg"
+      ],
+      "pasta": "altos",
+      "tags": [
+        "montanha",
+        "neve",
+        "gelo",
+        "alto",
+        "difícil"
       ]
     },
     {
@@ -91,6 +184,14 @@
         "deserto-1.svg",
         "deserto-2.svg",
         "deserto-3.svg"
+      ],
+      "pasta": "aridos",
+      "tags": [
+        "deserto",
+        "areia",
+        "quente",
+        "seco",
+        "árido"
       ]
     },
     {
@@ -102,6 +203,14 @@
         "pantano-1.svg",
         "pantano-2.svg",
         "pantano-3.svg"
+      ],
+      "pasta": "aguas",
+      "tags": [
+        "pântano",
+        "lama",
+        "úmido",
+        "sombrio",
+        "difícil"
       ]
     },
     {
@@ -113,6 +222,14 @@
         "agua-rasa-1.svg",
         "agua-rasa-2.svg",
         "agua-rasa-3.svg"
+      ],
+      "pasta": "aguas",
+      "tags": [
+        "água",
+        "raso",
+        "vau",
+        "navegável",
+        "claro"
       ]
     },
     {
@@ -124,6 +241,14 @@
         "oceano-1.svg",
         "oceano-2.svg",
         "oceano-3.svg"
+      ],
+      "pasta": "aguas",
+      "tags": [
+        "água",
+        "oceano",
+        "profundo",
+        "navegável",
+        "mar"
       ]
     },
     {
@@ -135,6 +260,14 @@
         "tundra-1.svg",
         "tundra-2.svg",
         "tundra-3.svg"
+      ],
+      "pasta": "gelo",
+      "tags": [
+        "tundra",
+        "frio",
+        "neve",
+        "musgo",
+        "inverno"
       ]
     },
     {
@@ -146,6 +279,14 @@
         "terra-arrasada-1.svg",
         "terra-arrasada-2.svg",
         "terra-arrasada-3.svg"
+      ],
+      "pasta": "fantasia",
+      "tags": [
+        "arrasada",
+        "queimada",
+        "cinzas",
+        "perigoso",
+        "guerra"
       ]
     }
   ],

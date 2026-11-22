@@ -10,6 +10,7 @@ import { EntradaMapa, type Ferramenta } from './entrada'
 import type { Hex } from './hex'
 import { Icone, type NomeIcone } from './Icones'
 import { InspetorHexagono } from './InspetorHexagono'
+import { PaletaTerrenos } from './PaletaTerrenos'
 import { CORES_REGIAO } from './operacoes'
 import { medirRegua, textoDaMedida } from './regua'
 import { EditorDeRegiao, ListaDeRegioes } from './Regioes'
@@ -358,7 +359,6 @@ export function MapaHex() {
   const fimRegua = regua ? (regua.b ?? motor?.render.reguaPonta ?? null) : null
   const distanciaRegua = regua && fimRegua ? medirRegua(regua.a, fimRegua).passos : null
 
-  const terrenos = motor?.tileset.def.terrenos ?? []
   const marcadores = motor?.tileset.def.marcadores ?? []
   const noCursor = hover ?? selecionado
   const hexNoCursor = noCursor ? motor?.ctrl.armazem.ler(noCursor.q, noCursor.r) : null
@@ -482,27 +482,17 @@ export function MapaHex() {
                 <span>{t.nome}</span>
               </button>
             ))
-          ) : (
-            terrenos.map((t) => {
-              const url = motor?.tileset.urlArquivo(t.id)
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  className="mapa-terreno"
-                  aria-pressed={terreno === t.id}
-                  title={t.nome}
-                  onClick={() => {
-                    setTerreno(t.id)
-                    if (ferramenta !== 'pintar') escolherFerramenta('pintar')
-                  }}
-                >
-                  {url ? <img src={url} alt="" draggable={false} /> : <span className="mapa-terreno__cor" style={{ background: t.cor }} />}
-                  <span>{t.nome}</span>
-                </button>
-              )
-            })
-          )}
+          ) : motor ? (
+            <PaletaTerrenos
+              def={motor.tileset.def}
+              urlDe={(id) => motor.tileset.urlArquivo(id)}
+              ativo={terreno}
+              aoEscolher={(id) => {
+                setTerreno(id)
+                if (ferramenta !== 'pintar') escolherFerramenta('pintar')
+              }}
+            />
+          ) : null}
         </aside>
 
         <div className="mapa__palco" ref={palcoRef}>

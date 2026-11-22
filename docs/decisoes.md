@@ -4,6 +4,9 @@ Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em ci
 
 ## 2026-11-22
 
+- **Painel de administrador só no PC do servidor.** Com o servidor na internet, a conta de administrador é o alvo mais valioso. A configuração "Superuser IPs" aceita o administrador só de `127.0.0.1`. O preço: administrar só no próprio PC, e não pelo celular.
+- **Backup a cada hora, com cópia numa pasta sincronizada com a nuvem.** O servidor mora num notebook, que pode estragar ou sumir. A cópia usa a nuvem que a pessoa já tem, sem serviço novo.
+- **Link de convite com o servidor preenchido (`?servidor=`).** Os amigos só abrem um link, sem digitar o endereço do Funnel.
 - **Login numa aba, sem bloquear o app.** A aba Campanha cuida do login e da escolha da campanha. Sem entrar, as fichas e o mapa continuam funcionando só no navegador, como antes.
 - **Endereço do servidor escolhido na tela de login.** O `VITE_POCKETBASE_URL` vira só o padrão. Assim o mesmo site de teste funciona com o PocketBase no próprio PC ou com o endereço do Tailscale Funnel de quem hospeda.
 - **SDK oficial do PocketBase como dependência (`pocketbase` no npm).** Ele cuida do login, da renovação da sessão e do tempo real. Escrever isso à mão daria mais código e mais chance de erro.

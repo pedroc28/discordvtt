@@ -4,7 +4,7 @@
 
 import PocketBase, { LocalAuthStore } from 'pocketbase'
 import { useSyncExternalStore } from 'react'
-import { ENDERECO_PADRAO, normalizarEndereco } from './endereco'
+import { ENDERECO_PADRAO, enderecoDoLink, normalizarEndereco, semParametroDoServidor } from './endereco'
 import { mensagemDeErro, type Acao } from './erros'
 import { campanhaValida, limparNomeCampanha, montarCampanhas, montarParticipantes } from './operacoes'
 import type { EstadoServidor, FaseConexao, Papel } from './tipos'
@@ -76,7 +76,18 @@ export class ConexaoServidor {
   private ultimaCarga = 0
 
   constructor() {
-    const endereco = normalizarEndereco(ler(CHAVE_ENDERECO) ?? '') ?? ENDERECO_PADRAO
+    // O link de convite (?servidor=) vale mais que o endereço guardado. Ele é guardado na hora
+    // e sai do endereço da página, para recarregar não trocar de servidor de novo.
+    const doLink = typeof window === 'undefined' ? null : enderecoDoLink(window.location.search)
+    if (doLink) {
+      gravar(CHAVE_ENDERECO, doLink)
+      try {
+        window.history.replaceState(window.history.state, '', semParametroDoServidor(window.location.href))
+      } catch {
+        // o endereço da página só não fica limpo
+      }
+    }
+    const endereco = doLink ?? normalizarEndereco(ler(CHAVE_ENDERECO) ?? '') ?? ENDERECO_PADRAO
     this.pb = criarCliente(endereco)
     this.atual = estadoVazio(endereco, 'iniciando', false)
   }

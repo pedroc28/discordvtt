@@ -8,7 +8,7 @@
 // só do Node.js 18 ou mais novo.
 
 import { execFileSync, spawn } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -21,6 +21,7 @@ const SENHA = 'senha-de-teste-123'
 const ADMIN = { email: 'admin@teste.local', senha: 'senha-do-admin-123' }
 
 let base = ''
+let pastaCopias = ''
 const falhas = []
 let total = 0
 
@@ -47,9 +48,11 @@ function portaLivre() {
   })
 }
 
-async function api(metodo, caminho, { token, corpo } = {}) {
+// `ip` simula um acesso vindo pelo Tailscale Funnel, que informa o IP de quem acessou no X-Forwarded-For.
+async function api(metodo, caminho, { token, corpo, ip } = {}) {
   const cabecalhos = {}
   if (token) cabecalhos.Authorization = token
+  if (ip) cabecalhos['X-Forwarded-For'] = ip
   if (corpo !== undefined) cabecalhos['Content-Type'] = 'application/json'
   const resposta = await fetch(base + caminho, {
     method: metodo,
@@ -301,6 +304,36 @@ async function testar() {
     )
   }
   confere('logins seguidos demais são barrados', tentativas.includes(429), tentativas)
+
+  const outraPessoa = await api('POST', '/api/collections/users/auth-with-password', {
+    corpo: { identity: contas.Ana.email, password: 'senha-errada' },
+    ip: '198.51.100.4',
+  })
+  confere('o limite vale por pessoa, e não para o grupo todo atrás do Funnel', outraPessoa.status === 400, outraPessoa.status)
+
+  console.log('\nServidor na internet')
+  const config = await api('GET', '/api/settings', { token: admin })
+  confere('administrador no próprio PC usa o painel', config.ok, config.dados)
+  confere('o IP de quem acessa vem do X-Forwarded-For, pela direita', config.dados?.trustedProxy?.headers?.includes('X-Forwarded-For') && config.dados?.trustedProxy?.useLeftmostIP === false, config.dados?.trustedProxy)
+  confere('backup automático a cada hora', config.dados?.backups?.cron === '0 * * * *', config.dados?.backups)
+
+  const adminDeFora = await api('GET', '/api/settings', { token: admin, ip: '203.0.113.9' })
+  confere('sessão de administrador não funciona vinda de fora do PC', !adminDeFora.ok, adminDeFora.status)
+
+  const loginAdminDeFora = await api('POST', '/api/collections/_superusers/auth-with-password', {
+    corpo: { identity: ADMIN.email, password: ADMIN.senha },
+    ip: '203.0.113.9',
+  })
+  confere('login de administrador vindo de fora do PC é recusado', !loginAdminDeFora.ok, loginAdminDeFora.status)
+
+  const backup = await api('POST', '/api/backups', { token: admin, corpo: { name: 'teste_copia.zip' } })
+  confere('administrador cria backup', backup.ok, backup)
+  let copiado = false
+  for (let i = 0; i < 20 && !copiado; i++) {
+    copiado = existsSync(join(pastaCopias, 'teste_copia.zip'))
+    if (!copiado) await esperar(250)
+  }
+  confere('o backup é copiado para a pasta de fora', copiado)
 }
 
 async function main() {
@@ -316,6 +349,7 @@ async function main() {
   }
 
   const dados = mkdtempSync(join(tmpdir(), 'discordvtt-pb-'))
+  pastaCopias = join(dados, 'copias')
   const argumentos = [
     `--dir=${join(dados, 'pb_data')}`,
     `--migrationsDir=${join(pasta, 'pb_migrations')}`,
@@ -326,7 +360,9 @@ async function main() {
   const porta = await portaLivre()
   base = `http://127.0.0.1:${porta}`
   let log = ''
-  const servidor = spawn(executavel, ['serve', `--http=127.0.0.1:${porta}`, '--hooksWatch=false', ...argumentos])
+  const servidor = spawn(executavel, ['serve', `--http=127.0.0.1:${porta}`, '--hooksWatch=false', ...argumentos], {
+    env: { ...process.env, DISCORDVTT_COPIA_BACKUP: pastaCopias },
+  })
   servidor.stdout.on('data', (parte) => (log += parte))
   servidor.stderr.on('data', (parte) => (log += parte))
   const terminou = new Promise((resolver) => servidor.once('exit', resolver))

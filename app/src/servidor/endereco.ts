@@ -27,3 +27,37 @@ export function normalizarEndereco(texto: string): string | null {
   const caminho = url.pathname.replace(/\/+$/, '')
   return `${url.protocol}//${url.host}${caminho}`
 }
+
+/** Endereço só deste PC ou da rede de casa: não serve para chamar amigos de fora. */
+export function ehEnderecoLocal(endereco: string): boolean {
+  try {
+    return LOCAL.test(new URL(endereco).hostname)
+  } catch {
+    return false
+  }
+}
+
+// O link de convite leva o endereço do servidor no parâmetro ?servidor=, como o ?tileset= do mapa.
+const PARAMETRO = 'servidor'
+
+/** Endereço vindo do link de convite, se houver e for válido. */
+export function enderecoDoLink(busca: string): string | null {
+  const valor = new URLSearchParams(busca).get(PARAMETRO)
+  return valor ? normalizarEndereco(valor) : null
+}
+
+/** A página atual sem o parâmetro do servidor, para o endereço do navegador ficar limpo. */
+export function semParametroDoServidor(pagina: string): string {
+  const url = new URL(pagina)
+  url.searchParams.delete(PARAMETRO)
+  return url.toString()
+}
+
+/** Link do site que já abre com o servidor preenchido na tela de login. */
+export function linkDeConvite(pagina: string, endereco: string): string {
+  const url = new URL(pagina)
+  url.search = ''
+  url.hash = ''
+  url.searchParams.set(PARAMETRO, endereco)
+  return url.toString()
+}

@@ -92,3 +92,4 @@ useServidor(): EstadoServidor  // hook React, atualiza sozinho
 ## Configuração
 
 - `VITE_POCKETBASE_URL`: endereço padrão do PocketBase (modelo em `app/.env.example`). A pessoa pode trocar na tela de login, e o app guarda o endereço escolhido no navegador.
+- Parâmetros no endereço do site: `?servidor=` (área do servidor, link de convite) e `?tileset=` (área do mapa). A área do servidor lê e tira só o `?servidor=`, sem mexer nos outros.

@@ -608,6 +608,12 @@ async function testarMapa({ admin, contas, Ana, Bruno, Carla, mesaBruno }) {
   const apagaLote = await api('DELETE', `/api/collections/lotes/records/${primeiro.dados.id}`, { token: Ana })
   confere('lote gravado não muda nem é apagado pelo app', !mudaLote.ok && !apagaLote.ok, [mudaLote.status, apagaLote.status])
 
+  console.log('\nMapa: limpeza com o prazo padrão')
+  const lotesAntes = await contar(admin, 'lotes', `mapa = "${mapa.id}"`)
+  await api('POST', '/api/crons/limpar_lotes', { token: admin })
+  await esperar(500)
+  confere('com o prazo padrão, a limpeza não apaga lotes recentes', lotesAntes > 0 && (await contar(admin, 'lotes', `mapa = "${mapa.id}"`)) === lotesAntes, lotesAntes)
+
   console.log('\nMapa: quem vê')
   const visto = await Promise.all([
     contar(Bruno, 'mapas', `id = "${mapa.id}"`),
@@ -778,7 +784,7 @@ async function subirServidor(dados, { migracoes = join(pasta, 'pb_migrations'), 
   base = `http://127.0.0.1:${porta}`
   let log = ''
   const servidor = spawn(executavel, ['serve', `--http=127.0.0.1:${porta}`, '--hooksWatch=false', ...argumentos], {
-    // O prazo da limpeza fica vazio (30 dias) a não ser que a rodada peça outro.
+    // O prazo da limpeza fica vazio (o padrão, 7 dias) a não ser que a rodada peça outro.
     env: { ...process.env, DISCORDVTT_DIAS_LOTES: '', ...env },
   })
   servidor.stdout.on('data', (parte) => (log += parte))

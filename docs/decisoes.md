@@ -4,6 +4,7 @@ Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em ci
 
 ## 2026-11-22
 
+- **Lotes guardados por 7 dias, e não 30.** Combinado com o GrifoCaolho. Backups menores, e o mestre reverte o que aconteceu na última semana. O preço: com sessões semanais, o histórico da sessão anterior some perto da seguinte, e uma aba esquecida aberta de uma semana para outra precisa recarregar o mapa. Se fizer falta, o prazo muda numa constante só.
 - **Mapa sincronizado por lotes numerados pelo servidor.** O app grava o lote inteiro, e um hook do servidor, numa transação, valida, dá o número de ordem e aplica nos hexágonos e regiões. Só o servidor grava hexágonos e regiões. O tempo real do PocketBase avisa registro por registro, e o contrato do mapa pede lotes inteiros na ordem do servidor: um registro por lote resolve as duas coisas, sem a API de batch. Um lote repetido responde como gravado, para o app poder reenviar sem medo.
 - **Um mapa por campanha, por enquanto, editável por quem participa.** A camada privada do mestre e quem pode editar ficam para combinar com o GrifoCaolho, junto com ligar o mapa ao servidor.
 - **Lotes apagados depois de 30 dias.** O estado do mapa fica nos hexágonos, e os lotes entrariam para sempre em todo backup. A numeração fica num contador no mapa, para não recomeçar. Um app que precise de um lote já apagado avisa que o mapa tem de ser recarregado, em vez de seguir errado.

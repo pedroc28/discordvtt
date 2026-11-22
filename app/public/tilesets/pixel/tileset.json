@@ -192,6 +192,42 @@
       ]
     },
     {
+      "id": "selva",
+      "nome": "Selva tropical",
+      "cor": "#276c27",
+      "extra": 0,
+      "arquivos": [
+        "selva-1.png",
+        "selva-2.png"
+      ],
+      "pasta": "florestas",
+      "tags": [
+        "selva",
+        "tropical",
+        "quente",
+        "úmido",
+        "denso"
+      ]
+    },
+    {
+      "id": "floresta-morta",
+      "nome": "Floresta morta",
+      "cor": "#52585a",
+      "extra": 0,
+      "arquivos": [
+        "floresta-morta-1.png",
+        "floresta-morta-2.png"
+      ],
+      "pasta": "florestas",
+      "tags": [
+        "morta",
+        "assombrada",
+        "sombrio",
+        "perigoso",
+        "árvores"
+      ]
+    },
+    {
       "id": "colina",
       "nome": "Colinas",
       "cor": "#88ad4e",
@@ -312,12 +348,11 @@
     {
       "id": "pico-nevado",
       "nome": "Picos nevados",
-      "cor": "#9aa6b0",
-      "extra": 84,
+      "cor": "#97b1c8",
+      "extra": 0,
       "arquivos": [
-        "pico-nevado-1.svg",
-        "pico-nevado-2.svg",
-        "pico-nevado-3.svg"
+        "pico-nevado-1.png",
+        "pico-nevado-2.png"
       ],
       "pasta": "altos",
       "tags": [

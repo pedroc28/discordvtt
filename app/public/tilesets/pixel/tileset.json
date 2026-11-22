@@ -418,14 +418,48 @@
       ]
     },
     {
-      "id": "deserto",
-      "nome": "Deserto",
-      "cor": "#dcc17c",
+      "id": "vulcao",
+      "nome": "Vulcão",
+      "cor": "#483f3c",
       "extra": 0,
       "arquivos": [
-        "deserto-1.svg",
-        "deserto-2.svg",
-        "deserto-3.svg"
+        "vulcao-1.png"
+      ],
+      "pasta": "altos",
+      "tags": [
+        "vulcão",
+        "fogo",
+        "lava",
+        "montanha",
+        "perigoso"
+      ]
+    },
+    {
+      "id": "campo-de-lava",
+      "nome": "Campo de lava",
+      "cor": "#452419",
+      "extra": 0,
+      "arquivos": [
+        "campo-de-lava-1.png",
+        "campo-de-lava-2.png"
+      ],
+      "pasta": "altos",
+      "tags": [
+        "lava",
+        "fogo",
+        "rocha",
+        "perigoso",
+        "árido"
+      ]
+    },
+    {
+      "id": "deserto",
+      "nome": "Deserto",
+      "cor": "#dda050",
+      "extra": 0,
+      "arquivos": [
+        "deserto-1.png",
+        "deserto-2.png"
       ],
       "pasta": "aridos",
       "tags": [

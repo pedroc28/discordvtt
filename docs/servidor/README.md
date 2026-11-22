@@ -1,6 +1,8 @@
 # Servidor
 
-Dono: Pedro. Passos 1 e 2 prontos: o PocketBase tem contas, campanhas e participantes (mestre ou jogador), com regras de acesso testadas, e o app tem a aba Campanha, com login, escolha da campanha e quem participa. O mapa e as fichas ainda não usam o servidor.
+Dono: Pedro. Passos 1, 2 e 3 prontos: o PocketBase tem contas, campanhas e participantes (mestre ou jogador), com regras de acesso testadas, o app tem a aba Campanha, e o servidor está no ar pelo Tailscale Funnel no PC do Pedro, com backup a cada hora copiado para o Google Drive. O mapa e as fichas ainda não usam o servidor.
+
+Para jogar, o PC do Pedro precisa estar ligado, acordado e com o `iniciar.bat` aberto. Os amigos entram pelo link de convite da aba Campanha.
 
 ## Peças
 
@@ -117,7 +119,7 @@ O script sobe um PocketBase com dados temporários, cria contas de teste e confe
 
 1. ~~Base: contas, campanhas e participantes, com migrações e regras.~~ Pronto.
 2. ~~Login no app e escolha da campanha, com o endereço do servidor configurável.~~ Pronto.
-3. **Hospedagem com Tailscale Funnel e backup.** O código está pronto (seções acima). Falta ligar o Funnel no PC do Pedro e testar com um amigo pelo 4G, conferindo no painel (**Logs**) que cada pessoa aparece com o próprio IP.
+3. ~~Hospedagem com Tailscale Funnel e backup.~~ Pronto e testado em 22/11/2026: login pelo celular no 4G e de um amigo, IP público de cada pessoa nos logs e backup copiado para o Google Drive.
 4. **`RepositorioPocketBase` para o mapa**, combinado com o GrifoCaolho. Proposta:
    - O tempo real do PocketBase avisa registro por registro, e o contrato do mapa pede lotes inteiros na ordem do servidor. Uma coleção `lotes`, com um registro por lote e número de ordem dado pelo servidor, resolve as duas coisas. Um hook atualiza os hexágonos na mesma gravação.
    - Hexágonos guardam `rios` e `estradas`. O token do grupo fica numa coleção própria, com um registro por mapa.

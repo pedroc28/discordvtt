@@ -31,7 +31,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 
 - [x] Base no PocketBase: contas, campanhas, mestres e jogadores, com regras de acesso testadas
 - [x] Login no app e escolha da campanha, com gerenciamento de participantes e tempo real
-- [ ] Hospedagem: deixar no ar para o grupo, de graça, com Tailscale Funnel no PC de quem hospeda, e backup
+- [x] Hospedagem: no ar para o grupo, de graça, com Tailscale Funnel no PC do Pedro e backup copiado para o Google Drive
 - [ ] `RepositorioPocketBase` para o mapa
 - [ ] Fichas sincronizadas: todos editando e vendo a mesma ficha em tempo real
 

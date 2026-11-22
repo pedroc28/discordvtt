@@ -4,6 +4,9 @@ Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em ci
 
 ## 2026-11-22
 
+- **Login numa aba, sem bloquear o app.** A aba Campanha cuida do login e da escolha da campanha. Sem entrar, as fichas e o mapa continuam funcionando só no navegador, como antes.
+- **Endereço do servidor escolhido na tela de login.** O `VITE_POCKETBASE_URL` vira só o padrão. Assim o mesmo site de teste funciona com o PocketBase no próprio PC ou com o endereço do Tailscale Funnel de quem hospeda.
+- **SDK oficial do PocketBase como dependência (`pocketbase` no npm).** Ele cuida do login, da renovação da sessão e do tempo real. Escrever isso à mão daria mais código e mais chance de erro.
 - **Servidor no PC de quem hospeda, com Tailscale Funnel.** É de graça, dá um endereço HTTPS fixo, funciona atrás de CGNAT e não precisa de domínio. Os amigos só abrem o site. O Cloudflare saiu do plano: o túnel grátis não tem Server-Sent Events, que o tempo real do PocketBase usa, e o túnel com nome exige um domínio pago. Nuvem grátis (Oracle) e hospedagem paga (PocketBase Cloud, PocketHost) ficam para depois, se o PC ligado virar problema. Mudar é copiar a pasta `pb_data`.
 - **Sem P2P.** Os dados só passariam entre quem está online ao mesmo tempo, o segredo do mestre e as permissões ficariam sem garantia, e a sincronia do mapa teria de ser refeita.
 - **Contas com cadastro fechado e login por e-mail e senha.** O administrador cria cada conta pelo painel, e uma conta vale para todas as campanhas. Com o servidor na internet, ninguém de fora consegue se cadastrar. E-mail é o padrão do PocketBase e permite ligar o "esqueci a senha" no futuro.

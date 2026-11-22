@@ -17,7 +17,7 @@ export const tela: DefinicaoTela = {
 }
 ```
 
-O `tela.ts` importa o CSS da própria área. Ordens em uso: fichas 10, mapa 20.
+O `tela.ts` importa o CSS da própria área. Ordens em uso: fichas 10, mapa 20, campanha 30.
 
 ## Tema (núcleo e todas as áreas)
 
@@ -72,6 +72,23 @@ campanha.participantes_via_campanha.usuario ?= @request.auth.id
 
 O alias `:mestre` faz as três condições valerem para a mesma participação. Sem ele, quem é mestre em uma campanha e jogador em outra passaria como mestre nas duas. Toda regra nova ganha verificação em `pocketbase/testar-regras.mjs`.
 
+## Sessão e campanha aberta (servidor, lado do app)
+
+Arquivos: `app/src/servidor/conexao.ts` e `app/src/servidor/tipos.ts` (área do servidor).
+
+```ts
+useServidor(): EstadoServidor  // hook React, atualiza sozinho
+// campos que as outras áreas podem usar:
+//   fase: 'iniciando' | 'desconectado' | 'entrando' | 'conectado'
+//   usuario: { id, nome } | null
+//   campanhaAtualId: string | null
+//   campanhas: { id, nome, papel: 'mestre' | 'jogador' }[]
+```
+
+- A campanha aberta é a que a pessoa escolheu na aba Campanha. O mapa e as fichas no servidor devem trabalhar nela.
+- Fora da área do servidor, ninguém importa o SDK do PocketBase nem chama métodos de `conexao`: a leitura é só pelo `useServidor()`. O que mais for preciso (como o `RepositorioPocketBase`) a área do servidor oferece.
+- Sem login (`fase` diferente de `conectado`), as fichas e o mapa continuam funcionando só no navegador.
+
 ## Configuração
 
-- `VITE_POCKETBASE_URL`: endereço do PocketBase usado pelo app (modelo em `app/.env.example`).
+- `VITE_POCKETBASE_URL`: endereço padrão do PocketBase (modelo em `app/.env.example`). A pessoa pode trocar na tela de login, e o app guarda o endereço escolhido no navegador.

@@ -579,6 +579,24 @@
       ]
     },
     {
+      "id": "recife",
+      "nome": "Recife de coral",
+      "cor": "#56a8af",
+      "extra": 0,
+      "arquivos": [
+        "recife-1.png",
+        "recife-2.png"
+      ],
+      "pasta": "aguas",
+      "tags": [
+        "recife",
+        "coral",
+        "raso",
+        "tropical",
+        "mar"
+      ]
+    },
+    {
       "id": "oceano",
       "nome": "Oceano",
       "cor": "#428fa3",
@@ -599,12 +617,11 @@
     {
       "id": "tundra",
       "nome": "Tundra",
-      "cor": "#cddae0",
+      "cor": "#98a99f",
       "extra": 0,
       "arquivos": [
-        "tundra-1.svg",
-        "tundra-2.svg",
-        "tundra-3.svg"
+        "tundra-1.png",
+        "tundra-2.png"
       ],
       "pasta": "gelo",
       "tags": [
@@ -613,6 +630,24 @@
         "neve",
         "musgo",
         "inverno"
+      ]
+    },
+    {
+      "id": "geleira",
+      "nome": "Geleira",
+      "cor": "#b6def1",
+      "extra": 0,
+      "arquivos": [
+        "geleira-1.png",
+        "geleira-2.png"
+      ],
+      "pasta": "gelo",
+      "tags": [
+        "geleira",
+        "gelo",
+        "frio",
+        "azul",
+        "difícil"
       ]
     },
     {

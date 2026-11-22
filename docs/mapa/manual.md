@@ -125,6 +125,7 @@ Um tileset é uma pasta em `app/public/tilesets/<id>/` com um `tileset.json` e a
   "orientacao": "pointy",   // por enquanto só pointy-top
   "largura": 256,           // largura do hexágono na imagem, em px
   "altura": 296,            // altura do hexágono SEM o extra, em px
+  "pixelart": false,        // true: amplia as imagens sem suavizar (arte em pixel art)
   "terrenos": [
     {
       "id": "floresta",             // é o que fica gravado no mapa. Não renomeie depois que houver mapas
@@ -147,6 +148,8 @@ Um tileset é uma pasta em `app/public/tilesets/<id>/` com um `tileset.json` e a
 **Formato das imagens.** PNG, WebP ou SVG. O hexágono pointy-top deve ocupar a imagem inteira de ponta a ponta: **256 px de largura por 296 de altura** (a altura é `2 × largura / √3`), com os cantos transparentes. Se o terreno tem algo que passa por cima do hexágono de cima (picos, árvores altas), some `extra` px **no topo** da imagem: a imagem fica `256 × (296 + extra)` e o hexágono continua alinhado à base. Dê mais de uma variante por terreno: cada hexágono sempre usa a mesma, escolhida pela posição, então o mapa não pisca nem repete um padrão visível.
 
 **Ícones de marcador.** Imagens quadradas com fundo transparente, de qualquer tamanho (o tileset padrão usa 128×128, em selo redondo). Um hexágono mostra até 3 marcadores lado a lado, e um "+N" se houver mais. Marcador sem imagem aparece como um círculo simples.
+
+**Pixel art e `?tileset=`.** Com `"pixelart": true`, as imagens são ampliadas sem suavização. A imagem pode ter qualquer tamanho: ela é esticada para o hexágono de `largura` × `altura`. A arte do PixelLab, por exemplo, são PNGs de 128 × 128 com o hexágono preenchendo o quadrado, e o mapa os estica para 256 × 296. Para ver outra pasta de tileset sem mexer no código, abra o mapa com `?tileset=<pasta>` no endereço (só letras minúsculas, números e hífen). O guia completo da arte nova, com a lista dos terrenos, está em [`arte.md`](arte.md).
 
 **Tileset gerado.** A arte atual é provisória e vem de `app/tools/gerar-tileset.mjs` (`npm run tileset`), que desenha 13 terrenos com 3 variantes cada e 12 ícones de marcador, em SVG. Rodar de novo apaga e refaz `app/public/tilesets/padrao/`, então **não edite esses arquivos à mão**: copie a pasta com outro nome para a arte nova.
 

@@ -18,7 +18,17 @@ import { RepositorioLocal } from './repositorio-local'
 import { Tileset } from './tileset'
 
 const MAPA_ID = 'principal'
-const URL_TILESET = `${import.meta.env.BASE_URL}tilesets/padrao/tileset.json`
+/** Tileset em uso. Para testar outra arte sem mexer no código, abra o mapa com `?tileset=<pasta>` no endereço. */
+function urlDoTileset(): string {
+  let id = 'padrao'
+  try {
+    const pedido = new URLSearchParams(window.location.search).get('tileset')
+    if (pedido && /^[a-z0-9-]+$/.test(pedido)) id = pedido
+  } catch {
+    // sem endereço legível: fica o padrão
+  }
+  return `${import.meta.env.BASE_URL}tilesets/${id}/tileset.json`
+}
 
 interface Motor {
   ctrl: ControladorMapa
@@ -149,7 +159,7 @@ export function MapaHex() {
     let cancelado = false
     let desmontar: (() => void) | null = null
 
-    Tileset.carregar(URL_TILESET)
+    Tileset.carregar(urlDoTileset())
       .then((tileset) => {
         if (cancelado) return
         const repo = new RepositorioLocal(MAPA_ID)

@@ -28,6 +28,8 @@ export interface DefTileset {
   largura: number
   /** Altura do hexágono sem o extra, em px. */
   altura: number
+  /** Arte em pixel art: as imagens são ampliadas sem suavizar, para os pixels ficarem nítidos. */
+  pixelart: boolean
   terrenos: DefTerreno[]
   marcadores: DefMarcador[]
 }
@@ -69,6 +71,7 @@ export function normalizarTileset(bruto: unknown): DefTileset | null {
     orientacao: 'pointy',
     largura: positivo(bruto.largura, 256),
     altura: positivo(bruto.altura, 296),
+    pixelart: bruto.pixelart === true,
     terrenos,
     marcadores,
   }
@@ -181,7 +184,11 @@ export class Tileset {
     const c = document.createElement('canvas')
     c.width = this.def.largura
     c.height = this.def.altura + extra
-    c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+    const ctx = c.getContext('2d')!
+    // Pixel art ampliada com suavização vira borrão. A imagem pode ter outro tamanho (ex.: 128 x 128
+    // para um hexágono de 256 x 296): ela é esticada para o tamanho do tile e os pixels ficam um pouco mais altos.
+    ctx.imageSmoothingEnabled = !this.def.pixelart
+    ctx.drawImage(img, 0, 0, c.width, c.height)
     return c
   }
 }

@@ -256,6 +256,8 @@ export class Renderizador {
     this.pedirChunks(lim)
 
     const largTile = this.tileset.def.largura
+    // Os tiles são rasterizados em tamanho nativo (largura do tileset): com zoom acima de 1 ampliam, e pixel art não pode suavizar.
+    ctx.imageSmoothingEnabled = !(this.tileset.def.pixelart && z >= 1)
     const comImagem = z >= ZOOM_SO_COR
     const folgaX = largTile
     const folgaCima = R * 1.2

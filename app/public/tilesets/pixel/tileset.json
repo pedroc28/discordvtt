@@ -804,12 +804,11 @@
     {
       "id": "terra-arrasada",
       "nome": "Terra arrasada",
-      "cor": "#4d423d",
+      "cor": "#3c2b25",
       "extra": 0,
       "arquivos": [
-        "terra-arrasada-1.svg",
-        "terra-arrasada-2.svg",
-        "terra-arrasada-3.svg"
+        "terra-arrasada-1.png",
+        "terra-arrasada-2.png"
       ],
       "pasta": "fantasia",
       "tags": [
@@ -818,6 +817,42 @@
         "cinzas",
         "perigoso",
         "guerra"
+      ]
+    },
+    {
+      "id": "floresta-encantada",
+      "nome": "Floresta encantada",
+      "cor": "#476873",
+      "extra": 0,
+      "arquivos": [
+        "floresta-encantada-1.png",
+        "floresta-encantada-2.png"
+      ],
+      "pasta": "fantasia",
+      "tags": [
+        "encantada",
+        "magia",
+        "floresta",
+        "fadas",
+        "brilho"
+      ]
+    },
+    {
+      "id": "cogumelos",
+      "nome": "Floresta de cogumelos",
+      "cor": "#48266a",
+      "extra": 0,
+      "arquivos": [
+        "cogumelos-1.png",
+        "cogumelos-2.png"
+      ],
+      "pasta": "fantasia",
+      "tags": [
+        "cogumelos",
+        "fungos",
+        "magia",
+        "escuro",
+        "estranho"
       ]
     }
   ],

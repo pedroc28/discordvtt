@@ -2,7 +2,7 @@
 
 Guia para quem gera a arte dos terrenos do mapa com o PixelLab (o agente de arte, ou uma pessoa). É autossuficiente: com este arquivo e o `docs/mapa/manual.md` dá para fazer todos os tiles sem perguntar nada. O formato técnico do tileset está no manual, na seção "Tilesets". Aqui está o que desenhar, como pedir ao PixelLab, como conferir e onde guardar.
 
-Estado: **44 de 45 tiles feitos** (43 da lista mais 2 extras, `praia-inteira` e `falesia-inteira`): água, planície e montanha (teste) e os lotes 1 a 13 (`campo`, `colina`, `savana`, `estepe`, `charneca`, `pomar`, `floresta`, `floresta-densa`, `bosque`, `taiga`, `floresta-outono`, `floresta-nevada`, `selva`, `floresta-morta`, `pico-nevado`, `rochoso`, `planalto`, `canion`, `vulcao`, `campo-de-lava`, `deserto`, `dunas`, `oasis`, `salar`, `pantano`, `mangue`, `agua-rasa`, `recife`, `tundra`, `geleira`, `mar-congelado`, `praia`, `falesia`, `delta`, `cidade`, `ruinas`, `terra-arrasada`, `floresta-encantada`, `cogumelos`). Falta 1 da lista da seção 7, `cristais`. Os 13 terrenos do tileset gerado por script já têm arte em pixel art, e a pasta `pixel` não tem mais SVG de terreno.
+Estado: **45 de 45 tiles feitos, a lista está completa** (43 da lista mais 2 extras, `praia-inteira` e `falesia-inteira`): água, planície e montanha (teste) e os lotes 1 a 14 (`campo`, `colina`, `savana`, `estepe`, `charneca`, `pomar`, `floresta`, `floresta-densa`, `bosque`, `taiga`, `floresta-outono`, `floresta-nevada`, `selva`, `floresta-morta`, `pico-nevado`, `rochoso`, `planalto`, `canion`, `vulcao`, `campo-de-lava`, `deserto`, `dunas`, `oasis`, `salar`, `pantano`, `mangue`, `agua-rasa`, `recife`, `tundra`, `geleira`, `mar-congelado`, `praia`, `falesia`, `delta`, `cidade`, `ruinas`, `terra-arrasada`, `floresta-encantada`, `cogumelos`, `cristais`). Os 13 terrenos do tileset gerado por script já têm arte em pixel art, e a pasta `pixel` não tem mais SVG de terreno.
 
 ## 1. Estilo
 
@@ -221,7 +221,7 @@ Marque aqui ao aprovar (`[x]`) e anote o job do PixelLab.
 - [x] Lote 11: `mar-congelado` (3 variantes), `praia` (2), `falesia` (3). Jobs `12210478-cae9-4772-ae42-fa9b7f9075c2` e `ec190cd1-879a-4b33-bc20-f260709afe8e`. O `mangue` do lote 9 foi **refeito** (job `ec190cd1-...`, 3 variantes) porque as árvores grandes não se encaixavam entre hexágonos. A `praia` e a `falesia` têm o lado do mar fixo, então só encaixam bem em costas viradas para o mesmo lado, e pedem o uso com cuidado
 - [x] Lote 12: `delta` (2 variantes), `cidade` (4), `ruinas` (2), mais dois extras: `praia-inteira` (4 variantes: 2 de areia e 2 de seixos) e `falesia-inteira` (2), sem lado do mar fixo, para costas em qualquer direção. Jobs `5d7d1d32-2ad4-4a0f-b03e-10ec5a4223db` (delta), `57bed18f-897d-422a-843e-1d74b403a0c2` (praia e falésia inteiras) e `f9fd6844-17eb-4cf9-afa9-65136e3e8c45` (objetos de cidade e ruínas, compostos sobre a planície). Três chamadas, 45 gerações
 - [x] Lote 13: `terra-arrasada` (2 variantes), `floresta-encantada` (2), `cogumelos` (2). Job `96215f89-3338-4cfb-bd61-89248c7ea90e`, uma chamada (15 gerações), sem nenhuma reprovação
-- [ ] Lote 14: `cristais`
+- [x] Lote 14: `cristais` (5 variantes). Job `841aaad4-a594-42d7-b4cf-63cbbca1dcec`, uma chamada (15 gerações). Das 6 imagens, 1 foi descartada por ser quase igual a outra
 
 ## 8. Pastas e tags na paleta
 

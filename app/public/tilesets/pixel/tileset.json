@@ -854,6 +854,27 @@
         "escuro",
         "estranho"
       ]
+    },
+    {
+      "id": "cristais",
+      "nome": "Planície de cristais",
+      "cor": "#a2add4",
+      "extra": 0,
+      "arquivos": [
+        "cristais-1.png",
+        "cristais-2.png",
+        "cristais-3.png",
+        "cristais-4.png",
+        "cristais-5.png"
+      ],
+      "pasta": "fantasia",
+      "tags": [
+        "cristais",
+        "magia",
+        "brilho",
+        "estranho",
+        "rocha"
+      ]
     }
   ],
   "marcadores": [

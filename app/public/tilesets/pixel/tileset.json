@@ -899,62 +899,62 @@
     {
       "id": "cidade",
       "nome": "Cidade",
-      "arquivo": "marcadores/cidade.svg"
+      "arquivo": "marcadores/cidade.png"
     },
     {
       "id": "vila",
       "nome": "Vila",
-      "arquivo": "marcadores/vila.svg"
+      "arquivo": "marcadores/vila.png"
     },
     {
       "id": "castelo",
       "nome": "Castelo",
-      "arquivo": "marcadores/castelo.svg"
+      "arquivo": "marcadores/castelo.png"
     },
     {
       "id": "masmorra",
       "nome": "Masmorra",
-      "arquivo": "marcadores/masmorra.svg"
+      "arquivo": "marcadores/masmorra.png"
     },
     {
       "id": "ruina",
       "nome": "Ruína",
-      "arquivo": "marcadores/ruina.svg"
+      "arquivo": "marcadores/ruina.png"
     },
     {
       "id": "torre",
       "nome": "Torre",
-      "arquivo": "marcadores/torre.svg"
+      "arquivo": "marcadores/torre.png"
     },
     {
       "id": "templo",
       "nome": "Templo",
-      "arquivo": "marcadores/templo.svg"
+      "arquivo": "marcadores/templo.png"
     },
     {
       "id": "acampamento",
       "nome": "Acampamento",
-      "arquivo": "marcadores/acampamento.svg"
+      "arquivo": "marcadores/acampamento.png"
     },
     {
       "id": "porto",
       "nome": "Porto",
-      "arquivo": "marcadores/porto.svg"
+      "arquivo": "marcadores/porto.png"
     },
     {
       "id": "tesouro",
       "nome": "Tesouro",
-      "arquivo": "marcadores/tesouro.svg"
+      "arquivo": "marcadores/tesouro.png"
     },
     {
       "id": "perigo",
       "nome": "Perigo",
-      "arquivo": "marcadores/perigo.svg"
+      "arquivo": "marcadores/perigo.png"
     },
     {
       "id": "ponto",
       "nome": "Ponto de interesse",
-      "arquivo": "marcadores/ponto.svg"
+      "arquivo": "marcadores/ponto.png"
     }
   ],
   "pixelart": true

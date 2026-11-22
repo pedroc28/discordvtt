@@ -1,95 +1,8 @@
 /* ==========================================================
    Editor de fichas
-   A interface fica quieta em volta da folha. A mesa é um feltro
-   verde de mesa de jogo, e a folha é papel em cima dela.
+   As variáveis de tema e os botões compartilhados ficam em
+   nucleo/tema.css. Aqui ficam só os estilos da ficha.
    ========================================================== */
-
-:root {
-  --ui-fonte: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
-  --ui-mono: 'Atkinson Hyperlegible Mono', ui-monospace, monospace;
-
-  --ui-papel: #f3f4f0;
-  --ui-papel-2: #e7e9e3;
-  --ui-papel-3: #dcdfd7;
-  --ui-linha: #cbd0c6;
-  --ui-tinta: #1a2420;
-  --ui-tinta-2: #59665f;
-  --feltro: #284a41;
-  --feltro-escuro: #1d3830;
-  --acento: #c4155a;
-  --acento-forte: #a10f48;
-  --acento-suave: rgb(196 21 90 / 0.12);
-  --perigo: #b42318;
-  --perigo-suave: #fbe4e1;
-  --ui-campo: #ffffff;
-  --aba-ativa: #fbfaf6;
-  --acento-aviso: #ff9cc0;
-  --sombra-folha:
-    0 1px 1px rgb(0 0 0 / 0.25),
-    0 14px 40px rgb(0 0 0 / 0.35);
-
-  color-scheme: light;
-}
-
-/* Modo escuro: a interface vira grafite esverdeado e o feltro escurece. */
-[data-tema='escuro'] {
-  --ui-papel: #1b201e;
-  --ui-papel-2: #252b28;
-  --ui-papel-3: #303733;
-  --ui-campo: #131715;
-  --ui-linha: #38413c;
-  --ui-tinta: #e4e9e5;
-  --ui-tinta-2: #97a59d;
-  --feltro: #172b25;
-  --feltro-escuro: #0f1d19;
-  --acento: #ec5590;
-  --acento-forte: #f382ac;
-  --acento-suave: rgb(236 85 144 / 0.18);
-  --perigo: #ff8577;
-  --perigo-suave: rgb(255 133 119 / 0.14);
-  --aba-ativa: #3b433f;
-  --acento-aviso: #a10f48;
-  --sombra-folha:
-    0 1px 1px rgb(0 0 0 / 0.5),
-    0 14px 40px rgb(0 0 0 / 0.55);
-
-  color-scheme: dark;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root {
-  height: 100%;
-  margin: 0;
-}
-
-body {
-  font: 13px/1.4 var(--ui-fonte);
-  color: var(--ui-tinta);
-  background: var(--feltro);
-  -webkit-font-smoothing: antialiased;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-  color: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-:focus-visible {
-  outline: 2px solid var(--acento);
-  outline-offset: 1px;
-}
 
 /* ---------- estrutura ---------- */
 
@@ -192,41 +105,10 @@ button {
   box-shadow: 0 1px 1px rgb(0 0 0 / 0.12);
 }
 
-.espaco {
-  flex: 1;
-}
-
-.grupo-botoes,
 .zoom {
   display: flex;
   align-items: center;
   gap: 2px;
-}
-
-.botao-icone {
-  display: inline-grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 0;
-  background: transparent;
-  border-radius: 4px;
-  color: var(--ui-tinta);
-  padding: 0;
-}
-
-.botao-icone:hover:not(:disabled) {
-  background: var(--ui-papel-3);
-}
-
-.botao-icone:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.botao-icone--perigo:hover:not(:disabled) {
-  background: var(--perigo-suave);
-  color: var(--perigo);
 }
 
 .zoom__valor {
@@ -240,28 +122,6 @@ button {
 
 .zoom__valor:hover {
   background: var(--ui-papel-3);
-}
-
-.botao-topo {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--ui-linha);
-  background: var(--ui-campo);
-  border-radius: 5px;
-  font-weight: 600;
-}
-
-.botao-topo:hover {
-  border-color: var(--ui-tinta-2);
-}
-
-.botao-topo[aria-pressed='true'],
-.botao-topo[aria-expanded='true'] {
-  border-color: var(--ui-tinta);
-  background: var(--ui-papel-2);
 }
 
 /* ---------- menu ---------- */
@@ -1994,17 +1854,3 @@ select.insp__entrada {
   margin-top: 14px;
 }
 
-.botao-topo--principal {
-  background: var(--ui-tinta);
-  border-color: var(--ui-tinta);
-  color: var(--ui-papel);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.botao-topo--principal:hover {
-  background: var(--ui-tinta-2);
-  border-color: var(--ui-tinta-2);
-}

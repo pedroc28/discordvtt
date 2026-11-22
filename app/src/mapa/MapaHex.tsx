@@ -2,7 +2,7 @@
 // A lógica fica em controlador.ts, renderizador.ts e entrada.ts. Aqui só se junta tudo.
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { useAparencia } from '../ficha/aparencia'
+import { useAparencia } from '../nucleo/aparencia'
 import { carregarCamera, autorLocal, salvarCamera, CAMERA_INICIAL } from './armazenamento'
 import { zoomEm } from './camera'
 import { ControladorMapa, novoId } from './controlador'

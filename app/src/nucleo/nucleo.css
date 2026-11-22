@@ -1,0 +1,90 @@
+/* ==========================================================
+   Moldura do app: abas das telas e botão de tema.
+   ========================================================== */
+
+.raiz {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.navegacao {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 4px 12px 0;
+  background: var(--feltro-escuro);
+  flex: none;
+}
+
+.navegacao__abas {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.navegacao__abas button {
+  border: 0;
+  background: transparent;
+  color: rgb(255 255 255 / 0.7);
+  padding: 6px 16px;
+  border-radius: 6px 6px 0 0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.navegacao__abas button:hover {
+  color: #fff;
+}
+
+.navegacao__abas button[aria-selected='true'] {
+  background: var(--ui-papel);
+  color: var(--ui-tinta);
+}
+
+.navegacao__tema {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: center;
+  margin-bottom: 4px;
+  border: 0;
+  background: transparent;
+  color: rgb(255 255 255 / 0.75);
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.navegacao__tema:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 0.08);
+}
+
+@media (max-width: 560px) {
+  .navegacao__tema span {
+    display: none;
+  }
+}
+
+.raiz__conteudo {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* a tela de cada área ocupa todo o espaço abaixo das abas */
+.raiz__conteudo > * {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+.raiz__vazio {
+  padding: 24px;
+  color: #fff;
+}

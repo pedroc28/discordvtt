@@ -1,16 +1,8 @@
-# Editor de fichas (etapa 1 do DiscordVtt)
+# Editor de fichas
 
 Editor de fichas de RPG no estilo pageboard. O mestre (ou quem cuida do sistema) monta o **modelo** arrastando campos para a folha, e os jogadores **preenchem** a ficha no mesmo componente.
 
-Stack: Vite, React 19 e TypeScript, sem bibliotecas além das fontes. Tudo roda no navegador e salva no `localStorage` por enquanto.
-
-## Rodar
-
-```bash
-npm install
-npm run dev      # abre em http://localhost:5173
-npm run build    # gera a pasta dist/
-```
+Tudo roda no navegador e salva no `localStorage` por enquanto. A área está **congelada**: só recebe mudanças quando os dois voltarem a ela juntos.
 
 ## O que já funciona
 
@@ -29,7 +21,7 @@ Tipos de campo: texto, texto longo (com linhas de caderno opcionais), número, a
 ## Organização
 
 ```
-src/ficha/
+app/src/ficha/
   tipos.ts            formato dos dados (Modelo, Elemento, Personagem)
   campos.ts           registro dos tipos de campo e seus padrões
   CampoVisual.tsx     desenha cada tipo de campo (edição e preenchimento)
@@ -41,9 +33,10 @@ src/ficha/
   Inspetor.tsx        painel da direita (propriedades)
   EditorDeFichas.tsx  tela principal que junta tudo
   armazenamento.ts    localStorage e validação de JSON importado
-  aparencia.ts        tema claro e escuro e cores da folha no modo escuro
+  aparencia.ts        cores da folha no modo escuro (o tema fica em src/nucleo/aparencia.ts)
+  tela.ts             registro da tela de fichas no núcleo
   exemplo.ts          modelo de exemplo d20
-  ficha.css           estilos da interface e da folha
+  ficha.css           estilos da ficha (tema e botões comuns ficam em src/nucleo/tema.css)
 ```
 
 ## Formato dos dados
@@ -76,6 +69,4 @@ Dois campos com a mesma chave mostram o mesmo valor. Isso serve para repetir os 
 
 ## Próximas etapas
 
-- **Etapa 2:** trocar o `useReducer` + `localStorage` por Yjs, com o PocketBase guardando os documentos. As operações em `operacoes.ts` já são puras, então a troca fica concentrada no `EditorDeFichas.tsx`.
-- **Etapa 3:** motor de fórmulas, campo calculado e botão de rolagem
-- **Etapa 4:** painel do mestre
+Estão no [roteiro](roteiro.md).

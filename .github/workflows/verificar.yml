@@ -1,5 +1,6 @@
-# Roda lint, build e testes do app em todo pull request e em todo push na main.
-# O nome do job (verificar) é o que scripts/entregar.sh espera antes de juntar.
+# Roda lint, build e testes do app e o teste das regras do servidor em todo pull request
+# e em todo push na main. O nome do job (verificar) é o que scripts/entregar.sh espera
+# antes de juntar, por isso o teste do servidor é uma etapa deste job, e não um job à parte.
 name: Verificar
 
 on:
@@ -24,3 +25,17 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm test
+      # Sobe um PocketBase da versão fixa com as migrações e hooks do repositório e confere
+      # quem vê, cria, altera e apaga o quê (ver pocketbase/testar-regras.mjs).
+      - name: Testar as regras do servidor
+        working-directory: .
+        run: |
+          VERSAO="$(cat pocketbase/VERSAO)"
+          ARQUIVO="pocketbase_${VERSAO}_linux_amd64.zip"
+          ENDERECO="https://github.com/pocketbase/pocketbase/releases/download/v${VERSAO}"
+          curl -fsSL -o "$RUNNER_TEMP/$ARQUIVO" "$ENDERECO/$ARQUIVO"
+          curl -fsSL -o "$RUNNER_TEMP/checksums.txt" "$ENDERECO/checksums.txt"
+          # Só roda o executável se ele for o mesmo que o PocketBase publicou.
+          (cd "$RUNNER_TEMP" && grep " $ARQUIVO\$" checksums.txt | sha256sum -c -)
+          unzip -q -o "$RUNNER_TEMP/$ARQUIVO" pocketbase -d "$RUNNER_TEMP/pb"
+          node pocketbase/testar-regras.mjs "$RUNNER_TEMP/pb/pocketbase"

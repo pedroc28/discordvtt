@@ -113,7 +113,7 @@ Proteções que valem atrás do Funnel (migração `1795321002_hospedagem.js`):
 node pocketbase/testar-regras.mjs caminho/do/pocketbase
 ```
 
-O script sobe um PocketBase com dados temporários, cria contas de teste e confere 53 situações: quem vê, cria, altera e apaga o quê, o limite de tentativas por pessoa, o administrador barrado vindo de fora e a cópia do backup. No fim, apaga tudo. Ele nunca toca no `pb_data` de verdade. Sem caminho, usa o executável da pasta `pocketbase`. O Claude roda o script antes de entregar qualquer mudança de regra ou hook.
+O script sobe um PocketBase com dados temporários, cria contas de teste e confere 53 situações: quem vê, cria, altera e apaga o quê, o limite de tentativas por pessoa, o administrador barrado vindo de fora e a cópia do backup. No fim, apaga tudo. Ele nunca toca no `pb_data` de verdade. Sem caminho, usa o executável da pasta `pocketbase`. A verificação do GitHub roda o script em todo pull request, baixando o PocketBase da versão de `pocketbase/VERSAO` e conferindo o checksum publicado, então uma regra quebrada impede a entrada na `main`.
 
 ## Próximos passos
 

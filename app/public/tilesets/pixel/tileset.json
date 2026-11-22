@@ -527,12 +527,11 @@
     {
       "id": "pantano",
       "nome": "Pântano",
-      "cor": "#5f7143",
+      "cor": "#576844",
       "extra": 0,
       "arquivos": [
-        "pantano-1.svg",
-        "pantano-2.svg",
-        "pantano-3.svg"
+        "pantano-1.png",
+        "pantano-2.png"
       ],
       "pasta": "aguas",
       "tags": [
@@ -544,14 +543,31 @@
       ]
     },
     {
-      "id": "agua-rasa",
-      "nome": "Água rasa",
-      "cor": "#62c0cb",
+      "id": "mangue",
+      "nome": "Manguezal",
+      "cor": "#4b6040",
       "extra": 0,
       "arquivos": [
-        "agua-rasa-1.svg",
-        "agua-rasa-2.svg",
-        "agua-rasa-3.svg"
+        "mangue-1.png",
+        "mangue-2.png"
+      ],
+      "pasta": "aguas",
+      "tags": [
+        "mangue",
+        "lama",
+        "raso",
+        "tropical",
+        "úmido"
+      ]
+    },
+    {
+      "id": "agua-rasa",
+      "nome": "Água rasa",
+      "cor": "#99cfa9",
+      "extra": 0,
+      "arquivos": [
+        "agua-rasa-1.png",
+        "agua-rasa-2.png"
       ],
       "pasta": "aguas",
       "tags": [

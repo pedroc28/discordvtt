@@ -78,6 +78,7 @@ Mudanças em relação ao plano inicial, decididas durante a construção:
 - **Lote 6** (rochoso, planalto, cânion) feito: 6 variantes em uma chamada (15 gerações).
 - **Lote 7** (vulcão, campo de lava, deserto) feito: 5 variantes em uma chamada (15 gerações).
 - **Lote 8** (dunas, oásis, planície de sal) feito: 6 variantes em uma chamada (15 gerações). As dunas repetem em grade.
+- **Lote 9** (pântano, manguezal, água rasa) feito: 6 variantes em uma chamada (15 gerações).
 - **Paleta com pastas e pesquisa por tag.** Cada terreno do `tileset.json` tem `pasta` e `tags` (3 a 5), e o tileset tem a lista `pastas`. O catálogo dos 43 terrenos previstos fica em `app/tools/catalogo-terrenos.json` e o gerador do tileset padrão lê dele.
 - **A arte em pixel art virou o padrão do mapa** (antes só aparecia com `?tileset=pixel`, e por isso parecia que as imagens não tinham sido aplicadas). O tileset gerado por script continua em `?tileset=padrao`.
 - O tileset ganhou a opção `pixelart` (amplia sem suavizar) e o mapa aceita `?tileset=<pasta>` no endereço para testar arte sem mexer no código.

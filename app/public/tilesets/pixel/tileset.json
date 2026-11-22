@@ -708,6 +708,100 @@
       ]
     },
     {
+      "id": "praia-inteira",
+      "nome": "Praia (tile inteiro)",
+      "cor": "#e1c59b",
+      "extra": 0,
+      "arquivos": [
+        "praia-inteira-1.png",
+        "praia-inteira-2.png",
+        "praia-inteira-3.png",
+        "praia-inteira-4.png"
+      ],
+      "pasta": "costa",
+      "tags": [
+        "praia",
+        "areia",
+        "costa",
+        "sem direção",
+        "quente"
+      ]
+    },
+    {
+      "id": "falesia-inteira",
+      "nome": "Falésia (tile inteiro)",
+      "cor": "#817767",
+      "extra": 0,
+      "arquivos": [
+        "falesia-inteira-1.png",
+        "falesia-inteira-2.png"
+      ],
+      "pasta": "costa",
+      "tags": [
+        "falésia",
+        "penhasco",
+        "rocha",
+        "costa",
+        "sem direção"
+      ]
+    },
+    {
+      "id": "delta",
+      "nome": "Delta de rio",
+      "cor": "#566d5a",
+      "extra": 0,
+      "arquivos": [
+        "delta-1.png",
+        "delta-2.png"
+      ],
+      "pasta": "costa",
+      "tags": [
+        "delta",
+        "rio",
+        "costa",
+        "lama",
+        "raso"
+      ]
+    },
+    {
+      "id": "cidade",
+      "nome": "Cidade murada",
+      "cor": "#5c7e3d",
+      "extra": 0,
+      "arquivos": [
+        "cidade-1.png",
+        "cidade-2.png",
+        "cidade-3.png",
+        "cidade-4.png"
+      ],
+      "pasta": "humano",
+      "tags": [
+        "cidade",
+        "muralha",
+        "civilizado",
+        "casas",
+        "comércio"
+      ]
+    },
+    {
+      "id": "ruinas",
+      "nome": "Ruínas antigas",
+      "cor": "#619544",
+      "extra": 0,
+      "arquivos": [
+        "ruinas-1.png",
+        "ruinas-2.png"
+      ],
+      "pasta": "humano",
+      "tags": [
+        "ruínas",
+        "antigo",
+        "pedra",
+        "abandonado",
+        "mistério"
+      ]
+    },
+    {
       "id": "terra-arrasada",
       "nome": "Terra arrasada",
       "cor": "#4d423d",

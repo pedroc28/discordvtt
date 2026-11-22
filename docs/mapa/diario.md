@@ -71,6 +71,7 @@ Mudanças em relação ao plano inicial, decididas durante a construção:
 
 - Guia para o agente do PixelLab e lista de 43 terrenos em [`arte.md`](arte.md). Três já feitos como teste (oceano, planície, montanha, 2 variantes cada) na pasta `app/public/tilesets/pixel/`, que é uma cópia do tileset padrão com esses três terrenos trocados.
 - **Lote 1** (campo, colina, savana) feito e na pasta `pixel`. Aprendizados novos no guia: o modo de estilo (`style_images`) quebra o hexágono, descrever um objeto só gera objeto solto sem chão, e terrenos que cobrem áreas grandes precisam de muitas variantes (a savana com 1 variante virou uma grade repetida no mapa, com 6 ficou natural).
+- **Lote 2** (estepe, charneca, pomar) feito: 12 variantes novas. Dois lotes seguidos já mostram o ritmo: 1 chamada por lote e mais 1 para completar variantes dos terrenos contínuos (30 gerações por lote).
 - **Paleta com pastas e pesquisa por tag.** Cada terreno do `tileset.json` tem `pasta` e `tags` (3 a 5), e o tileset tem a lista `pastas`. O catálogo dos 43 terrenos previstos fica em `app/tools/catalogo-terrenos.json` e o gerador do tileset padrão lê dele.
 - O tileset ganhou a opção `pixelart` (amplia sem suavizar) e o mapa aceita `?tileset=<pasta>` no endereço para testar arte sem mexer no código.
 - Descoberta: o `create_tiles_pro` do PixelLab em `hex_pointy` com `tile_size` 128 entrega 128 × 128 com o hexágono achatado preenchendo o quadrado. O mapa estica para o hexágono regular. Usar `tile_height` não serve, porque acrescenta uma laje de espessura.

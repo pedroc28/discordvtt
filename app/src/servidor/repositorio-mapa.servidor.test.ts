@@ -100,6 +100,49 @@ describe.skipIf(!ENDERECO_DE_TESTE)('RepositorioPocketBase com o servidor de ver
     await repositorio.fechar()
   }, 20000)
 
+  it('a camada do mestre chega só ao mestre, e revelar aparece para o jogador', async () => {
+    await campanhaDeTeste(mestre, [jogadora])
+    const doMestre = abrir(mestre)
+    const daJogadora = abrir(jogadora)
+    expect([doMestre.ehMestre, daJogadora.ehMestre]).toEqual([true, false])
+    const vistosMestre: Lote[] = []
+    const vistosJogadora: Lote[] = []
+    doMestre.assinar((l) => vistosMestre.push(l))
+    daJogadora.assinar((l) => vistosJogadora.push(l))
+    await Promise.all([doMestre.carregarRegioes(), daJogadora.carregarRegioes()])
+
+    const esconder = { ...lote([]), privado: { ocultos: [{ q: 4, r: -20, antes: null, depois: hexagono(4, -20, 'ruinas') }], notas: [{ q: 4, r: -20, antes: null, depois: { q: 4, r: -20, texto: 'A cripta', rev: 1 } }] } }
+    await doMestre.aplicar(esconder)
+    expect(await esperarAte(() => vistosMestre.some((l) => l.id === esconder.id && l.privado?.ocultos.length === 1))).toBe(true)
+    expect((await doMestre.carregarChunkOculto('0,-2')).map((h) => h.terreno)).toEqual(['ruinas'])
+    expect((await doMestre.carregarNotasPrivadas('0,-2')).map((n) => n.texto)).toEqual(['A cripta'])
+    expect(await daJogadora.carregarChunkOculto('0,-2')).toEqual([])
+
+    const revelar = { ...lote([{ q: 4, r: -20, antes: null, depois: hexagono(4, -20, 'ruinas') }]), privado: { ocultos: [{ q: 4, r: -20, antes: null, depois: null }], notas: [] } }
+    await doMestre.aplicar(revelar)
+    expect(await esperarAte(() => vistosJogadora.some((l) => l.id === revelar.id))).toBe(true)
+    expect(vistosJogadora.every((l) => !l.privado && l.id !== esconder.id)).toBe(true)
+    expect((await daJogadora.carregarChunk('0,-2')).map((h) => h.terreno)).toEqual(['ruinas'])
+    expect(await doMestre.carregarChunkOculto('0,-2')).toEqual([])
+    await Promise.all([doMestre.fechar(), daJogadora.fechar()])
+  }, 20000)
+
+  it('o mestre trava o mapa, a jogadora fica sabendo e não edita', async () => {
+    await campanhaDeTeste(mestre, [jogadora])
+    const doMestre = abrir(mestre)
+    const daJogadora = abrir(jogadora)
+    const vistas: string[] = []
+    daJogadora.assinarPermissao((p) => vistas.push(p))
+    await daJogadora.carregarRegioes()
+    await doMestre.gravarPermissao('mestre')
+    expect(await esperarAte(() => vistas.includes('mestre'))).toBe(true)
+    await expect(daJogadora.aplicar(lote([{ q: 0, r: 0, antes: null, depois: hexagono(0, 0, 'campo') }]))).rejects.toThrow('só o mestre edita este mapa')
+    await doMestre.gravarPermissao('todos')
+    expect(await esperarAte(() => vistas.at(-1) === 'todos')).toBe(true)
+    await daJogadora.aplicar(lote([{ q: 0, r: 0, antes: null, depois: hexagono(0, 0, 'campo') }]))
+    await Promise.all([doMestre.fechar(), daJogadora.fechar()])
+  }, 20000)
+
   it('trocar de campanha fecha o mapa, e o próximo pedido explica', async () => {
     await campanhaDeTeste(mestre, [])
     const repositorio = abrir(mestre)

@@ -36,11 +36,15 @@ Cuidados:
 | `users` | `name` (obrigatório, até 60 letras), `email`, `avatar` | A coleção de contas que já vem no PocketBase. Os outros veem o nome, nunca o e-mail. |
 | `campanhas` | `nome` (obrigatório, até 80 letras) | |
 | `participantes` | `campanha`, `usuario`, `papel` (`mestre` ou `jogador`) | Uma pessoa entra uma vez só em cada campanha. Apagar a campanha ou a conta apaga as participações. |
-| `mapas` | `campanha`, `nome`, `ultimaOrdem` | Um por campanha, por enquanto (índice único). Nasce com a campanha. `ultimaOrdem` é o número do último lote gravado. |
+| `mapas` | `campanha`, `nome`, `ultimaOrdem`, `permissao` | Um por campanha, por enquanto (índice único). Nasce com a campanha. `ultimaOrdem` é o número do último lote público gravado. `permissao` é a trava: `todos` ou `mestre`. |
 | `hexagonos` | `mapa`, `q`, `r`, `chunk`, `dados` | Um registro por hexágono (índice único em mapa, q e r). `dados` é o hexágono inteiro, no formato do contrato. `chunk` é calculado pelo servidor. |
 | `regioes` | `mapa`, `regiaoId`, `dados` | `regiaoId` é o id da região no app. `dados` é a região inteira. |
 | `tokens_grupo` | `mapa`, `q`, `r`, `ts`, `autor`, `presente` | Um por mapa (índice único), criado junto com ele. `presente` falso é o token fora do mapa. |
-| `lotes` | `mapa`, `ordem`, `loteId`, `autor`, `ts`, `mudancas`, `regioes` | O histórico recente de edições do mapa. `ordem` e `autor` são dados pelo servidor. Apagados depois de 7 dias. |
+| `lotes` | `mapa`, `ordem`, `loteId`, `autor`, `ts`, `tipo`, `alvoId`, `mudancas`, `regioes` | O histórico recente de edições públicas do mapa. `ordem` e `autor` são dados pelo servidor. `tipo` é `edicao`, `importacao` ou `reversao`, e `alvoId` é o lote que uma reversão desfaz. Apagados depois de 7 dias. |
+| `mapas_mestre` | `mapa`, `ultimaOrdem` | Um por mapa, criado junto com ele: o contador da camada do mestre. Fica fora do mapa para jogadores não verem quantas edições secretas houve. |
+| `hexagonos_ocultos` | `mapa`, `q`, `r`, `chunk`, `dados` | Hexágonos que só o mestre vê, com os marcadores deles. Pode haver um público e um oculto na mesma posição. |
+| `notas_mestre` | `mapa`, `q`, `r`, `chunk`, `dados` | Notas privadas do mestre, uma por posição. `dados` é `{ q, r, texto, rev }`. |
+| `lotes_mestre` | `mapa`, `ordem`, `loteId`, `autor`, `ts`, `tipo`, `alvoId`, `ocultos`, `notas` | A parte privada dos lotes, com numeração própria. O `loteId` é o mesmo do lote que o app mandou. Apagados depois de 7 dias. |
 
 Todas têm `created` e `updated`. Apagar a campanha apaga o mapa e, em cascata, tudo o que é dele.
 
@@ -51,16 +55,17 @@ Todas têm `created` e `updated`. Apagar a campanha apaga o mapa e, em cascata, 
 | `users` | quem está logado | só o administrador | a própria conta | só o administrador |
 | `campanhas` | quem participa | qualquer conta, que vira mestre | mestre | mestre |
 | `participantes` | quem participa da mesma campanha | mestre | mestre troca o papel, sem mudar a campanha nem a pessoa | mestre, ou a própria pessoa saindo |
-| `mapas` | quem participa da campanha | ninguém (nasce com a campanha) | ninguém | ninguém (sai com a campanha) |
+| `mapas` | quem participa da campanha | ninguém (nasce com a campanha) | mestre, só o nome e a trava | ninguém (sai com a campanha) |
 | `hexagonos` e `regioes` | quem participa da campanha do mapa | ninguém: só o hook dos lotes | ninguém | ninguém |
 | `tokens_grupo` | quem participa da campanha do mapa | ninguém (nasce com o mapa) | quem participa, sem mudar de mapa | ninguém |
-| `lotes` | quem participa da campanha do mapa | quem participa da campanha do mapa | ninguém | ninguém (só a limpeza) |
+| `lotes` | quem participa da campanha do mapa | quem participa da campanha do mapa (o hook confere o resto) | ninguém | ninguém (só a limpeza) |
+| `mapas_mestre`, `hexagonos_ocultos`, `notas_mestre` e `lotes_mestre` | mestre da campanha do mapa | ninguém: só os hooks | ninguém | ninguém (só a limpeza, nos lotes) |
 
 Visitante sem login não vê nada. O administrador, pelo painel, passa por cima de todas as regras.
 
 "Mestre" quer dizer mestre **daquela** campanha. A regra usa o alias `@collection.participantes:mestre` para que campanha, pessoa e papel sejam conferidos na mesma participação. Sem o alias, quem é mestre em uma campanha e jogador em outra conseguiria mandar nas duas.
 
-Por enquanto, quem participa da campanha lê e edita o mapa, mestre ou jogador. A camada privada do mestre ainda não existe.
+Quem participa da campanha lê e edita o mapa, mestre ou jogador, a não ser que o mestre trave o mapa. A camada do mestre só o mestre lê, e o tempo real também respeita isso: jogador não recebe nada dela.
 
 Hooks, em `pocketbase/pb_hooks/campanhas.pb.js`:
 
@@ -75,17 +80,26 @@ O servidor guarda o mapa de cada campanha. O contrato com a área do mapa (forma
 
 **Sincronia por lotes.** Cada edição do mapa (uma pincelada, um nome, uma região) é um lote, como no navegador. O app grava o lote inteiro na coleção `lotes`, e o hook `pb_hooks/mapa.pb.js` faz o resto numa transação só:
 
-1. Confere o lote inteiro. Um item errado recusa o lote todo, com uma mensagem que diz qual hexágono ou região estava errado.
+1. Confere o lote inteiro. Um item errado recusa o lote todo, com uma mensagem que diz qual hexágono, nota ou região estava errado.
 2. Se um lote com o mesmo id já foi gravado (o app reenviou depois de a conexão cair), responde com o lote que já estava gravado, sem aplicar de novo.
-3. Dá o número de ordem: o `ultimaOrdem` do mapa mais 1. O PocketBase grava uma transação de cada vez, então dois lotes nunca recebem o mesmo número.
-4. Aplica o "depois" de cada mudança em `hexagonos` e `regioes`, calculando o chunk de cada hexágono.
-5. Grava o lote com o "antes" real do servidor no lugar do que o app achava, e com o autor sendo a conta logada.
+3. Confere o que a regra de acesso não consegue (ver "Permissões", abaixo).
+4. Separa o lote em duas camadas. A parte pública (`mudancas` e `regioes`) recebe o número de ordem do mapa (`ultimaOrdem` mais 1) e é aplicada em `hexagonos` e `regioes`. A parte privada (`privado`, com `ocultos` e `notas`) recebe o número da camada do mestre (`mapas_mestre`) e é aplicada em `hexagonos_ocultos` e `notas_mestre`. O PocketBase grava uma transação de cada vez, então dois lotes nunca recebem o mesmo número.
+5. Grava cada parte com o "antes" real do servidor no lugar do que o app achava, e com o autor sendo a conta logada. A parte pública vira um registro de `lotes`, e a privada, um de `lotes_mestre`, com o mesmo `loteId`. Um lote só com parte privada não cria nada em `lotes`, e a resposta é o registro de `lotes_mestre`.
 
-Se algo falhar, nada muda, nem o número de ordem. Só esse hook grava hexágonos e regiões: as regras de acesso não deixam ninguém gravar direto. O tempo real avisa cada lote novo a quem participa da campanha, e a ordem dos números é a verdade do mapa.
+Se algo falhar, nada muda, nem os números de ordem. A parte privada vem no corpo do pedido, e não num campo da coleção `lotes`, então nunca chega perto do registro que jogadores leem. Revelar um hexágono é um lote só, com o hexágono na parte pública e a saída dele na parte privada: entra tudo junto ou nada. Só esse hook grava hexágonos e regiões: as regras de acesso não deixam ninguém gravar direto. O tempo real avisa cada lote novo a quem participa da campanha, e a ordem dos números é a verdade do mapa.
 
 **O que o servidor confere.** Posição inteira e até um milhão de hexágonos do centro, terreno, região, nome (até 500 letras), nota (até 20 mil), marcadores (até 100 por hexágono), rios e estradas só nas direções 0, 1 e 2, cor de região no formato `#rrggbb` e região pai diferente da própria. Campos que o servidor não conhece passam como vieram, para o mapa poder ganhar campos novos sem esperar o servidor. Quando isso acontecer, vale avisar o Pedro para validar o campo novo.
 
-**Tamanho do lote.** Até 20 mil hexágonos e 16 MB por lote. Medido em 22/11/2026: um mapa inteiro de 5 mil hexágonos, com nome, nota e marcador em cada um, dá 1,3 MB e leva 1,6 s no servidor. Importado por cima de um mapa existente, com o "antes" preenchido, dá 2,8 MB e 1,6 s. 20 mil hexágonos com "antes" dão 11,2 MB e 5,4 s. Enquanto um lote grande grava, os outros esperam a vez.
+**Permissões.** O hook recusa, com uma mensagem que explica:
+
+- qualquer edição de quem não é mestre, com o mapa travado (`permissao` igual a `mestre`). O token do grupo continua livre.
+- parte privada mandada por quem não é mestre
+- importação (`tipo` igual a `importacao`) de quem não é mestre
+- reversão (`tipo` igual a `reversao`) de um lote de outra pessoa, por quem não é mestre, ou sem dizer qual lote desfaz (`alvoId`). O jogador também não desfaz um lote que já saiu do histórico de 7 dias.
+
+O tipo é declarado pelo app, então ele não impede um jogador de apagar muito numa edição comum. Contra isso valem o limite de tamanho, o de frequência e o histórico, que deixa o mestre desfazer.
+
+**Tamanho do lote.** Uma edição comum (ou reversão) tem até 2.000 mudanças, somando hexágonos, ocultos e notas: uma pincelada tem de 1 a 20. A importação, que é só do mestre, vai num lote só para entrar inteira ou nada e para se desfazer num passo, com até 20 mil mudanças e 16 MB. Acima disso, o mapa pede para dividir. Medido em 22/11/2026: um mapa inteiro de 5 mil hexágonos, com nome, nota e marcador em cada um, dá 1,3 MB e leva 1,6 s no servidor. Importado por cima de um mapa existente, com o "antes" preenchido, dá 2,8 MB e 1,6 s. 20 mil hexágonos com "antes" dão 11,2 MB e 5,4 s. Enquanto um lote grande grava, os outros esperam a vez.
 
 **Chunk.** O servidor calcula a chave do chunk de cada hexágono do mesmo jeito que o `chaveChunk` do mapa (16 × 16, `Math.floor`, chave `"cq,cr"`), e o app carrega os hexágonos por chunk. Os casos conferidos dos dois lados, com coordenadas negativas, ficam em `app/src/servidor/casos-chunk.json`.
 
@@ -97,28 +111,36 @@ Se algo falhar, nada muda, nem o número de ordem. Só esse hook grava hexágono
 
 ### Lado do app
 
-`RepositorioPocketBase`, em `app/src/servidor/repositorio-mapa.ts`, é a implementação da `RepositorioMapa` que fala com o servidor. A área do mapa pega um pronto com `abrirRepositorioMapa()`, de `conexao.ts`, que devolve o mapa da campanha aberta, ou null sem login ou sem campanha.
+`RepositorioPocketBase`, em `app/src/servidor/repositorio-mapa.ts`, é a implementação da `RepositorioMapa` que fala com o servidor. A área do mapa pega um pronto com `abrirRepositorioMapa()`, de `conexao.ts`, que devolve o mapa da campanha aberta, com o papel da pessoa nela, ou null sem login ou sem campanha.
 
 - **Abrir.** No primeiro pedido, acha o mapa da campanha, assina o tempo real dos lotes e do token e só então lê o `ultimaOrdem`. Assim nenhum lote gravado no meio do caminho se perde: os que já estavam gravados estão nos hexágonos que o mapa carrega, e os seguintes chegam como lotes.
 - **Lotes na ordem.** Todo lote passa por `fila-lotes.ts`, inclusive o eco do próprio lote e a resposta da gravação: o lote N só é entregue depois do N - 1, e repetidos são ignorados. Se falta um, o repositório espera meio segundo e busca no servidor. Quando o tempo real reconecta, busca o que perdeu.
 - **Mapa desatualizado.** Se o lote que falta já foi apagado pela limpeza, o mapa local não tem como ficar certo. O repositório para de entregar lotes, `desatualizado` vira verdadeiro, quem assinou `aoDesatualizar` é avisado, e ler o mapa passa a falhar com "Recarregue o mapa". Gravar continua funcionando.
 - **Erros de verdade.** `carregarChunk` falha quando o servidor não responde, em vez de devolver um chunk vazio. As mensagens dizem a causa e o que fazer, começando em minúscula, porque o mapa as mostra depois do que tentava ("Não consegui salvar: o servidor em ... não respondeu.").
-- **Fechar.** Trocar de campanha, sair ou trocar de servidor fecha sozinho os repositórios abertos: as assinaturas do tempo real são canceladas, e os pedidos seguintes falham com "o mapa foi fechado porque você trocou de campanha ou saiu do servidor". `fechar()` faz o mesmo na hora.
+- **Camada do mestre.** Para o mestre, o repositório assina também `lotes_mestre`, tem uma segunda fila com a numeração da camada do mestre e entrega a parte privada como um lote à parte, com o mesmo id e só o campo `privado` (`mudancas` e `regioes` vazias). Um lote com as duas partes chega ao mestre em dois pedaços, inclusive o eco do próprio lote. `carregarChunkOculto`, `carregarNotasPrivadas` e `exportarCamadaMestre` leem a camada, e `ehMestre` diz se ela existe para quem usa. Para jogadores, os três devolvem vazio, sem perguntar ao servidor.
+- **Trava.** `carregarPermissao`, `gravarPermissao` (só o mestre consegue) e `assinarPermissao`, que avisa quando o mestre trava ou destrava.
+- **Contadores.** O repositório também ouve o mapa e o contador da camada do mestre. Se o número passar do último lote entregue, ele busca o que falta, mesmo que nenhum lote seguinte chegue para mostrar o buraco.
+- **Fechar.** Trocar de campanha, sair, trocar de servidor ou mudar de papel na campanha fecha sozinho os repositórios abertos: as assinaturas do tempo real são canceladas, e os pedidos seguintes falham com "o mapa foi fechado porque você trocou de campanha ou saiu do servidor". `fechar()` faz o mesmo na hora.
 - **Sem o SDK.** O repositório recebe um `ClienteMapa`, que o `conexao.ts` cria preso à sessão. Os testes usam um servidor falso com o mesmo comportamento do hook, e o SDK continua num arquivo só.
 
-### Para combinar com o GrifoCaolho
+### Combinado com o GrifoCaolho
 
-1. **Ligar o mapa ao servidor.** Trocar o `new RepositorioLocal(MAPA_ID)` do `MapaHex.tsx` por `abrirRepositorioMapa()` quando houver login e campanha, com o autor sendo o id da conta (`useServidor().usuario.id`). Criar outro controlador quando a campanha mudar, e decidir o que a tela faz com `aoDesatualizar` (o mais simples é recarregar o mapa). Sem login, o mapa continua no navegador.
-2. **Eco do próprio lote.** Investigado e confirmado com o PocketBase de verdade: Ana e Bruno pintam o mesmo hexágono quase juntos, o lote da Ana recebe o número maior, e o servidor fica com o terreno dela. Bruno vê o mesmo, mas a Ana fica vendo o terreno do Bruno até recarregar. O motivo: o controlador aplica a pincelada na hora, recebe depois o lote do Bruno (número menor) por cima e ignora o eco do próprio lote, que traria o valor certo de volta. Proposta para o controlador: quando chegar um lote de outra pessoa, reaplicar por cima as próprias edições que ainda não voltaram como eco. O repositório já entrega o eco na ordem do servidor, que é o que essa correção precisa.
-3. **Chunk que falha.** O `carregarChunk` do servidor agora falha de verdade, mas o controlador ainda trata a falha como chunk vazio, e uma edição nele pode gravar por cima do mapa verdadeiro. Precisa tentar de novo depois, sem deixar editar até o chunk chegar.
-4. **Prazo da limpeza.** Combinado: 7 dias, sem o limite de 5.000 lotes por enquanto. Uma aba aberta e sem conexão por mais de 7 dias cai em `aoDesatualizar`. Falta decidir o que a tela mostra nesse caso.
-5. **Camada privada do mestre.** Fica de fora até definirmos o que é privado (nota, hexágonos escondidos, marcadores, regiões). Vai para coleções próprias, que jogadores não leem, e `exportarTudo` respeita o que cada um pode ver.
-6. **Viagem e provisões.** Hoje ficam no `localStorage` de cada navegador. Decidir se passam a ser da campanha, iguais para todos.
-7. **Quem edita o mapa.** Hoje qualquer participante lê e edita. Decidir se jogador só lê, só move o token, ou edita tudo.
-8. **Token e relógios.** O contrato compara o `ts` do relógio de cada aparelho. O servidor limita o relógio adiantado, mas o controlador ignora um token com `ts` menor que o dele, então um celular com o relógio muito adiantado pode deixar de ver os movimentos dos outros até recarregar. E `gravarToken(null)` não leva `ts` no contrato: o repositório põe a hora na hora de gravar.
-9. **Tamanho da importação.** Até 20 mil hexágonos ou 16 MB num lote. Uma importação maior recebe a mensagem pedindo para dividir.
-10. **Cor da região.** Arrastar o seletor de cor grava um lote a cada movimento. Cabe no limite de pedidos, mas gravar ao soltar pouparia o servidor e o histórico.
-11. **Campos novos no hexágono.** Passam pelo servidor sem validação. Avisar o Pedro quando entrar um, para o servidor validar.
+Fechado em 22/11/2026. O lado do mapa fica com o Grifo, e o do servidor, com o Pedro.
+
+1. **Ligar o mapa ao servidor** (Grifo). O mapa escolhe o repositório pela campanha com `abrirRepositorioMapa()`, o autor passa a ser o id da conta, e o controlador é trocado quando a campanha muda. Sem login, o mapa continua no navegador.
+2. **Eco do próprio lote** (Grifo). Investigado e confirmado com o PocketBase de verdade: quando duas pessoas pintam o mesmo hexágono quase juntas, quem gravou por último fica vendo o terreno do outro até recarregar. O controlador aplica a pincelada na hora, recebe depois o lote da outra pessoa (número menor) por cima e ignora o eco do próprio lote, que traria o valor certo de volta. A correção combinada: quando chegar um lote de outra pessoa, reaplicar por cima as próprias edições que ainda não voltaram como eco. O repositório já entrega o eco na ordem do servidor, que é o que essa correção precisa.
+3. **Chunk que falha** (Grifo). Tentar de novo e não deixar editar até ele chegar, em vez de tratar como vazio.
+4. **Mapa desatualizado** (Grifo). Reconectar não recarrega nada: o repositório busca os lotes que faltam sozinho. Só o `aoDesatualizar` pede recarga: sem edição pendente, o mapa recarrega sozinho com um aviso pequeno ("Mapa atualizado"). Com edição que não foi enviada, mostra um aviso com o botão Recarregar.
+5. **Camada do mestre** (Pedro, pronta). Privado é só nota e hexágono oculto, com os marcadores dele. Regiões são sempre públicas. Lote misto, num lote só, com `privado`, `tipo` e `alvoId` (ver "Permissões").
+6. **Quem edita** (pronto). Jogadores e mestres constroem. O mestre desfaz lotes de qualquer pessoa, importa e pode travar o mapa (`permissao`).
+7. **Token** (Grifo). O controlador aplica o token na ordem em que o repositório entrega, sem comparar com o relógio local.
+8. **Importação** (combinado). Num lote só, até 20 mil mudanças, só do mestre. Acima disso, o mapa pede para dividir.
+9. **Levar o mapa do navegador para a campanha** (Grifo). Só o mestre, uma vez, com a campanha de mapa vazio, como um lote de importação. Antes, o app baixa uma cópia em JSON, e o mapa do navegador nunca é apagado.
+10. **Cor da região** (Grifo). Gravar ao soltar o seletor, em vez de a cada movimento.
+11. **Campos novos no hexágono** (Grifo avisa o Pedro). Passam pelo servidor sem validação até o Pedro validar.
+12. **Viagem e provisões** (depois da primeira entrega). As regras de viagem e o estoque do grupo passam a ser da campanha, editados só pelo mestre, num registro por campanha com um campo JSON. Cada jogador pode simular só para si. A rota continua local.
+13. **Presença** (fora por enquanto). O PocketBase não tem mensagem efêmera.
+14. **Teste ao vivo com o grupo** (os dois), quando o mapa estiver ligado ao servidor.
 
 ## Aba Campanha
 
@@ -187,7 +209,7 @@ Proteções que valem atrás do Funnel (migração `1795321002_hospedagem.js`):
 node pocketbase/testar-regras.mjs caminho/do/pocketbase
 ```
 
-O script sobe um PocketBase com dados temporários, cria contas de teste e confere 119 situações: quem vê, cria, altera e apaga o quê, a troca de senha, o limite de tentativas por pessoa, o administrador barrado vindo de fora, a cópia do backup e o mapa (lotes, gravações ao mesmo tempo, lote recusado, lote repetido, chunk com negativos, tempo real, token, um lote de 5 mil hexágonos com a medição do tempo). Numa segunda rodada, ele sobe um servidor como os de antes do mapa, com campanhas, aplica a migração do mapa, confere que as campanhas antigas ganharam mapa e testa a limpeza dos lotes. No fim, apaga tudo. Ele nunca toca no `pb_data` de verdade. Sem caminho, usa o executável da pasta `pocketbase`. A verificação do GitHub roda o script em todo pull request, baixando o PocketBase da versão de `pocketbase/VERSAO` e conferindo o checksum publicado, então uma regra quebrada impede a entrada na `main`.
+O script sobe um PocketBase com dados temporários, cria contas de teste e confere 157 situações: quem vê, cria, altera e apaga o quê, a troca de senha, o limite de tentativas por pessoa, o administrador barrado vindo de fora, a cópia do backup, o mapa (lotes, gravações ao mesmo tempo, lote recusado, lote repetido, chunk com negativos, tempo real, token, uma importação de 5 mil hexágonos com a medição do tempo) e a camada do mestre (quem vê, tempo real, revelar, lote misto recusado inteiro, importação, reversão e trava). Numa segunda rodada, ele sobe um servidor como os de antes do mapa, com campanhas, aplica as migrações do mapa, confere que as campanhas antigas ganharam mapa, camada do mestre e trava aberta, e testa a limpeza dos lotes, inclusive os do mestre. No fim, apaga tudo. Ele nunca toca no `pb_data` de verdade. Sem caminho, usa o executável da pasta `pocketbase`. A verificação do GitHub roda o script em todo pull request, baixando o PocketBase da versão de `pocketbase/VERSAO` e conferindo o checksum publicado, então uma regra quebrada impede a entrada na `main`.
 
 ## Servidor de teste
 
@@ -202,14 +224,14 @@ O script sobe um PocketBase com dados temporários, com as migrações e os hook
 - **À mão:** com o app rodando (`npm run dev`, em `app/`), entre na aba Campanha com uma das contas e o endereço `http://127.0.0.1:8092`. Duas janelas, com contas diferentes, fazem dois jogadores.
 - **Nos testes:** os testes do app que precisam de um servidor de verdade terminam em `.servidor.test.ts` e rodam quando a variável `DISCORDVTT_SERVIDOR_TESTE` tem o endereço do servidor de teste. Sem ela, como no `npm test` comum, são pulados. Em `app/`: `DISCORDVTT_SERVIDOR_TESTE=http://127.0.0.1:8092 npx vitest run .servidor.test.ts`.
 - **Ajudantes** em `app/src/servidor/teste-servidor.ts`: `entrarComoTeste('mestre')` entra com uma das contas e devolve a conexão, `campanhaDeTeste(mestre, [jogadores])` cria uma campanha só para o teste e abre nela para todos, e `instalarEventSource()` dá ao Node o EventSource que o SDK usa no tempo real. Depois disso, `conexao.abrirRepositorioMapa()` devolve o `RepositorioPocketBase` daquela pessoa.
-- **Na verificação do GitHub:** depois do teste das regras, ela sobe o servidor de teste e roda todos os `.servidor.test.ts`. Hoje são os testes do `RepositorioPocketBase` em `repositorio-mapa.servidor.test.ts`: dois jogadores sincronizando, chunk com coordenadas negativas, lote reenviado, lote recusado, troca de campanha e saída do servidor.
+- **Na verificação do GitHub:** depois do teste das regras, ela sobe o servidor de teste e roda todos os `.servidor.test.ts`. Hoje são os testes do `RepositorioPocketBase` em `repositorio-mapa.servidor.test.ts`: dois jogadores sincronizando, chunk com coordenadas negativas, lote reenviado, lote recusado, camada do mestre com revelar, trava do mapa, troca de campanha e saída do servidor.
 
 ## Próximos passos
 
 1. ~~Base: contas, campanhas e participantes, com migrações e regras.~~ Pronto.
 2. ~~Login no app e escolha da campanha, com o endereço do servidor configurável.~~ Pronto.
 3. ~~Hospedagem com Tailscale Funnel e backup.~~ Pronto e testado em 22/11/2026: login pelo celular no 4G e de um amigo, IP público de cada pessoa nos logs e backup copiado para o Google Drive. A restauração do backup do Google Drive foi ensaiada no mesmo dia (ver "Backup").
-4. **Mapa no servidor.** A base está pronta (22/11/2026): coleções, regras, sincronia por lotes, limpeza e o `RepositorioPocketBase` (ver a seção "Mapa"). Falta ligar o mapa nele e a camada privada do mestre, combinados com o GrifoCaolho (ver "Para combinar com o GrifoCaolho").
+4. **Mapa no servidor.** Do lado do servidor, pronto em 22/11/2026: coleções, regras, sincronia por lotes, limpeza, camada do mestre, trava e o `RepositorioPocketBase` (ver a seção "Mapa"). Falta o Grifo ligar o mapa nele e o teste ao vivo com o grupo (ver "Combinado com o GrifoCaolho").
 5. **Fichas sincronizadas**, quando a ficha descongelar. Com a ficha inteira num registro só, duas pessoas editando campos diferentes apagariam a edição uma da outra. Precisa de um registro por valor ou por chave.
 6. **Rodízio de anfitrião**, se o grupo decidir. Fica para depois dos passos 4 e 5 testados em sessões reais, para não misturar problemas de sincronia com problemas de troca de anfitrião. O detalhamento está na seção abaixo.
 

@@ -5,7 +5,9 @@ import {
   normalizarHexagonoDoServidor,
   normalizarLista,
   normalizarLoteDoServidor,
+  normalizarLoteMestreDoServidor,
   normalizarMapaDoServidor,
+  normalizarNotaPrivada,
   normalizarParticipacao,
   normalizarRegiaoDoServidor,
   normalizarTokenDoServidor,
@@ -100,9 +102,33 @@ describe('validação dos dados do mapa no servidor', () => {
   })
 
   it('mapa e token', () => {
-    expect(normalizarMapaDoServidor({ id: 'm1', ultimaOrdem: 12 })).toEqual({ id: 'm1', ultimaOrdem: 12 })
-    expect(normalizarMapaDoServidor({ id: 'm1' })).toEqual({ id: 'm1', ultimaOrdem: 0 })
+    expect(normalizarMapaDoServidor({ id: 'm1', ultimaOrdem: 12, permissao: 'mestre' })).toEqual({ id: 'm1', ultimaOrdem: 12, permissao: 'mestre' })
+    // Sem trava, ou com um valor desconhecido, vale aberta: quem confere de verdade é o servidor.
+    expect(normalizarMapaDoServidor({ id: 'm1' })).toEqual({ id: 'm1', ultimaOrdem: 0, permissao: 'todos' })
+    expect(normalizarMapaDoServidor({ id: 'm1', permissao: 'ninguem' })?.permissao).toBe('todos')
     expect(normalizarTokenDoServidor({ id: 't1', q: 2, r: 3, ts: 5, autor: 'u', presente: true })).toEqual({ id: 't1', token: { q: 2, r: 3, ts: 5, autor: 'u' } })
     expect(normalizarTokenDoServidor({ id: 't1', q: 2, r: 3, ts: 5, presente: false })).toEqual({ id: 't1', token: null })
+  })
+})
+
+describe('validação da camada do mestre', () => {
+  it('lote do mestre vira um Lote só com a parte privada, com o mesmo id', () => {
+    const oculto = { q: 1, r: 1, terreno: 'ruinas', regiaoId: null, nome: '', nota: '', marcadores: [], rios: [], estradas: [], rev: 1 }
+    const nota = { q: 1, r: 1, texto: 'segredo', rev: 1 }
+    const bruto = { ordem: 3, loteId: 'l1', autor: 'u1', ts: 9, tipo: 'reversao', alvoId: 'l0', ocultos: [{ q: 1, r: 1, antes: null, depois: oculto }], notas: [{ q: 1, r: 1, antes: null, depois: nota }] }
+    expect(normalizarLoteMestreDoServidor(bruto)).toEqual({
+      ordem: 3,
+      lote: { id: 'l1', autor: 'u1', ts: 9, mudancas: [], regioes: [], tipo: 'reversao', alvoId: 'l0', privado: { ocultos: [{ q: 1, r: 1, antes: null, depois: oculto }], notas: [{ q: 1, r: 1, antes: null, depois: nota }] } },
+    })
+  })
+
+  it('tipo desconhecido fica de fora, e o lote vale como edição', () => {
+    expect(normalizarLoteDoServidor({ ordem: 1, loteId: 'l', tipo: 'qualquer' })?.lote.tipo).toBeUndefined()
+    expect(normalizarLoteDoServidor({ ordem: 1, loteId: 'l', tipo: 'importacao' })?.lote.tipo).toBe('importacao')
+  })
+
+  it('nota privada precisa de posição e texto', () => {
+    expect(normalizarNotaPrivada({ q: 0, r: -1, texto: 'x' })).toEqual({ q: 0, r: -1, texto: 'x', rev: 1 })
+    expect(normalizarNotaPrivada({ q: 0, r: -1 })).toBeNull()
   })
 })

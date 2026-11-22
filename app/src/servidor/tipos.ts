@@ -61,8 +61,18 @@ export interface EstadoServidor {
 
 // ---------- mapa ----------
 
+/** Quem edita o mapa: todos que participam da campanha, ou só o mestre. */
+export type PermissaoMapa = 'todos' | 'mestre'
+
 /** O mapa da campanha no servidor. `ultimaOrdem` é o número do último lote gravado nele. */
 export interface MapaDoServidor {
+  id: string
+  ultimaOrdem: number
+  permissao: PermissaoMapa
+}
+
+/** O contador da camada do mestre de um mapa: só o mestre lê. */
+export interface CamadaMestreDoServidor {
   id: string
   ultimaOrdem: number
 }

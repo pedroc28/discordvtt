@@ -237,4 +237,14 @@ A paleta de terrenos do mapa divide os tiles em **pastas** e tem **pesquisa por 
 
 - **Transições.** Hoje, onde dois terrenos se encontram há um corte seco na borda do hexágono. O PixelLab tem `tile_feature="tileset"` com `hex_pointy`, que gera um conjunto de 32 tiles de costa que se encaixam (por exemplo grama para água). Vale testar para a costa, que é a emenda mais visível.
 - **Objetos que passam do hexágono.** Montanhas e árvores altas podem ganhar `extra` (pixels a mais no topo da imagem) para os picos subirem por cima do hexágono de cima. Hoje todos ficam dentro do hexágono.
-- **Ícones de marcador e peças** (cidade, castelo, masmorra, token do grupo) também podem virar pixel art no mesmo estilo.
+- **Peças do mapa em pixel art:** o token do grupo e os desenhos de rio e estrada (hoje feitos em canvas) ainda não têm arte em pixel art. Os ícones de marcador já têm, ver a seção 10.
+
+## 10. Ícones de marcador
+
+Os 12 ícones (`cidade`, `vila`, `castelo`, `masmorra`, `ruina`, `torre`, `templo`, `acampamento`, `porto`, `tesouro`, `perigo`, `ponto`) estão em `app/public/tilesets/pixel/marcadores/` como PNG de **64 × 64** com fundo transparente. O mapa os amplia sem suavizar quando o zoom passa de 100%.
+
+- **Ferramenta:** `create_image_pixen`, 1 geração por imagem (12 ícones por 12 gerações, mais 2 de uma refação). `width` e `height` 64, `no_background` ligado, `outline` `single color black outline`, `detail` `medium detail`, `view` `high top-down`. O PixelLab aceita só **8 jobs ao mesmo tempo**: mande 8 e espere.
+- **Receita do prompt:** `fantasy map icon of <o que é, com 2 ou 3 detalhes>, bold readable silhouette, vibrant colors, light from the top-left`. Construções saem em um pequeno bloco isométrico de terreno, e objetos (barraca, baú, caveira, estrela) saem soltos. Os dois estilos convivem bem no mapa.
+- **Erro que já aconteceu:** a primeira `masmorra` veio com fundo quadrado azul e moldura. Pedir `a mound of grey rock with a dark cave mouth ... transparent background` resolveu.
+- **Conferir:** canto `(0, 0)` transparente, silhueta legível a 50% de zoom e fora do mapa, ao lado dos outros 11.
+- Jobs do primeiro lote: cidade `375375fc-5bd8-414a-a853-27afa84514b3`, vila `29342b52-1004-48bc-a314-898d7ecbd824`, castelo `f0256cff-6705-4b2e-bc0b-1fcf8176cd2c`, ruína `5c500d91-ef8e-42b0-a052-07fd3e65abc0`, torre `67845e34-983b-4d3d-9bec-f34edca48d6c`, templo `1a287658-23ab-4aa2-bf94-01bff27cd8a2`, acampamento `abd322c6-e2c2-4dbe-83c1-63bbc7fb4bc2`, porto `bf3f32b0-eeee-4de6-8acc-3801eceefcc7`, tesouro `2a1cffbc-cbb7-4550-a1bd-d730216b17db`, perigo `9e3960fa-dfdc-4941-8cf5-ca493ff1f96f`, ponto `9b99df11-52cc-49c0-9824-cf26bdf4e220` e masmorra `2b7a0f16-74c3-4f5a-bb54-c4fc3b5ba412`.

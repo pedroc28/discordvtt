@@ -66,7 +66,7 @@
     {
       "id": "campo",
       "nome": "Campos de cultivo",
-      "cor": "#75602c",
+      "cor": "#b09b5d",
       "extra": 0,
       "arquivos": [
         "campo-1.png",
@@ -418,11 +418,15 @@
     {
       "id": "canion",
       "nome": "Cânion",
-      "cor": "#a0432d",
+      "cor": "#e99251",
       "extra": 0,
       "arquivos": [
         "canion-1.png",
-        "canion-2.png"
+        "canion-2.png",
+        "canion-3.png",
+        "canion-4.png",
+        "canion-5.png",
+        "canion-6.png"
       ],
       "pasta": "altos",
       "tags": [
@@ -656,11 +660,13 @@
     {
       "id": "geleira",
       "nome": "Geleira",
-      "cor": "#b6def1",
+      "cor": "#a4d4f1",
       "extra": 0,
       "arquivos": [
         "geleira-1.png",
-        "geleira-2.png"
+        "geleira-2.png",
+        "geleira-3.png",
+        "geleira-4.png"
       ],
       "pasta": "gelo",
       "tags": [

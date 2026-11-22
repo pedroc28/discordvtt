@@ -1,0 +1,152 @@
+{
+  "id": "padrao",
+  "nome": "Padrão (gerado por script)",
+  "orientacao": "pointy",
+  "largura": 256,
+  "altura": 296,
+  "terrenos": [
+    {
+      "id": "planicie",
+      "nome": "Planície",
+      "cor": "#9fc062",
+      "extra": 0,
+      "arquivos": [
+        "planicie-1.svg",
+        "planicie-2.svg",
+        "planicie-3.svg"
+      ]
+    },
+    {
+      "id": "campo",
+      "nome": "Campos de cultivo",
+      "cor": "#c0b963",
+      "extra": 0,
+      "arquivos": [
+        "campo-1.svg",
+        "campo-2.svg",
+        "campo-3.svg"
+      ]
+    },
+    {
+      "id": "floresta",
+      "nome": "Floresta",
+      "cor": "#5f8f45",
+      "extra": 0,
+      "arquivos": [
+        "floresta-1.svg",
+        "floresta-2.svg",
+        "floresta-3.svg"
+      ]
+    },
+    {
+      "id": "floresta-densa",
+      "nome": "Floresta densa",
+      "cor": "#3c6232",
+      "extra": 0,
+      "arquivos": [
+        "floresta-densa-1.svg",
+        "floresta-densa-2.svg",
+        "floresta-densa-3.svg"
+      ]
+    },
+    {
+      "id": "colina",
+      "nome": "Colinas",
+      "cor": "#98b95c",
+      "extra": 0,
+      "arquivos": [
+        "colina-1.svg",
+        "colina-2.svg",
+        "colina-3.svg"
+      ]
+    },
+    {
+      "id": "montanha",
+      "nome": "Montanhas",
+      "cor": "#8c8273",
+      "extra": 56,
+      "arquivos": [
+        "montanha-1.svg",
+        "montanha-2.svg",
+        "montanha-3.svg"
+      ]
+    },
+    {
+      "id": "pico-nevado",
+      "nome": "Picos nevados",
+      "cor": "#9aa6b0",
+      "extra": 84,
+      "arquivos": [
+        "pico-nevado-1.svg",
+        "pico-nevado-2.svg",
+        "pico-nevado-3.svg"
+      ]
+    },
+    {
+      "id": "deserto",
+      "nome": "Deserto",
+      "cor": "#dcc17c",
+      "extra": 0,
+      "arquivos": [
+        "deserto-1.svg",
+        "deserto-2.svg",
+        "deserto-3.svg"
+      ]
+    },
+    {
+      "id": "pantano",
+      "nome": "Pântano",
+      "cor": "#5f7143",
+      "extra": 0,
+      "arquivos": [
+        "pantano-1.svg",
+        "pantano-2.svg",
+        "pantano-3.svg"
+      ]
+    },
+    {
+      "id": "agua-rasa",
+      "nome": "Água rasa",
+      "cor": "#62c0cb",
+      "extra": 0,
+      "arquivos": [
+        "agua-rasa-1.svg",
+        "agua-rasa-2.svg",
+        "agua-rasa-3.svg"
+      ]
+    },
+    {
+      "id": "oceano",
+      "nome": "Oceano",
+      "cor": "#2a5f98",
+      "extra": 0,
+      "arquivos": [
+        "oceano-1.svg",
+        "oceano-2.svg",
+        "oceano-3.svg"
+      ]
+    },
+    {
+      "id": "tundra",
+      "nome": "Tundra",
+      "cor": "#cddae0",
+      "extra": 0,
+      "arquivos": [
+        "tundra-1.svg",
+        "tundra-2.svg",
+        "tundra-3.svg"
+      ]
+    },
+    {
+      "id": "terra-arrasada",
+      "nome": "Terra arrasada",
+      "cor": "#4d423d",
+      "extra": 0,
+      "arquivos": [
+        "terra-arrasada-1.svg",
+        "terra-arrasada-2.svg",
+        "terra-arrasada-3.svg"
+      ]
+    }
+  ]
+}

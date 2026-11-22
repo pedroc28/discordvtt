@@ -1,0 +1,287 @@
+/* ==========================================================
+   Mapa hexagonal e navegação entre telas.
+   Usa as cores da interface (--ui-*, --acento) definidas em ficha.css.
+   ========================================================== */
+
+/* ---------- navegação entre telas ---------- */
+
+.raiz {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.navegacao {
+  display: flex;
+  gap: 2px;
+  padding: 4px 12px 0;
+  background: var(--feltro-escuro);
+  flex: none;
+}
+
+.navegacao button {
+  border: 0;
+  background: transparent;
+  color: rgb(255 255 255 / 0.7);
+  padding: 6px 16px;
+  border-radius: 6px 6px 0 0;
+  font-weight: 600;
+}
+
+.navegacao button:hover {
+  color: #fff;
+}
+
+.navegacao button[aria-selected='true'] {
+  background: var(--ui-papel);
+  color: var(--ui-tinta);
+}
+
+.raiz__conteudo {
+  flex: 1;
+  min-height: 0;
+}
+
+.raiz__conteudo > .app,
+.raiz__conteudo > .mapa {
+  height: 100%;
+}
+
+/* ---------- mapa ---------- */
+
+.mapa {
+  --mapa-vazio: #223530;
+  --mapa-grade: rgb(255 255 255 / 0.2);
+  --mapa-destaque: #ffd24a;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--ui-papel);
+  color: var(--ui-tinta);
+}
+
+[data-tema='escuro'] .mapa {
+  --mapa-vazio: #121c1a;
+  --mapa-grade: rgb(255 255 255 / 0.14);
+}
+
+.mapa__topo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--ui-papel);
+  border-bottom: 1px solid var(--ui-linha);
+  flex: none;
+  overflow-x: auto;
+}
+
+.mapa__topo .modo button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 32px;
+  justify-content: center;
+}
+
+.mapa__topo .botao-icone[aria-pressed='true'] {
+  background: var(--acento-suave);
+  color: var(--acento-forte);
+}
+
+[data-tema='escuro'] .mapa__topo .botao-icone[aria-pressed='true'] {
+  color: var(--acento);
+}
+
+.mapa__zoom {
+  min-width: 44px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--ui-tinta-2);
+}
+
+.mapa__corpo {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.mapa__paleta {
+  flex: none;
+  width: 212px;
+  overflow-y: auto;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  align-content: start;
+  gap: 4px;
+  background: var(--ui-papel);
+  border-right: 1px solid var(--ui-linha);
+}
+
+.mapa-terreno {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.mapa-terreno:hover {
+  background: var(--ui-papel-3);
+}
+
+.mapa-terreno[aria-pressed='true'] {
+  border-color: var(--acento);
+  background: var(--acento-suave);
+}
+
+.mapa-terreno img,
+.mapa-terreno__cor {
+  width: 56px;
+  height: 60px;
+  object-fit: contain;
+  user-select: none;
+}
+
+.mapa-terreno span:not(.mapa-terreno__cor) {
+  font-size: 11px;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.mapa__palco {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--mapa-vazio);
+}
+
+.mapa__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.mapa__dica {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: min(360px, 80%);
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+}
+
+.mapa__dica--erro {
+  background: var(--perigo);
+}
+
+.mapa__status {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: flex;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.mapa__aviso {
+  position: absolute;
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  max-width: min(480px, 92%);
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--ui-papel);
+  color: var(--ui-tinta);
+  border: 1px solid var(--ui-linha);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.3);
+}
+
+/* ---------- celular ---------- */
+
+@media (max-width: 720px) {
+  .mapa__rotulo {
+    display: none;
+  }
+
+  /* No celular a barra quebra em duas linhas em vez de rolar, e o zoom é pela pinça. */
+  .mapa__topo {
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    overflow-x: visible;
+  }
+
+  .mapa__grupo-zoom {
+    display: none;
+  }
+
+  .mapa__corpo {
+    flex-direction: column-reverse;
+  }
+
+  .mapa__paleta {
+    width: auto;
+    height: 96px;
+    display: flex;
+    gap: 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-top: 1px solid var(--ui-linha);
+    padding: 6px 8px;
+  }
+
+  .mapa-terreno {
+    flex: none;
+    width: 72px;
+  }
+
+  .mapa-terreno img,
+  .mapa-terreno__cor {
+    width: 44px;
+    height: 48px;
+  }
+
+  .mapa__status {
+    bottom: 8px;
+  }
+}
+
+@media (pointer: coarse) {
+  .mapa__topo .botao-icone {
+    width: 44px;
+    height: 44px;
+  }
+
+  .mapa__topo .modo button {
+    min-height: 40px;
+    min-width: 40px;
+  }
+}

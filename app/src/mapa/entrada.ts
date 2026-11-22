@@ -16,9 +16,10 @@ import { tocarRegua } from './regua'
  * Pintar, Apagar e Região usam o pincel (arrastando). Rio e Estrada também riscam arrastando, mas por
  * arestas. Navegar, Marcador, Token e Régua movem o mapa arrastando e agem num toque rápido: Navegar
  * seleciona o hexágono, Marcador coloca um marcador nele, Token leva o token do grupo até ele e
- * Régua marca o início e o fim da medida.
+ * Régua marca o início e o fim da medida e Rota acrescenta um ponto à rota de viagem. Com Navegar ou Token,
+ * pegar o token e arrastar o leva para outro hexágono (um toque no token, sem arrastar, continua selecionando).
  */
-export type Ferramenta = 'navegar' | 'pintar' | 'apagar' | 'regiao' | 'marcador' | 'rio' | 'estrada' | 'token' | 'regua'
+export type Ferramenta = 'navegar' | 'pintar' | 'apagar' | 'regiao' | 'marcador' | 'rio' | 'estrada' | 'token' | 'regua' | 'rota'
 
 export interface OpcoesEntrada {
   ferramenta: Ferramenta
@@ -37,13 +38,14 @@ const usaTraco = (f: Ferramenta) => usaPincel(f) || f === 'rio' || f === 'estrad
 const LIMITE_TOQUE_PX = 8
 const LIMITE_TOQUE_MS = 450
 
-type Modo = 'nenhum' | 'arrastar' | 'traco' | 'gesto'
+type Modo = 'nenhum' | 'arrastar' | 'traco' | 'gesto' | 'token'
 
 export class EntradaMapa {
   opcoes: OpcoesEntrada
   aoSelecionar: (h: Hex) => void = () => {}
   aoMarcar: (h: Hex) => void = () => {}
   aoMoverToken: (h: Hex) => void = () => {}
+  aoRota: (h: Hex) => void = () => {}
   aoMudarRegua: () => void = () => {}
   aoPassar: (h: Hex | null) => void = () => {}
   aoMudarPrevia: () => void = () => {}
@@ -134,6 +136,7 @@ export class EntradaMapa {
     if (this.ponteiros.size >= 2) {
       this.traco?.cancelar()
       this.traco = null
+      this.render.definirFantasmaToken(null)
       this.modo = 'gesto'
       this.gesto = this.medirGesto()
       return
@@ -146,6 +149,14 @@ export class EntradaMapa {
       this.render.hover = sob
       this.aoPassar(sob)
       this.atualizarPrevia()
+    }
+    // Pegar o token: com Navegar ou Token, apertar no hexágono do token e arrastar leva o token junto.
+    const f0 = this.opcoes.ferramenta
+    const token = this.ctrl.token
+    if (e.button === 0 && !this.espaco && (f0 === 'navegar' || f0 === 'token') && token && mesmoHex(sob, token)) {
+      this.modo = 'token'
+      this.render.definirFantasmaToken(sob)
+      return
     }
     const arrasta = e.button === 1 || e.button === 2 || this.espaco || !usaTraco(this.opcoes.ferramenta)
     if (arrasta) {
@@ -187,6 +198,8 @@ export class EntradaMapa {
       this.render.definirCamera(arrastar(this.render.camera, p.x - anterior.x, p.y - anterior.y))
     } else if (this.modo === 'traco') {
       this.pincelar(p)
+    } else if (this.modo === 'token') {
+      this.render.definirFantasmaToken(h)
     }
   }
 
@@ -200,7 +213,17 @@ export class EntradaMapa {
       e.button === 0
     this.ponteiros.delete(e.pointerId)
 
-    if (this.modo === 'traco') {
+    if (this.modo === 'token') {
+      const destino = this.render.tokenFantasma
+      this.render.definirFantasmaToken(null)
+      const token = this.ctrl.token
+      if (destino && token && !mesmoHex(destino, token)) {
+        this.aoMoverToken(destino)
+      } else if (this.opcoes.ferramenta === 'navegar' && e.button === 0) {
+        // Apertou no token e soltou no mesmo lugar: é um toque comum, seleciona o hexágono.
+        this.aoSelecionar(this.render.hexSob(p.x, p.y))
+      }
+    } else if (this.modo === 'traco') {
       this.traco?.confirmar()
       this.traco = null
     } else if (eraToque) {
@@ -208,6 +231,7 @@ export class EntradaMapa {
       const f = this.opcoes.ferramenta
       if (f === 'marcador') this.aoMarcar(h)
       else if (f === 'token') this.aoMoverToken(h)
+      else if (f === 'rota') this.aoRota(h)
       else if (f === 'regua') {
         this.render.regua = tocarRegua(this.render.regua, h)
         this.render.pedirQuadro()
@@ -230,6 +254,7 @@ export class EntradaMapa {
 
   private aoCancelar = (e: PointerEvent) => {
     this.ponteiros.delete(e.pointerId)
+    this.render.definirFantasmaToken(null)
     if (this.modo === 'traco') {
       this.traco?.cancelar()
       this.traco = null

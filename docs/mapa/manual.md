@@ -23,7 +23,9 @@ Aba **Mapa**, no topo do app.
 | Colocar marcador | ferramenta Marcador (M): escolha o ícone e toque no hexágono (ele precisa ter terreno) | idem |
 | Desenhar rio | ferramenta Rio (I): arraste pelas bordas dos hexágonos. A borda mais perto do cursor ganha o rio (ela aparece destacada antes). O modo "Tirar" apaga | idem |
 | Desenhar estrada | ferramenta Estrada (D): arraste de hexágono em hexágono, e a estrada liga o centro de um ao do vizinho. Modo "Tirar" apaga | idem |
-| Token do grupo | ferramenta Token (T): toque num hexágono e o token vai para lá, para todos. "Ir até o token" centraliza o mapa, "Tirar o token" o remove | idem |
+| Token do grupo | ferramenta Token (T): toque num hexágono e o token vai para lá, para todos. **Arrastar:** com Navegar ou Token, aperte no hexágono do token e arraste: ele aparece no destino (a origem fica apagada) e cai ao soltar. Um toque no token, sem arrastar, só seleciona o hexágono. "Ir até o token" centraliza o mapa, "Tirar o token" o remove | idem, com um dedo. Dois dedos continuam movendo o mapa |
+| Rota de viagem | ferramenta Rota (P): toque nos hexágonos na ordem da viagem. O caminho mais barato entre os pontos aparece tracejado, com os pontos numerados, e a duração e as provisões aparecem na aba lateral | idem |
+| Aba de viagem e provisões | botão de painel na barra, ou "Marcar rota no mapa": abre e recolhe a aba da direita (o app lembra) | no celular a aba vira uma folha sobre o mapa, e recolhida é um botão redondo no canto |
 | Medir distância | ferramenta Régua (L): toque no começo e no fim, e o mapa mostra a distância em hexágonos. Um terceiro toque recomeça, Esc limpa | idem |
 | Esconder as cores das regiões | botão do olho | idem |
 | Tamanho do pincel | 1, 7 ou 19 hexágonos (teclas `[` e `]`) | idem |
@@ -56,6 +58,13 @@ Desfazer é **por jogador**: só desfaz o que você fez, e pula hexágonos que o
 
 **Exportar e importar.** O arquivo é um JSON (`arquivo.ts`) com `formato: "mapa-hex"`, `versao`, `meta` (nome, tileset e escala), `exportadoEm`, `hexagonos` (os mesmos objetos do `Hexagono`, em ordem fixa de fileira e coluna), `regioes` e `token`. Leva o mapa inteiro, inclusive chunks que ninguém abriu (o repositório lista tudo por `exportarTudo`, opcional). Na importação o arquivo é validado: itens quebrados são descartados e contados, hexágono repetido vale o último, versão mais nova que a do app é recusada com mensagem, e terrenos que a arte atual não tem são avisados (aparecem em cinza). Há dois modos: **mesclar** põe o arquivo por cima e mantém o resto, e **substituir** deixa o mapa igual ao arquivo, apagando o que não estiver nele e movendo o token (exige `exportarTudo`). A importação é **um passo só no desfazer**, nos dois modos, e a revisão dos hexágonos sobe acima das duas para ordenar certo. Importar o arquivo que acabou de exportar não muda nada.
 
+**Viagem e provisões.** A aba lateral (`PainelViagem.tsx`, contas em `viagem.ts`, puras e testadas) calcula quanto dura uma viagem e o que o grupo precisa levar.
+- **Rota:** o caminho mais barato entre os pontos marcados, andando só por hexágonos que existem (Dijkstra). Pode começar no token do grupo (e acompanha o token se ele mudar). Se não há caminho, o painel diz entre quais pontos (água aberta ou hexágono vazio no meio).
+- **Custo:** cada terreno tem um custo de travessia (planície 1, bosque 1,25, floresta e colina 1,5, taiga e deserto 2, floresta densa e cânion 2,5, selva, montanha, pântano e geleira 3, picos nevados, vulcão e lava 4). Água aberta (oceano, recife) não se atravessa. **Estrada** pela aresta custa 0,5 em qualquer terreno. **Rio** sem ponte soma 1 (o vau), e estrada por cima do rio é ponte. A tabela inteira está em `CUSTO_TERRENO`, e terreno que não está nela custa 1,5.
+- **Tempo:** esforço = custo total × km por hexágono. Dias = esforço ÷ (marcha normal × multiplicador do ritmo: lento 0,75, normal 1, rápido 1,25). O dia tem 8 horas de marcha. A provisão é de dias inteiros (arredonda para cima).
+- **Provisões:** rações e água por pessoa e por montaria, por dia, vezes os dias, com o peso de cada uma, a capacidade de carga do grupo, o estoque atual (quanto falta e quantos dias ele dura) e um aviso de sobrecarga. Sem rota, dá para digitar os dias.
+- Tudo é ajustável no painel (km por hexágono, marcha, consumo, pesos, cargas) e fica salvo no navegador, por pessoa, e não vai para o servidor.
+
 **Segredo do mestre.** Quando existir a camada privada do mestre (notas e hexágonos ocultos), ela deve ficar em **coleções separadas, protegidas no servidor** (regras de acesso do PocketBase). Esconder só na tela deixaria o dado exposto na rede.
 
 ## Organização
@@ -73,6 +82,8 @@ tileset.ts           carrega o tileset (manifesto + imagens)
 renderizador.ts      desenha no canvas 2D
 entrada.ts           mouse, toque e caneta (Pointer Events)
 regua.ts             régua de distância (pura)
+viagem.ts            rota, custo de terreno, dias e provisões (puro)
+PainelViagem.tsx     aba lateral de viagem e provisões
 arquivo.ts           arquivo de exportação: montar, ler com validação e planejar a importação (puro)
 paleta.ts            pastas e pesquisa por tag da paleta de terrenos (pura)
 PaletaTerrenos.tsx   paleta de terrenos com pastas e pesquisa

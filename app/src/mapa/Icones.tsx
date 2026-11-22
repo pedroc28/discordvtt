@@ -10,6 +10,8 @@ export type NomeIcone =
   | 'estrada'
   | 'token'
   | 'regua'
+  | 'rota'
+  | 'lateral'
   | 'baixar'
   | 'subir'
   | 'olho'
@@ -42,6 +44,14 @@ const desenhos: Record<NomeIcone, ReactNode> = {
     </>
   ),
   regua: <path d="M2 10.5 10.5 2l3.5 3.5L5.5 14zM5 8.5l1.6 1.6M7.4 6.1 9 7.7M9.8 3.7l1.6 1.6" />,
+  rota: (
+    <>
+      <circle cx="3.5" cy="12.5" r="1.6" />
+      <circle cx="12.5" cy="3.5" r="1.6" />
+      <path d="M5 11.8C8 10.5 5.5 7 8 6.2s3-1.2 3.2-1.4" strokeDasharray="1.6 1.6" />
+    </>
+  ),
+  lateral: <path d="M2.5 3h11v10h-11zM10 3v10" />,
   baixar: <path d="M8 2.5v8M4.8 7.6 8 10.8l3.2-3.2M3 13h10" />,
   subir: <path d="M8 10.8v-8M4.8 5.7 8 2.5l3.2 3.2M3 13h10" />,
   olho: (

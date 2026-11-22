@@ -780,3 +780,242 @@
   gap: 8px;
   margin-top: 12px;
 }
+
+/* ---------- aba lateral de viagem e provisões ---------- */
+
+.mapa__viagem {
+  flex: none;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--ui-papel);
+  border-left: 1px solid var(--ui-linha);
+  color: var(--ui-tinta);
+}
+
+.mapa__viagem--recolhida {
+  width: 40px;
+  align-items: center;
+  padding: 6px 0;
+  gap: 10px;
+}
+
+.viagem__vertical {
+  writing-mode: vertical-rl;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--ui-tinta-2);
+}
+
+.viagem__topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ui-linha);
+}
+
+.viagem__topo h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.viagem__corpo {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 12px 16px;
+}
+
+.viagem__secao {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ui-linha);
+}
+
+.viagem__secao h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.viagem__grade {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.viagem__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--ui-tinta-2);
+}
+
+.viagem__entrada {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.viagem__entrada input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 2px 6px;
+  border: 1px solid var(--ui-linha);
+  border-radius: 6px;
+  background: var(--ui-campo);
+  color: var(--ui-tinta);
+  font: inherit;
+  font-size: 13px;
+}
+
+.viagem__entrada small {
+  flex: none;
+  font-size: 11px;
+  color: var(--ui-tinta-2);
+}
+
+.viagem__botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.viagem__botoes .botao-topo[aria-pressed='true'] {
+  background: var(--acento-suave);
+  color: var(--acento-forte);
+}
+
+[data-tema='escuro'] .viagem__botoes .botao-topo[aria-pressed='true'] {
+  color: var(--acento);
+}
+
+.viagem__marca {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  min-height: 28px;
+}
+
+.viagem__dica {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ui-tinta-2);
+}
+
+.viagem__alerta {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--perigo);
+}
+
+.viagem__resultado {
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.viagem__resultado > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.viagem__resultado dt {
+  color: var(--ui-tinta-2);
+}
+
+.viagem__resultado dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.viagem__destaque dd {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.viagem__barra {
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 4px;
+  background: var(--ui-papel-3);
+  overflow: hidden;
+}
+
+.viagem__barra-cheia {
+  display: block;
+  height: 100%;
+  background: var(--acento);
+}
+
+.viagem__barra-cheia--alerta {
+  background: var(--perigo);
+}
+
+.viagem__ajustes {
+  margin-top: 8px;
+}
+
+.viagem__ajustes summary {
+  cursor: pointer;
+  min-height: 28px;
+  font-size: 12px;
+  color: var(--ui-tinta-2);
+}
+
+.viagem__regras {
+  padding-top: 10px;
+}
+
+@media (max-width: 720px) {
+  /* No celular a aba vira uma folha por cima do mapa, e recolhida é só um botão no canto. */
+  .mapa__viagem {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 96px;
+    width: auto;
+    max-height: 58%;
+    border-left: 0;
+    border-top: 1px solid var(--ui-linha);
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 24px rgb(0 0 0 / 0.3);
+    z-index: 6;
+  }
+
+  .mapa__viagem--recolhida {
+    left: auto;
+    right: 8px;
+    bottom: 104px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid var(--ui-linha);
+    border-radius: 22px;
+    box-shadow: 0 4px 14px rgb(0 0 0 / 0.3);
+  }
+
+  .viagem__vertical {
+    display: none;
+  }
+
+  /* Com 10 ferramentas a fileira não cabe em 375 px: quebra em duas em vez de alargar a página. */
+  .mapa__topo .modo {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+}

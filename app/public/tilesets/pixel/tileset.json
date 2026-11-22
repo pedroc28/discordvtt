@@ -348,11 +348,15 @@
     {
       "id": "pico-nevado",
       "nome": "Picos nevados",
-      "cor": "#97b1c8",
+      "cor": "#aec5d5",
       "extra": 0,
       "arquivos": [
         "pico-nevado-1.png",
-        "pico-nevado-2.png"
+        "pico-nevado-2.png",
+        "pico-nevado-3.png",
+        "pico-nevado-4.png",
+        "pico-nevado-5.png",
+        "pico-nevado-6.png"
       ],
       "pasta": "altos",
       "tags": [
@@ -473,11 +477,15 @@
     {
       "id": "dunas",
       "nome": "Dunas altas",
-      "cor": "#bc865c",
+      "cor": "#eab981",
       "extra": 0,
       "arquivos": [
         "dunas-1.png",
-        "dunas-2.png"
+        "dunas-2.png",
+        "dunas-3.png",
+        "dunas-4.png",
+        "dunas-5.png",
+        "dunas-6.png"
       ],
       "pasta": "aridos",
       "tags": [

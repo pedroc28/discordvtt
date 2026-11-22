@@ -36,6 +36,7 @@ Arquivos: `app/src/mapa/repositorio.ts` e `app/src/mapa/tipos.ts` (área do mapa
 ```ts
 interface RepositorioMapa {
   carregarChunk(chaveDoChunk: string): Promise<Hexagono[]>
+  carregarRegioes(): Promise<Regiao[]>
   aplicar(lote: Lote): Promise<void>
   assinar(ouvinte: (lote: Lote) => void): () => void
   // Opcional: o mapa inteiro, inclusive chunks que ninguém abriu. Serve à exportação e ao modo substituir da importação.
@@ -55,6 +56,34 @@ interface RepositorioMapa {
 - A ordem em que os lotes chegam do servidor é a verdade.
 - Um chunk que falhou ao carregar não pode ser gravado como vazio por cima do verdadeiro.
 - A camada privada do mestre fica em coleções separadas, protegidas no servidor.
+- **Chunk:** o tamanho do chunk (`TAMANHO_CHUNK = 16`) e o formato da chave (`chaveChunk`: `Math.floor(q / 16)` e `Math.floor(r / 16)`, juntos como `"cq,cr"`, sem `-0`) são contrato entre mapa e servidor. O servidor calcula a chave de cada hexágono do mesmo jeito (`pocketbase/pb_hooks/mapa.js`), e o `carregarChunk` pede por ela. Mudar qualquer um dos dois exige mudar o outro e migrar os hexágonos do servidor. Os casos com negativos conferidos pelos dois lados ficam em `app/src/servidor/casos-chunk.json`.
+- **Validação:** o `RepositorioPocketBase` valida o que chega do servidor com `normalizarHexagono`, `normalizarRegiao` e `normalizarToken` de `app/src/mapa/armazenamento.ts`, as mesmas que o mapa usa no navegador. Mudar o que elas aceitam muda também o que vem do servidor.
+
+### O que o servidor oferece ao mapa
+
+Arquivos: `app/src/servidor/conexao.ts` e `app/src/servidor/repositorio-mapa.ts` (área do servidor). Detalhes em `docs/servidor/README.md`, seção "Mapa".
+
+```ts
+abrirRepositorioMapa(): RepositorioPocketBase | null  // mapa da campanha aberta, ou null sem login ou sem campanha
+
+class RepositorioPocketBase implements RepositorioMapa {
+  // tudo da RepositorioMapa, inclusive exportarTudo e os três métodos do token, e mais:
+  readonly campanhaId: string
+  readonly fechado: boolean        // fechado ao trocar de campanha, sair ou trocar de servidor
+  readonly desatualizado: boolean  // faltou um lote que o servidor já apagou
+  aoDesatualizar(ouvinte: () => void): () => void
+  fechar(): Promise<void>
+}
+```
+
+- Um mapa por campanha, por enquanto. Quem participa da campanha lê e edita.
+- `assinar` entrega todos os lotes na ordem do servidor, inclusive o eco do próprio lote (o controlador ignora pelo `id`). Nenhum lote é entregue duas vezes nem fora de ordem: se falta um, o repositório busca no servidor antes de seguir.
+- `aplicar` com um lote já gravado (mesmo `id`) dá certo e não aplica de novo.
+- O autor de lotes e do token é o id da conta logada, posto pelo servidor. O controlador deve usar `useServidor().usuario.id` como autor, para o desfazer e o eco baterem.
+- `carregarChunk`, `carregarRegioes`, `exportarTudo` e o token falham com um `Error` quando o servidor não responde ou recusa. A mensagem diz a causa e o que fazer, em minúscula, para vir depois do que o mapa tentava.
+- Lotes com mais de 30 dias são apagados no servidor. Se o repositório precisar de um deles, ele para de entregar lotes, fica `desatualizado`, avisa `aoDesatualizar`, e a leitura passa a falhar pedindo para recarregar o mapa. Quem usa cria um repositório e um controlador novos.
+- Um lote tem no máximo 20 mil hexágonos e 16 MB. O servidor recusa um item fora do formato e, com ele, o lote inteiro.
+- `gravarToken(null)` grava a hora de quem tirou o token, e um aviso de token mais velho que o último entregue é ignorado.
 
 ## Campanhas e papéis (servidor)
 

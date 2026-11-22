@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mensagemDeErro } from './erros'
+import { MAPA_FECHADO, mensagemDeErro, mensagemDeErroMapa } from './erros'
 
 // Mesmo formato do ClientResponseError do SDK do PocketBase.
 const erro = (status: number, message = '', data: Record<string, unknown> = {}) => ({ status, response: { status, message, data } })
@@ -49,5 +49,24 @@ describe('mensagens de erro', () => {
   it('erro desconhecido cai numa mensagem da própria ação', () => {
     expect(mensagemDeErro(new Error('???'), 'apagar', ENDERECO)).toBe('Não consegui apagar a campanha. Tente de novo.')
     expect(mensagemDeErro(erro(500), 'criar', ENDERECO)).toBe('Não consegui criar a campanha. Tente de novo.')
+  })
+})
+
+describe('mensagens de erro do mapa', () => {
+  it('dizem a causa e o que fazer, para vir depois do que o mapa tentava', () => {
+    expect(mensagemDeErroMapa(erro(0), ENDERECO)).toBe(`o servidor em ${ENDERECO} não respondeu. Confira se ele está ligado e tente de novo.`)
+    expect(mensagemDeErroMapa(erro(404), ENDERECO)).toContain('não participa mais desta campanha')
+    expect(mensagemDeErroMapa(erro(413), ENDERECO)).toContain('Divida a importação')
+    expect(mensagemDeErroMapa(erro(429), ENDERECO)).toContain('Espere alguns segundos')
+  })
+
+  it('repassa o motivo que o servidor deu para recusar o lote', () => {
+    const recusa = erro(400, 'Lote recusado: o hexágono (1, 2) não tem terreno.')
+    expect(mensagemDeErroMapa(recusa, ENDERECO)).toBe('o servidor recusou: o hexágono (1, 2) não tem terreno.')
+  })
+
+  it('mensagens do próprio repositório passam como estão', () => {
+    expect(mensagemDeErroMapa(new Error(MAPA_FECHADO), ENDERECO)).toBe(MAPA_FECHADO)
+    expect(mensagemDeErroMapa(new Error('outra coisa'), ENDERECO)).toContain('Tente de novo')
   })
 })

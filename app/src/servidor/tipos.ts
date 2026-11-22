@@ -1,6 +1,8 @@
 // Formato dos dados do servidor dentro do app. Tudo o que chega do PocketBase passa por
 // validacao.ts antes de virar um destes tipos.
 
+import type { Lote, TokenGrupo } from '../mapa/tipos'
+
 export type Papel = 'mestre' | 'jogador'
 
 export interface Usuario {
@@ -55,4 +57,24 @@ export interface EstadoServidor {
   semResposta: boolean
   /** Há uma sessão guardada neste navegador que não deu para retomar (por exemplo, servidor desligado). */
   sessaoSalva: boolean
+}
+
+// ---------- mapa ----------
+
+/** O mapa da campanha no servidor. `ultimaOrdem` é o número do último lote gravado nele. */
+export interface MapaDoServidor {
+  id: string
+  ultimaOrdem: number
+}
+
+/** Um lote como o servidor gravou: o lote do mapa e o número de ordem que o servidor deu. */
+export interface LoteDoServidor {
+  ordem: number
+  lote: Lote
+}
+
+/** O registro do token do grupo de um mapa. `token` é null quando o token está fora do mapa. */
+export interface TokenDoServidor {
+  id: string
+  token: TokenGrupo | null
 }

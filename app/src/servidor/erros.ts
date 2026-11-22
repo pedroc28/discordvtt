@@ -71,3 +71,31 @@ export function mensagemDeErro(erro: unknown, acao: Acao, endereco: string): str
   }
   return FALHA[acao]
 }
+
+// ---------- mapa ----------
+// O mapa mostra estas mensagens depois do que ele tentava fazer ("Não consegui salvar: ..."),
+// então elas dizem só a causa e o que fazer, começando com letra minúscula.
+
+export const MAPA_FECHADO = 'o mapa foi fechado porque você trocou de campanha ou saiu do servidor. Abra o mapa de novo.'
+export const MAPA_DESATUALIZADO =
+  'o mapa ficou desatualizado enquanto a conexão estava fora, e o servidor já apagou o que faltava. Recarregue o mapa.'
+export const MAPA_SEM_REGISTRO = 'não encontrei o mapa desta campanha. Confira na aba Campanha se você ainda participa dela.'
+
+export function mensagemDeErroMapa(erro: unknown, endereco: string): string {
+  // Erros do próprio repositório já vêm prontos.
+  if (erro instanceof Error && [MAPA_FECHADO, MAPA_DESATUALIZADO, MAPA_SEM_REGISTRO].includes(erro.message)) return erro.message
+  if (!ehObj(erro)) return 'aconteceu um erro inesperado. Tente de novo.'
+  const status = typeof erro.status === 'number' ? erro.status : -1
+  const resposta = ehObj(erro.response) ? erro.response : {}
+  const mensagem = typeof resposta.message === 'string' ? resposta.message : ''
+
+  if (status === 0) return `o servidor em ${endereco} não respondeu. Confira se ele está ligado e tente de novo.`
+  if (status === 401) return 'sua sessão expirou. Entre de novo na aba Campanha.'
+  if (status === 429) return 'muitas mudanças seguidas. Espere alguns segundos e tente de novo.'
+  if (status === 413) return 'o lote é grande demais para o servidor. Divida a importação em partes.'
+  // O hook do servidor já explica em português o que estava errado no lote.
+  if (mensagem.startsWith('Lote recusado:')) return `o servidor recusou: ${mensagem.slice('Lote recusado:'.length).trim()}`
+  if (status === 403 || status === 404) return 'você não participa mais desta campanha, ou ela foi apagada. Confira na aba Campanha.'
+  if (status === 400) return 'o servidor recusou a mudança. Atualize a página e tente de novo.'
+  return 'o servidor não conseguiu atender. Tente de novo daqui a pouco.'
+}

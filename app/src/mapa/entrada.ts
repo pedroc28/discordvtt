@@ -11,14 +11,22 @@ import type { ControladorMapa, Traco } from './controlador'
 import { disco, linha, mesmoHex, type Hex } from './hex'
 import type { Renderizador } from './renderizador'
 
-export type Ferramenta = 'navegar' | 'pintar' | 'apagar'
+/**
+ * Pintar, Apagar e Região usam o pincel (arrastando). Navegar e Marcador movem o mapa arrastando
+ * e agem num toque rápido: Navegar seleciona o hexágono, Marcador coloca um marcador nele.
+ */
+export type Ferramenta = 'navegar' | 'pintar' | 'apagar' | 'regiao' | 'marcador'
 
 export interface OpcoesEntrada {
   ferramenta: Ferramenta
   terreno: string
+  /** Região usada pela ferramenta Região. Null tira os hexágonos de qualquer região. */
+  regiaoId: string | null
   /** Raio do pincel: 0 = 1 hexágono, 1 = 7, 2 = 19. */
   raio: number
 }
+
+const usaPincel = (f: Ferramenta) => f === 'pintar' || f === 'apagar' || f === 'regiao'
 
 const LIMITE_TOQUE_PX = 8
 const LIMITE_TOQUE_MS = 450
@@ -27,7 +35,8 @@ type Modo = 'nenhum' | 'arrastar' | 'traco' | 'gesto'
 
 export class EntradaMapa {
   opcoes: OpcoesEntrada
-  aoSelecionar: (h: Hex | null) => void = () => {}
+  aoSelecionar: (h: Hex) => void = () => {}
+  aoMarcar: (h: Hex) => void = () => {}
   aoPassar: (h: Hex | null) => void = () => {}
   aoMudarPrevia: () => void = () => {}
 
@@ -73,17 +82,20 @@ export class EntradaMapa {
 
   /** Atualiza o contorno do pincel (ao trocar ferramenta, terreno ou raio). */
   atualizarPrevia() {
-    const { ferramenta, terreno, raio } = this.opcoes
+    const { ferramenta, terreno, regiaoId, raio } = this.opcoes
     const h = this.render.hover
     if (!h) {
       this.render.previa = null
-    } else if (ferramenta === 'navegar') {
+    } else if (!usaPincel(ferramenta)) {
       this.render.previa = { hexes: [h], preenchimento: null }
     } else {
-      this.render.previa = {
-        hexes: disco(h, raio),
-        preenchimento: ferramenta === 'apagar' ? 'rgba(220,40,40,0.28)' : this.corDoTerreno(terreno),
-      }
+      let preenchimento: string
+      if (ferramenta === 'apagar') preenchimento = 'rgba(220,40,40,0.28)'
+      else if (ferramenta === 'regiao') {
+        const cor = this.render.corDaRegiao(regiaoId)
+        preenchimento = cor ? `${cor}88` : 'rgba(255,255,255,0.22)'
+      } else preenchimento = this.corDoTerreno(terreno)
+      this.render.previa = { hexes: disco(h, raio), preenchimento }
     }
     this.render.pedirQuadro()
     this.aoMudarPrevia()
@@ -125,7 +137,7 @@ export class EntradaMapa {
       this.aoPassar(sob)
       this.atualizarPrevia()
     }
-    const arrasta = e.button === 1 || e.button === 2 || this.espaco || this.opcoes.ferramenta === 'navegar'
+    const arrasta = e.button === 1 || e.button === 2 || this.espaco || !usaPincel(this.opcoes.ferramenta)
     if (arrasta) {
       this.modo = 'arrastar'
       return
@@ -179,7 +191,9 @@ export class EntradaMapa {
       this.traco?.confirmar()
       this.traco = null
     } else if (eraToque) {
-      this.aoSelecionar(this.render.hexSob(p.x, p.y))
+      const h = this.render.hexSob(p.x, p.y)
+      if (this.opcoes.ferramenta === 'marcador') this.aoMarcar(h)
+      else this.aoSelecionar(h)
     }
     if (this.ponteiros.size === 0) this.modo = 'nenhum'
     else if (this.ponteiros.size === 1) {
@@ -251,7 +265,9 @@ export class EntradaMapa {
         }
       }
     }
-    if (this.opcoes.ferramenta === 'apagar') this.traco.apagar(hexes)
-    else this.traco.pintar(hexes, this.opcoes.terreno)
+    const { ferramenta, terreno, regiaoId } = this.opcoes
+    if (ferramenta === 'apagar') this.traco.apagar(hexes)
+    else if (ferramenta === 'regiao') this.traco.regiao(hexes, regiaoId)
+    else this.traco.pintar(hexes, terreno)
   }
 }

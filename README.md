@@ -8,6 +8,7 @@ Mesa virtual própria para o nosso grupo de RPG: fichas editáveis para qualquer
 app/         app web (Vite, React e TypeScript)
   src/ficha/ editor de fichas, já funcionando
   src/mapa/  mapa hexagonal infinito compartilhado (leia src/mapa/README.md)
+docs/        registros do projeto (mapa-hexagonal.md: o que foi feito e os próximos passos)
 pocketbase/  (próxima etapa) backend: login, campanhas, fichas e tempo real
 ```
 
@@ -37,7 +38,7 @@ Para evitar conflitos, combinem quem mexe em quais arquivos. As regras completas
 
 - [x] Editor de fichas: layout livre, tipos de campo, páginas, modo escuro, barra de vida, relógio do Apocalypse World
 - [x] Mapa hexagonal infinito: pintar terreno, desfazer por jogador, sincronia entre abas, toque e mouse (fases 0 e 1)
-- [ ] Mapa hexagonal: notas por hexágono, regiões e marcadores (fase 2)
+- [x] Mapa hexagonal: nome e nota por hexágono, regiões com hierarquia e marcadores (fase 2)
 - [ ] Mapa hexagonal: rios, estradas, token do grupo e régua (fase 3)
 - [ ] Fórmulas e rolagens: campos calculados e botões como `roll@forca`
 - [ ] Base no PocketBase: login, campanhas, mestre e jogadores

@@ -5,7 +5,7 @@
 //   RepositorioLocal    IndexedDB do navegador, com aviso entre abas (ver repositorio-local.ts)
 // Na etapa do servidor entra uma terceira, que fala com o PocketBase, e nada acima muda.
 
-import type { Hexagono, Lote, Mudanca } from './tipos'
+import type { Hexagono, Lote, Mudanca, MudancaRegiao, Regiao } from './tipos'
 import { chave, chaveChunk } from './hex'
 
 export type OuvinteLote = (lote: Lote) => void
@@ -13,13 +13,15 @@ export type OuvinteLote = (lote: Lote) => void
 export interface RepositorioMapa {
   /** Hexágonos de um chunk. Chunk que ninguém construiu devolve lista vazia. */
   carregarChunk(chaveDoChunk: string): Promise<Hexagono[]>
+  /** Todas as regiões do mapa (são poucas e globais, então vêm de uma vez). */
+  carregarRegioes(): Promise<Regiao[]>
   /** Grava um lote. Deve avisar os outros clientes (e pode avisar o próprio, que ignora o eco). */
   aplicar(lote: Lote): Promise<void>
   /** Recebe lotes feitos por outros clientes. Retorna a função que cancela. */
   assinar(ouvinte: OuvinteLote): () => void
 }
 
-/** Aplica as mudanças de um lote a um mapa de chunks. Compartilhado pelas implementações. */
+/** Aplica as mudanças de hexágonos de um lote a um mapa de chunks. Compartilhado pelas implementações. */
 export function aplicarNosChunks(chunks: Map<string, Map<string, Hexagono>>, mudancas: readonly Mudanca[]) {
   for (const m of mudancas) {
     const ck = chaveChunk(m)
@@ -30,8 +32,17 @@ export function aplicarNosChunks(chunks: Map<string, Map<string, Hexagono>>, mud
   }
 }
 
+/** Aplica as mudanças de regiões de um lote a um mapa de regiões. */
+export function aplicarNasRegioes(regioes: Map<string, Regiao>, mudancas: readonly MudancaRegiao[]) {
+  for (const m of mudancas) {
+    if (m.depois) regioes.set(m.id, m.depois)
+    else regioes.delete(m.id)
+  }
+}
+
 export class RepositorioMemoria implements RepositorioMapa {
   private chunks = new Map<string, Map<string, Hexagono>>()
+  private regioes = new Map<string, Regiao>()
   private ouvintes = new Set<OuvinteLote>()
   private atraso: number
 
@@ -46,12 +57,18 @@ export class RepositorioMemoria implements RepositorioMapa {
 
   async carregarChunk(chaveDoChunk: string): Promise<Hexagono[]> {
     await this.esperar()
-    return [...(this.chunks.get(chaveDoChunk)?.values() ?? [])].map((h) => ({ ...h }))
+    return [...(this.chunks.get(chaveDoChunk)?.values() ?? [])].map((h) => structuredClone(h))
+  }
+
+  async carregarRegioes(): Promise<Regiao[]> {
+    await this.esperar()
+    return [...this.regioes.values()].map((r) => ({ ...r }))
   }
 
   async aplicar(lote: Lote): Promise<void> {
     await this.esperar()
     aplicarNosChunks(this.chunks, lote.mudancas)
+    aplicarNasRegioes(this.regioes, lote.regioes)
     for (const o of [...this.ouvintes]) o(lote)
   }
 

@@ -1,11 +1,11 @@
-// Repositório no navegador: IndexedDB guarda os chunks, e um BroadcastChannel avisa
+// Repositório no navegador: IndexedDB guarda os chunks e as regiões, e um BroadcastChannel avisa
 // as outras abas do mesmo mapa, que se comportam como outros jogadores. Isso já exercita
 // o caminho de sincronização (lote recebido de outro cliente) antes de existir servidor.
 
-import { normalizarHexagono } from './armazenamento'
-import { aplicarNosChunks, type OuvinteLote, type RepositorioMapa } from './repositorio'
+import { normalizarHexagono, normalizarRegiao } from './armazenamento'
+import { aplicarNosChunks, aplicarNasRegioes, type OuvinteLote, type RepositorioMapa } from './repositorio'
 import { chaveChunk } from './hex'
-import type { Hexagono, Lote } from './tipos'
+import type { Hexagono, Lote, Regiao } from './tipos'
 
 const NOME_BANCO = 'discordvtt-mapa'
 const LOJA = 'chunks'
@@ -28,6 +28,12 @@ const pedido = <T>(req: IDBRequest<T>) =>
 interface RegistroChunk {
   id: string
   hexagonos: Hexagono[]
+}
+
+/** As regiões ficam num registro só, na mesma loja. A chave não tem vírgula, então não colide com a de chunks. */
+interface RegistroRegioes {
+  id: string
+  regioes: Regiao[]
 }
 
 export class RepositorioLocal implements RepositorioMapa {
@@ -54,12 +60,24 @@ export class RepositorioLocal implements RepositorioMapa {
     return `${this.mapaId}|${chaveDoChunk}`
   }
 
+  private idRegioes() {
+    return `${this.mapaId}|regioes`
+  }
+
   async carregarChunk(chaveDoChunk: string): Promise<Hexagono[]> {
     const db = await this.db()
     const reg = await pedido<RegistroChunk | undefined>(
       db.transaction(LOJA, 'readonly').objectStore(LOJA).get(this.id(chaveDoChunk)),
     )
     return (reg?.hexagonos ?? []).map(normalizarHexagono).filter((h): h is Hexagono => !!h)
+  }
+
+  async carregarRegioes(): Promise<Regiao[]> {
+    const db = await this.db()
+    const reg = await pedido<RegistroRegioes | undefined>(
+      db.transaction(LOJA, 'readonly').objectStore(LOJA).get(this.idRegioes()),
+    )
+    return (reg?.regioes ?? []).map(normalizarRegiao).filter((r): r is Regiao => !!r)
   }
 
   async aplicar(lote: Lote): Promise<void> {
@@ -84,6 +102,12 @@ export class RepositorioLocal implements RepositorioMapa {
       mapa.set(ck, dentro)
       aplicarNosChunks(mapa, mudancas)
       loja.put({ id: this.id(ck), hexagonos: [...dentro.values()] } satisfies RegistroChunk)
+    }
+    if (lote.regioes.length) {
+      const atual = await pedido<RegistroRegioes | undefined>(loja.get(this.idRegioes()))
+      const mapa = new Map<string, Regiao>((atual?.regioes ?? []).map((r) => [r.id, r]))
+      aplicarNasRegioes(mapa, lote.regioes)
+      loja.put({ id: this.idRegioes(), regioes: [...mapa.values()] } satisfies RegistroRegioes)
     }
     await concluida
     this.canal?.postMessage(lote)

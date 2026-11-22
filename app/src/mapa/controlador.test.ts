@@ -82,6 +82,27 @@ describe('traço, desfazer e refazer', () => {
     expect(c.podeDesfazer).toBe(false)
   })
 
+  it('desfaz vários passos seguidos no mesmo hexágono, e refaz na ordem', async () => {
+    const c = await cliente(new RepositorioMemoria(), 'ana')
+    for (const terreno of ['planicie', 'floresta', 'deserto']) {
+      const t = c.iniciarTraco()
+      t.pintar([origem], terreno)
+      t.confirmar()
+    }
+    expect(terrenoEm(c, 0, 0)).toBe('deserto')
+    expect(c.desfazer()).toBe(0)
+    expect(terrenoEm(c, 0, 0)).toBe('floresta')
+    expect(c.desfazer()).toBe(0)
+    expect(terrenoEm(c, 0, 0)).toBe('planicie')
+    expect(c.desfazer()).toBe(0)
+    expect(terrenoEm(c, 0, 0)).toBeNull()
+    c.refazer()
+    c.refazer()
+    expect(terrenoEm(c, 0, 0)).toBe('floresta')
+    c.refazer()
+    expect(terrenoEm(c, 0, 0)).toBe('deserto')
+  })
+
   it('cancelar volta o mapa ao que era e não entra no histórico', async () => {
     const c = await cliente(new RepositorioMemoria(), 'ana')
     const base = c.iniciarTraco()
@@ -211,6 +232,7 @@ describe('dois clientes no mesmo repositório', () => {
       autor: 'ana',
       ts: 0,
       mudancas: [{ q: 2, r: 2, antes: null, depois: hexagonoNovo(2, 2, 'pantano') }],
+      regioes: [],
     }
     beto.receber(lote)
     await carregando
@@ -242,8 +264,19 @@ describe('normalizar', () => {
       regiaoId: null,
       nome: '',
       nota: '',
+      marcadores: [],
       rev: 1,
     })
+  })
+
+  it('descarta marcador quebrado e mantém o bom', () => {
+    const h = normalizarHexagono({
+      q: 0,
+      r: 0,
+      terreno: 'planicie',
+      marcadores: [{ id: 'a', tipo: 'cidade', nome: 'Vila' }, { id: '', tipo: 'x' }, 'lixo'],
+    })
+    expect(h?.marcadores).toEqual([{ id: 'a', tipo: 'cidade', nome: 'Vila' }])
   })
 
   it('recusa coordenada quebrada ou terreno vazio', () => {

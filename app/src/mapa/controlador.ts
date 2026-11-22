@@ -1,19 +1,45 @@
 // Junta armazém, repositório e histórico. É o único lugar que escreve no mapa.
 //
-// Fluxo de uma edição: o Traço aplica na hora no armazém (otimista), e ao terminar a
-// pincelada o lote vai para o repositório. Lotes de outros clientes chegam por `receber`.
+// Fluxo de uma edição: o Traço (pincelada) ou `editar` aplicam na hora no armazém (otimista),
+// e o lote vai para o repositório. Lotes de outros clientes chegam por `receber`.
 // O desfazer é seletivo: só reverte o que ainda está como o lote deixou (ver operacoes.ts).
 
 import { ArmazemMapa } from './armazem'
 import { chaveChunk, type Hex } from './hex'
-import { fundirMudancas, mudancasApagar, mudancasPintar, reverterLote } from './operacoes'
+import {
+  fundirMudancas,
+  fundirMudancasRegiao,
+  mudancaCriarRegiao,
+  mudancaEditarHexagono,
+  mudancaEditarRegiao,
+  mudancaExcluirRegiao,
+  mudancasApagar,
+  mudancasPintar,
+  mudancasRegiaoDosHexagonos,
+  regiaoNova,
+  reverterLote,
+} from './operacoes'
 import type { RepositorioMapa } from './repositorio'
-import type { Lote, Mudanca } from './tipos'
+import type { Lote, Mudanca, MudancaRegiao, PatchHexagono, PatchRegiao } from './tipos'
 
 const LIMITE_HISTORICO = 200
 const LIMITE_ECOS = 300
+/** Edições seguidas do mesmo grupo (ex.: digitar uma nota) dentro desta janela viram um passo só. */
+const JANELA_GRUPO = 2000
 
-export const novoIdLote = () => crypto.randomUUID()
+export const novoId = () => crypto.randomUUID()
+
+interface Partes {
+  mudancas?: Mudanca[]
+  regioes?: MudancaRegiao[]
+}
+
+export interface DadosRegiao {
+  nome: string
+  cor: string
+  descricao?: string
+  paiId?: string | null
+}
 
 /** Uma pincelada em andamento. Termina com `confirmar` (grava) ou `cancelar` (volta atrás). */
 export class Traco {
@@ -33,6 +59,11 @@ export class Traco {
     this.aplicar(mudancasApagar(this.ctrl.armazem, this.carregados(hexes)))
   }
 
+  /** Põe os hexágonos que existem numa região, ou tira de qualquer região com null. */
+  regiao(hexes: readonly Hex[], regiaoId: string | null) {
+    this.aplicar(mudancasRegiaoDosHexagonos(this.ctrl.armazem, this.carregados(hexes), regiaoId))
+  }
+
   get vazio() {
     return this.mudancas.length === 0
   }
@@ -42,7 +73,7 @@ export class Traco {
     this.encerrado = true
     const mudancas = fundirMudancas(this.mudancas)
     if (!mudancas.length) return null
-    return this.ctrl.registrar(mudancas)
+    return this.ctrl.registrar({ mudancas })
   }
 
   cancelar() {
@@ -75,6 +106,9 @@ export class ControladorMapa {
   private carregamentos = new Map<string, Promise<void>>()
   /** Lotes que chegaram enquanto o chunk ainda carregava. Entram assim que ele chegar. */
   private pendentes = new Map<string, Mudanca[]>()
+  private carregandoRegioes: Promise<void> | null = null
+  private regioesPendentes: MudancaRegiao[] = []
+  private ultimoGrupo: { grupo: string; tempo: number; loteId: string } | null = null
   private ouvintesHistorico = new Set<() => void>()
   private cancelarAssinatura: () => void
   /** Sobe a cada mudança no histórico. Serve de "versão" para a interface. */
@@ -130,11 +164,59 @@ export class ControladorMapa {
     return p
   }
 
+  /** Carrega as regiões (uma vez). Edições de região só funcionam depois disto. */
+  carregarRegioes(): Promise<void> {
+    if (this.armazem.regioesProntas) return Promise.resolve()
+    if (!this.carregandoRegioes) {
+      this.regioesPendentes = []
+      this.carregandoRegioes = this.repo
+        .carregarRegioes()
+        .then((lista) => this.armazem.definirRegioes(lista))
+        .catch((e) => {
+          this.aoErro(`Não consegui carregar as regiões: ${mensagemDe(e)}`)
+          this.armazem.definirRegioes([])
+        })
+        .finally(() => {
+          this.armazem.aplicarRegioes(this.regioesPendentes)
+          this.regioesPendentes = []
+          this.carregandoRegioes = null
+        })
+    }
+    return this.carregandoRegioes
+  }
+
   iniciarTraco(): Traco {
     return new Traco(this)
   }
 
-  /** Desfaz o último lote seu. Retorna quantos hexágonos foram pulados por conflito. */
+  /**
+   * Edita campos de um hexágono que existe. Com `grupo`, edições seguidas viram um passo só no
+   * desfazer (use para digitação). Retorna null se o hexágono não existe ou nada mudou.
+   */
+  editarHexagono(q: number, r: number, patch: PatchHexagono, grupo?: string): Lote | null {
+    const m = mudancaEditarHexagono(this.armazem, q, r, patch)
+    return m ? this.editar({ mudancas: [m] }, grupo) : null
+  }
+
+  /** Cria uma região e devolve o id, ou null se as regiões ainda não carregaram. */
+  criarRegiao(dados: DadosRegiao): string | null {
+    if (!this.armazem.regioesProntas) return null
+    const id = novoId()
+    this.editar({ regioes: [mudancaCriarRegiao(regiaoNova(id, dados))] })
+    return id
+  }
+
+  editarRegiao(id: string, patch: PatchRegiao, grupo?: string): Lote | null {
+    const m = mudancaEditarRegiao(this.armazem, id, patch)
+    return m ? this.editar({ regioes: [m] }, grupo) : null
+  }
+
+  excluirRegiao(id: string): Lote | null {
+    const m = mudancaExcluirRegiao(this.armazem, id)
+    return m ? this.editar({ regioes: [m] }) : null
+  }
+
+  /** Desfaz o último lote seu. Retorna quantos itens foram pulados por conflito. */
   desfazer(): number {
     return this.reverter('desfazer')
   }
@@ -143,11 +225,39 @@ export class ControladorMapa {
     return this.reverter('refazer')
   }
 
-  /** Aplica, guarda no histórico e envia um lote próprio cujas mudanças já estão no armazém. */
-  registrar(mudancas: Mudanca[]): Lote {
-    const lote: Lote = { id: novoIdLote(), autor: this.autor, ts: Date.now(), mudancas }
-    this.feitos.push(lote)
-    if (this.feitos.length > LIMITE_HISTORICO) this.feitos.shift()
+  /** Aplica no armazém e registra. Para edições que não são pinceladas. */
+  private editar(partes: Partes, grupo?: string): Lote | null {
+    const mudancas = partes.mudancas ?? []
+    const regioes = partes.regioes ?? []
+    if (!mudancas.length && !regioes.length) return null
+    this.armazem.aplicarMudancas(mudancas)
+    this.armazem.aplicarRegioes(regioes)
+    return this.registrar({ mudancas, regioes }, grupo)
+  }
+
+  /** Guarda no histórico e envia um lote próprio cujas mudanças já estão no armazém. */
+  registrar(partes: Partes, grupo?: string): Lote {
+    const agora = Date.now()
+    const novo = { mudancas: partes.mudancas ?? [], regioes: partes.regioes ?? [] }
+    const topo = this.feitos[this.feitos.length - 1]
+    const g = this.ultimoGrupo
+    let lote: Lote
+    if (grupo && g && g.grupo === grupo && agora - g.tempo < JANELA_GRUPO && topo && topo.id === g.loteId) {
+      // Continua o passo anterior: o lote novo carrega o "antes" do primeiro e o "depois" do último.
+      lote = {
+        id: novoId(),
+        autor: this.autor,
+        ts: agora,
+        mudancas: fundirMudancas([...topo.mudancas, ...novo.mudancas]),
+        regioes: fundirMudancasRegiao([...topo.regioes, ...novo.regioes]),
+      }
+      this.feitos[this.feitos.length - 1] = lote
+    } else {
+      lote = { id: novoId(), autor: this.autor, ts: agora, ...novo }
+      this.feitos.push(lote)
+      if (this.feitos.length > LIMITE_HISTORICO) this.feitos.shift()
+    }
+    this.ultimoGrupo = grupo ? { grupo, tempo: agora, loteId: lote.id } : null
     this.desfeitos = []
     this.enviar(lote)
     this.mudouHistorico()
@@ -169,6 +279,10 @@ export class ControladorMapa {
       if (espera) espera.push(...mudancas)
       else this.armazem.aplicarMudancas(mudancas)
     }
+    if (lote.regioes.length) {
+      if (this.armazem.regioesProntas) this.armazem.aplicarRegioes(lote.regioes)
+      else this.regioesPendentes.push(...lote.regioes)
+    }
   }
 
   destruir() {
@@ -180,13 +294,15 @@ export class ControladorMapa {
     const destino = sentido === 'desfazer' ? this.desfeitos : this.feitos
     const original = origem.pop()
     if (!original) return 0
+    this.ultimoGrupo = null
     const { lote, conflitos } = reverterLote(this.armazem, original, {
-      id: novoIdLote(),
+      id: novoId(),
       autor: this.autor,
       ts: Date.now(),
     })
     if (lote) {
       this.armazem.aplicarMudancas(lote.mudancas)
+      this.armazem.aplicarRegioes(lote.regioes)
       // Vai para a outra pilha o lote que acabou de ser aplicado: desfazê-lo é o oposto.
       // (As revisões mudam a cada aplicação, então não dá para guardar o original.)
       destino.push(lote)

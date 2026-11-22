@@ -3,7 +3,7 @@
 
 import type { Camera } from './camera'
 import { limitarZoom } from './camera'
-import type { Hexagono, MapaMeta } from './tipos'
+import type { Hexagono, MapaMeta, Marcador, Regiao } from './tipos'
 
 type Obj = Record<string, unknown>
 const ehObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -20,6 +20,29 @@ export function normalizarHexagono(bruto: unknown): Hexagono | null {
     regiaoId: typeof bruto.regiaoId === 'string' ? bruto.regiaoId : null,
     nome: str(bruto.nome, ''),
     nota: str(bruto.nota, ''),
+    marcadores: Array.isArray(bruto.marcadores)
+      ? bruto.marcadores.map(normalizarMarcador).filter((m): m is Marcador => !!m)
+      : [],
+    rev: inteiro(bruto.rev) && bruto.rev > 0 ? bruto.rev : 1,
+  }
+}
+
+function normalizarMarcador(bruto: unknown): Marcador | null {
+  if (!ehObj(bruto) || typeof bruto.id !== 'string' || !bruto.id) return null
+  if (typeof bruto.tipo !== 'string' || !bruto.tipo) return null
+  return { id: bruto.id, tipo: bruto.tipo, nome: str(bruto.nome, '') }
+}
+
+const COR_HEX = /^#[0-9a-f]{6}$/i
+
+export function normalizarRegiao(bruto: unknown): Regiao | null {
+  if (!ehObj(bruto) || typeof bruto.id !== 'string' || !bruto.id) return null
+  return {
+    id: bruto.id,
+    nome: str(bruto.nome, 'Região'),
+    cor: typeof bruto.cor === 'string' && COR_HEX.test(bruto.cor) ? bruto.cor : '#888888',
+    descricao: str(bruto.descricao, ''),
+    paiId: typeof bruto.paiId === 'string' && bruto.paiId !== bruto.id ? bruto.paiId : null,
     rev: inteiro(bruto.rev) && bruto.rev > 0 ? bruto.rev : 1,
   }
 }

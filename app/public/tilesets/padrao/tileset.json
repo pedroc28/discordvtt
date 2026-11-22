@@ -148,5 +148,67 @@
         "terra-arrasada-3.svg"
       ]
     }
+  ],
+  "marcadores": [
+    {
+      "id": "cidade",
+      "nome": "Cidade",
+      "arquivo": "marcadores/cidade.svg"
+    },
+    {
+      "id": "vila",
+      "nome": "Vila",
+      "arquivo": "marcadores/vila.svg"
+    },
+    {
+      "id": "castelo",
+      "nome": "Castelo",
+      "arquivo": "marcadores/castelo.svg"
+    },
+    {
+      "id": "masmorra",
+      "nome": "Masmorra",
+      "arquivo": "marcadores/masmorra.svg"
+    },
+    {
+      "id": "ruina",
+      "nome": "Ruína",
+      "arquivo": "marcadores/ruina.svg"
+    },
+    {
+      "id": "torre",
+      "nome": "Torre",
+      "arquivo": "marcadores/torre.svg"
+    },
+    {
+      "id": "templo",
+      "nome": "Templo",
+      "arquivo": "marcadores/templo.svg"
+    },
+    {
+      "id": "acampamento",
+      "nome": "Acampamento",
+      "arquivo": "marcadores/acampamento.svg"
+    },
+    {
+      "id": "porto",
+      "nome": "Porto",
+      "arquivo": "marcadores/porto.svg"
+    },
+    {
+      "id": "tesouro",
+      "nome": "Tesouro",
+      "arquivo": "marcadores/tesouro.svg"
+    },
+    {
+      "id": "perigo",
+      "nome": "Perigo",
+      "arquivo": "marcadores/perigo.svg"
+    },
+    {
+      "id": "ponto",
+      "nome": "Ponto de interesse",
+      "arquivo": "marcadores/ponto.svg"
+    }
   ]
 }

@@ -2,7 +2,7 @@
 
 Guia para quem gera a arte dos terrenos do mapa com o PixelLab (o agente de arte, ou uma pessoa). É autossuficiente: com este arquivo e o `docs/mapa/manual.md` dá para fazer todos os tiles sem perguntar nada. O formato técnico do tileset está no manual, na seção "Tilesets". Aqui está o que desenhar, como pedir ao PixelLab, como conferir e onde guardar.
 
-Estado: **30 de 43 tiles feitos**: água, planície e montanha (teste) e os lotes 1 a 9 (`campo`, `colina`, `savana`, `estepe`, `charneca`, `pomar`, `floresta`, `floresta-densa`, `bosque`, `taiga`, `floresta-outono`, `floresta-nevada`, `selva`, `floresta-morta`, `pico-nevado`, `rochoso`, `planalto`, `canion`, `vulcao`, `campo-de-lava`, `deserto`, `dunas`, `oasis`, `salar`, `pantano`, `mangue`, `agua-rasa`). Faltam 13 da lista da seção 7.
+Estado: **33 de 43 tiles feitos**: água, planície e montanha (teste) e os lotes 1 a 10 (`campo`, `colina`, `savana`, `estepe`, `charneca`, `pomar`, `floresta`, `floresta-densa`, `bosque`, `taiga`, `floresta-outono`, `floresta-nevada`, `selva`, `floresta-morta`, `pico-nevado`, `rochoso`, `planalto`, `canion`, `vulcao`, `campo-de-lava`, `deserto`, `dunas`, `oasis`, `salar`, `pantano`, `mangue`, `agua-rasa`, `recife`, `tundra`, `geleira`). Faltam 10 da lista da seção 7.
 
 ## 1. Estilo
 
@@ -213,7 +213,7 @@ Marque aqui ao aprovar (`[x]`) e anote o job do PixelLab.
 - [x] Lote 7: `vulcao` (1 variante, é um marco isolado), `campo-de-lava` (2), `deserto` (2). Job `1658043d-26c1-4348-9056-3f8d5168440a`, uma chamada (15 gerações). A outra variante do vulcão saiu com a fumaça como um cano cinza reto e foi descartada. As duas variantes do deserto são bem diferentes entre si (areia com dunas pequenas e dunas onduladas grandes), então a segunda já adianta a ideia do `dunas`
 - [x] Lote 8: `dunas` (2 variantes), `oasis` (2), `salar` (2). Job `30db8647-c146-4cee-a8bf-840b97211562`, uma chamada (15 gerações). Ponto fraco: cada tile de dunas é uma duna enorme só, então pintar vários juntos forma uma grade de curvas em S. Funciona melhor misturado com `deserto`. Vale gerar mais 3 variantes de dunas menores e de direções diferentes
 - [x] Lote 9: `pantano` (2 variantes), `mangue` (2), `agua-rasa` (2). Job `e094f1a9-3144-4909-8154-ad2558957c43`, uma chamada (15 gerações). Atenção: a arte antiga em SVG de `pantano` e `agua-rasa` foi removida da pasta `pixel`
-- [ ] Lote 10: `recife`, `tundra`, `geleira`
+- [x] Lote 10: `recife` (2 variantes), `tundra` (2), `geleira` (2). Job `da2c9373-b579-4519-b9c8-5a6a5a0e79e2`, uma chamada (15 gerações). A arte antiga em SVG da `tundra` foi removida da pasta `pixel`. Ponto fraco: as rachaduras da geleira não continuam de um hexágono para o vizinho
 - [ ] Lote 11: `mar-congelado`, `praia`, `falesia`
 - [ ] Lote 12: `delta`, `cidade`, `ruinas`
 - [ ] Lote 13: `terra-arrasada`, `floresta-encantada`, `cogumelos`

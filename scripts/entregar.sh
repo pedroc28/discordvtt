@@ -54,7 +54,7 @@ echo "2/4 Verificando (lint, build e testes)..."
 verificar
 
 echo "3/4 Enviando e abrindo o pull request..."
-git -c push.negotiate=true push --quiet -u origin "$branch" 2>&1 | grep -v -i -e negotiat -e acknowledg || true
+git -c push.negotiate=true push --quiet -u origin "$branch" 2>&1 | grep -v -i -e negotiat -e acknowledg -e '^remote:' || true
 numero="$(gh api "repos/$REPO/pulls?head=$DONO:$branch&state=open" --jq '.[0].number // empty')"
 if [ -z "$numero" ]; then
   if [ -n "$corpo" ]; then
@@ -86,7 +86,11 @@ if [ "$estado" != "completed:success" ]; then
   exit 1
 fi
 
-gh api "repos/$REPO/pulls/$numero/merge" -X PUT -f merge_method=squash -f commit_title="$titulo (#$numero)" --jq .message > /dev/null
+if ! resposta="$(gh api "repos/$REPO/pulls/$numero/merge" -X PUT -f merge_method=squash -f commit_title="$titulo (#$numero)" --jq .message 2>&1)"; then
+  echo "O GitHub recusou juntar o pull request #$numero: $resposta" >&2
+  echo "Veja em https://github.com/$REPO/pull/$numero e avise a pessoa se for preciso mexer nas configurações." >&2
+  exit 1
+fi
 git fetch --quiet origin +refs/heads/main:refs/remotes/origin/main
 echo "Pronto: o pull request #$numero entrou na main."
 echo "O site de teste atualiza em alguns minutos: $SITE"

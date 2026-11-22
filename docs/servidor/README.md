@@ -126,3 +126,29 @@ O script sobe um PocketBase com dados temporários, cria contas de teste e confe
    - A camada privada do mestre fica em coleções próprias, com regras de mestre (ver `docs/contratos.md`).
    - A API de batch do PocketBase vem desligada e tem limite de pedidos por lote. Se for usada, a migração liga e ajusta.
 5. **Fichas sincronizadas**, quando a ficha descongelar. Com a ficha inteira num registro só, duas pessoas editando campos diferentes apagariam a edição uma da outra. Precisa de um registro por valor ou por chave.
+6. **Rodízio de anfitrião**, se o grupo decidir. Fica para depois dos passos 4 e 5 testados em sessões reais, para não misturar problemas de sincronia com problemas de troca de anfitrião. O detalhamento está na seção abaixo.
+
+## Rodízio de anfitrião (futuro)
+
+O objetivo é permitir que qualquer membro hospede o servidor num dia em que o Pedro não puder. O PocketBase não sincroniza com outra cópia, então a regra é **um servidor por vez**: o rodízio passa os dados de um PC para outro, e não liga vários servidores juntos.
+
+Uma pasta do Google Drive compartilhada entre quem pode hospedar vira o lugar oficial dos dados, e o `iniciar.bat` faz sozinho a troca:
+
+- **Ao ligar:**
+  - Confere o arquivo de trava na pasta compartilhada e recusa se o servidor estiver ligado em outro PC, dizendo onde e desde quando.
+  - Restaura o backup mais recente da pasta, se ele for mais novo que os dados locais, esperando o Drive terminar de sincronizar o último backup.
+  - Grava a trava com o nome de quem hospeda.
+- **Enquanto está ligado:** backup a cada 15 minutos para a pasta compartilhada e trava renovada a cada minuto.
+- **Ao desligar:** um último backup sobe para a pasta, e a trava é liberada. Esse é o "devolver os dados".
+- **Endereço:** o app guarda a lista dos endereços do Funnel de quem pode hospedar e usa o que estiver no ar. Os amigos continuam com o mesmo link.
+- **Falha:** se um PC desligar de repente, perde-se o que foi feito desde o último backup, de até 15 minutos. A trava fica velha, e o próximo anfitrião assume depois de confirmar.
+- **Preparação de cada anfitrião, uma vez só:** clonar o repositório, baixar o PocketBase, configurar o Tailscale e ter acesso à pasta compartilhada.
+
+Cuidados que valem desde já, para o rodízio não exigir retrabalho:
+
+- Tudo o que o servidor guarda fica dentro do `pb_data`, sem arquivos espalhados pelo PC.
+- Toda mudança de coleção continua por migração, para qualquer PC chegar ao mesmo resultado.
+- Nada específico de um PC vai para o banco. O que é de cada PC, como a pasta da cópia de backup, fica fora dele, em arquivos como o `copia-backup.txt`.
+- O app pega o endereço do servidor de um lugar só (`endereco.ts` e `conexao.ts`), que depois pode virar a lista de anfitriões.
+
+A alternativa ao rodízio continua sendo o servidor na nuvem: a mudança é a mesma operação, restaurar o `pb_data` lá, feita uma vez só.

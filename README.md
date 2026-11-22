@@ -8,6 +8,7 @@ Mesa virtual própria para o nosso grupo de RPG: chat de voz, chat de texto, fic
 app/         app web (Vite, React e TypeScript)
   src/ficha/ editor de fichas, já funcionando
   src/mapa/  mapa hexagonal infinito compartilhado (leia src/mapa/README.md)
+docs/        registros do projeto (mapa-hexagonal.md: o que foi feito e os próximos passos)
 pocketbase/  (próxima etapa) backend: login, chat, fichas e tempo real
 infra/       (próxima etapa) Docker Compose com PocketBase e LiveKit
 ```

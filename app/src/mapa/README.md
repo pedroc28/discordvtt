@@ -2,6 +2,8 @@
 
 Mapa compartilhado, construído pelos jogadores: terreno, nome e nota por hexágono, regiões e marcadores. Ainda por vir: rios, estradas, token do grupo e régua. Pensado desde o começo para vários jogadores ao mesmo tempo, no computador e no celular.
 
+Este é o manual do módulo. O histórico do projeto (decisões, o que foi feito por fase, problemas achados e próximos passos) está em [`docs/mapa-hexagonal.md`](../../../docs/mapa-hexagonal.md).
+
 Tudo roda sem servidor por enquanto: o mapa fica no IndexedDB do navegador, e abas abertas ao mesmo tempo se comportam como jogadores diferentes (assim o caminho de sincronização já é exercitado).
 
 ## Usar

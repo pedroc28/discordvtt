@@ -84,6 +84,7 @@ class RepositorioPocketBase implements RepositorioMapa {
 - Lotes com mais de 7 dias são apagados no servidor. Se o repositório precisar de um deles, ele para de entregar lotes, fica `desatualizado`, avisa `aoDesatualizar`, e a leitura passa a falhar pedindo para recarregar o mapa. Quem usa cria um repositório e um controlador novos.
 - Um lote tem no máximo 20 mil hexágonos e 16 MB. O servidor recusa um item fora do formato e, com ele, o lote inteiro.
 - `gravarToken(null)` grava a hora de quem tirou o token, e um aviso de token mais velho que o último entregue é ignorado.
+- **Testes contra o servidor de verdade:** um teste do mapa que precise do PocketBase usa os ajudantes de `app/src/servidor/teste-servidor.ts` (`entrarComoTeste`, `campanhaDeTeste` e `instalarEventSource`) e o nome do arquivo termina em `.servidor.test.ts`. Ele roda contra o `pocketbase/servidor-de-teste.mjs` na verificação do GitHub e é pulado no `npm test` comum. Detalhes em `docs/servidor/README.md`, seção "Servidor de teste".
 
 ## Campanhas e papéis (servidor)
 

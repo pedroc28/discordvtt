@@ -1,6 +1,7 @@
-# Roda lint, build e testes do app e o teste das regras do servidor em todo pull request
-# e em todo push na main. O nome do job (verificar) é o que scripts/entregar.sh espera
-# antes de juntar, por isso o teste do servidor é uma etapa deste job, e não um job à parte.
+# Roda lint, build e testes do app, o teste das regras do servidor e os testes do app contra o
+# servidor de teste em todo pull request e em todo push na main. O nome do job (verificar) é o que
+# scripts/entregar.sh espera antes de juntar, por isso os testes do servidor são etapas deste job,
+# e não jobs à parte.
 name: Verificar
 
 on:
@@ -39,3 +40,16 @@ jobs:
           (cd "$RUNNER_TEMP" && grep " $ARQUIVO\$" checksums.txt | sha256sum -c -)
           unzip -q -o "$RUNNER_TEMP/$ARQUIVO" pocketbase -d "$RUNNER_TEMP/pb"
           node pocketbase/testar-regras.mjs "$RUNNER_TEMP/pb/pocketbase"
+      # Sobe o servidor de teste (pocketbase/servidor-de-teste.mjs) e roda contra ele os testes do app que
+      # precisam de um PocketBase de verdade: os arquivos que terminam em .servidor.test.ts. No npm test
+      # comum, sem a variável DISCORDVTT_SERVIDOR_TESTE, eles são pulados.
+      - name: Testar o app com o servidor de teste
+        run: |
+          LOG="$RUNNER_TEMP/servidor-de-teste.log"
+          node ../pocketbase/servidor-de-teste.mjs "$RUNNER_TEMP/pb/pocketbase" --porta=8092 > "$LOG" 2>&1 &
+          for i in $(seq 1 60); do
+            grep -q "Servidor de teste pronto." "$LOG" && break
+            sleep 0.5
+          done
+          if ! grep -q "Servidor de teste pronto." "$LOG"; then cat "$LOG"; exit 1; fi
+          DISCORDVTT_SERVIDOR_TESTE=http://127.0.0.1:8092 npx vitest run .servidor.test.ts

@@ -13,3 +13,4 @@ Dono: Pedro (pedroc28). Esta pasta guarda tudo o que o app usa para falar com o 
 - Resposta atrasada não pode trazer de volta dados de quem já saiu ou trocou de servidor: `conexao.ts` confere a geração antes de mudar o estado.
 - Lógica de conversão e validação de dados do servidor fica fora de componentes e ganha teste no Vitest.
 - Gravação de lote é atômica: ou entra tudo, ou nada.
+- Teste que precisa de um PocketBase de verdade termina em `.servidor.test.ts` e usa `teste-servidor.ts`. Ele roda contra o `pocketbase/servidor-de-teste.mjs` na verificação do GitHub e é pulado sem `DISCORDVTT_SERVIDOR_TESTE`.

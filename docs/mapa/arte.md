@@ -240,7 +240,7 @@ A paleta de terrenos do mapa divide os tiles em **pastas** e tem **pesquisa por 
 
 ## 9. Depois dos 43
 
-- **Transições.** Hoje, onde dois terrenos se encontram há um corte seco na borda do hexágono. O PixelLab tem `tile_feature="tileset"` com `hex_pointy`, que gera um conjunto de 32 tiles de costa que se encaixam (por exemplo grama para água). Vale testar para a costa, que é a emenda mais visível.
+- **Transições.** Foram feitas por código (ver o manual, "Transições entre terrenos"), mas estão **desligadas** por decisão do usuário: o pontilhado não agradou. Se um dia quiser uma costa desenhada à mão (espuma, areia molhada), o PixelLab tem `tile_feature="tileset"` com `hex_pointy`, que gera um conjunto de 32 tiles de costa que se encaixam (por exemplo grama para água). Ainda não foi testado.
 - **Objetos que passam do hexágono.** Montanhas e árvores altas podem ganhar `extra` (pixels a mais no topo da imagem) para os picos subirem por cima do hexágono de cima. Hoje todos ficam dentro do hexágono.
 - **Peças do mapa em pixel art:** os ícones de marcador (seção 10), o token do grupo e os rios e estradas (seção 11) já estão em pixel art.
 

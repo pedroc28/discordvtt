@@ -43,6 +43,7 @@
     }
   ],
   "token": "token.png",
+  "transicoes": false,
   "terrenos": [
     {
       "id": "planicie",

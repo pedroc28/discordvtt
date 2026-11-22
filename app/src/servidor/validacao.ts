@@ -17,6 +17,12 @@ export function normalizarUsuario(bruto: unknown): Usuario | null {
   return { id: bruto.id, nome: texto(bruto.name, 'Sem nome') }
 }
 
+/** E-mail da própria conta, que o servidor só devolve para a dona dela. */
+export function emailDaConta(bruto: unknown): string | null {
+  if (!ehObj(bruto) || typeof bruto.email !== 'string' || !bruto.email.includes('@')) return null
+  return bruto.email
+}
+
 export function normalizarCampanha(bruto: unknown): Campanha | null {
   if (!ehObj(bruto) || !id(bruto.id)) return null
   return { id: bruto.id, nome: texto(bruto.nome, 'Campanha sem nome') }

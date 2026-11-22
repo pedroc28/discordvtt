@@ -46,6 +46,20 @@ export function usuariosDisponiveis(usuarios: Usuario[], participantes: Particip
 
 export const NOME_PAPEL: Record<Papel, string> = { mestre: 'Mestre', jogador: 'Jogador' }
 
+// Limites da senha no PocketBase: mínimo da coleção de contas e máximo do bcrypt.
+export const SENHA_MINIMA = 8
+export const SENHA_MAXIMA = 71
+
+/** O que está errado na troca de senha, antes de mandar ao servidor, ou null se está tudo certo. */
+export function problemaNaNovaSenha(atual: string, nova: string, confirmacao: string): string | null {
+  if (!atual) return 'Digite a senha atual.'
+  if (nova.length < SENHA_MINIMA) return `A nova senha precisa ter pelo menos ${SENHA_MINIMA} caracteres.`
+  if (nova.length > SENHA_MAXIMA) return `A nova senha pode ter no máximo ${SENHA_MAXIMA} caracteres.`
+  if (nova !== confirmacao) return 'A confirmação não bate com a nova senha. Digite a mesma senha nos dois campos.'
+  if (nova === atual) return 'A nova senha é igual à atual. Escolha uma diferente.'
+  return null
+}
+
 /** Nome de campanha aceito pelo servidor: sem espaços nas pontas e com até 80 letras. */
 export function limparNomeCampanha(nome: string): string | null {
   const limpo = nome.trim().replace(/\s+/g, ' ')

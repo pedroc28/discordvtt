@@ -11,8 +11,10 @@ export type Acao =
   | 'papel'
   | 'remover'
   | 'sair-da-campanha'
+  | 'senha'
 
 const FALHA: Record<Acao, string> = {
+  senha: 'Não consegui trocar a senha. Tente de novo.',
   entrar: 'Não consegui entrar. Tente de novo.',
   carregar: 'Não consegui carregar as campanhas. Tente de novo.',
   criar: 'Não consegui criar a campanha. Tente de novo.',
@@ -50,6 +52,12 @@ export function mensagemDeErro(erro: unknown, acao: Acao, endereco: string): str
 
   // As regras escritas no próprio servidor já respondem em português.
   if (mensagem.includes('pelo menos um mestre')) return mensagem
+
+  if (acao === 'senha' && status === 400) {
+    if (codigosDosCampos(campos).includes('validation_invalid_old_password')) return 'A senha atual está errada.'
+    if ('password' in campos || 'passwordConfirm' in campos) return 'O servidor não aceitou a nova senha. Use de 8 a 71 caracteres.'
+    return FALHA[acao]
+  }
 
   if (status === 400) {
     if (codigosDosCampos(campos).includes('validation_not_unique')) return 'Essa pessoa já está na campanha.'

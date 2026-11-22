@@ -6,9 +6,9 @@ import PocketBase, { LocalAuthStore } from 'pocketbase'
 import { useSyncExternalStore } from 'react'
 import { ENDERECO_PADRAO, enderecoDoLink, normalizarEndereco, semParametroDoServidor } from './endereco'
 import { mensagemDeErro, type Acao } from './erros'
-import { campanhaValida, limparNomeCampanha, montarCampanhas, montarParticipantes } from './operacoes'
+import { campanhaValida, limparNomeCampanha, montarCampanhas, montarParticipantes, problemaNaNovaSenha } from './operacoes'
 import type { EstadoServidor, FaseConexao, Papel } from './tipos'
-import { normalizarCampanha, normalizarLista, normalizarParticipacao, normalizarUsuario } from './validacao'
+import { emailDaConta, normalizarCampanha, normalizarLista, normalizarParticipacao, normalizarUsuario } from './validacao'
 
 const CHAVE_ENDERECO = 'servidor:endereco'
 // Sessão e campanha escolhida ficam separadas por servidor: trocar de endereço não mistura contas.
@@ -439,11 +439,55 @@ export class ConexaoServidor {
     )
   }
 
+  /**
+   * Troca a senha da própria conta. A mensagem volta para a tela mostrar junto do formulário,
+   * que fica no fim da página, longe da área de mensagens do topo.
+   */
+  async trocarSenha(atual: string, nova: string, confirmacao: string): Promise<ResultadoSenha> {
+    if (this.atual.ocupado || this.atual.fase !== 'conectado') {
+      return { ok: false, erro: 'Espere a ação anterior terminar e tente de novo.' }
+    }
+    const problema = problemaNaNovaSenha(atual, nova, confirmacao)
+    if (problema) return { ok: false, erro: problema }
+    const usuario = this.atual.usuario
+    const email = emailDaConta(this.pb.authStore.record)
+    if (!usuario || !email) return { ok: false, erro: mensagemDeErro(null, 'senha', this.atual.endereco) }
+
+    const geracao = this.geracao
+    let trocou = false
+    this.mudar({ ocupado: true, erro: null, aviso: null })
+    try {
+      await this.pb.collection('users').update(usuario.id, { oldPassword: atual, password: nova, passwordConfirm: confirmacao })
+      trocou = true
+      // O PocketBase invalida todas as sessões da conta quando a senha muda, inclusive esta.
+      // Entrar de novo com a senha nova mantém a pessoa conectada aqui.
+      await this.pb.collection('users').authWithPassword(email, nova)
+      if (geracao !== this.geracao) return { ok: false, erro: '' }
+      // As assinaturas do tempo real foram feitas com a sessão antiga.
+      this.pararAssinaturas()
+      void this.assinarMudancas(geracao)
+      this.mudar({ ocupado: false })
+      return { ok: true, aviso: 'Senha trocada. Nos outros aparelhos, entre de novo com a senha nova.' }
+    } catch (erro) {
+      if (geracao !== this.geracao) return { ok: false, erro: '' }
+      if (trocou || statusDe(erro) === 401) {
+        // Sem sessão válida, a tela volta para o login e mostra a mensagem lá em cima.
+        this.sessaoExpirou()
+        if (trocou) this.mudar({ erro: 'Sua senha foi trocada. Entre de novo com a senha nova.' })
+        return { ok: false, erro: '' }
+      }
+      this.mudar({ ocupado: false })
+      return { ok: false, erro: mensagemDeErro(erro, 'senha', this.atual.endereco) }
+    }
+  }
+
   /** Esconde a mensagem de erro ou de aviso. */
   limparMensagens() {
     if (this.atual.erro || this.atual.aviso) this.mudar({ erro: null, aviso: null })
   }
 }
+
+export type ResultadoSenha = { ok: true; aviso: string } | { ok: false; erro: string }
 
 export const conexao = new ConexaoServidor()
 

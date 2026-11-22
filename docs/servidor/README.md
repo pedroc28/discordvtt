@@ -27,7 +27,7 @@ Cuidados:
 
 - **Cadastro fechado.** O administrador cria a conta de cada pessoa pelo painel, na coleção `users`, com nome, e-mail e senha. Ninguém se cadastra pelo app, mesmo achando o endereço do servidor.
 - **Uma conta por pessoa** vale para todas as campanhas. Depois de criada, o mestre de cada campanha só adiciona a pessoa a ela.
-- **Login por e-mail e senha.** O servidor não envia e-mails, então senha esquecida se troca no painel. Se um dia configurarem um e-mail no painel, o "esqueci a senha" passa a funcionar sozinho.
+- **Login por e-mail e senha.** Cada pessoa troca a própria senha na aba Campanha, em "Sua conta", informando a senha atual. O servidor não envia e-mails, então senha esquecida se troca no painel. Se um dia configurarem um e-mail no painel, o "esqueci a senha" passa a funcionar sozinho.
 
 ## Coleções
 
@@ -65,6 +65,7 @@ Configurações, em `pocketbase/pb_migrations/1795321001_configuracoes.js`: nome
 - **Campanhas:** a lista mostra as campanhas da pessoa e o papel dela em cada uma. A escolhida fica aberta e é lembrada. Qualquer pessoa cria uma campanha e vira mestre dela.
 - **Campanha aberta:** o mestre renomeia, chama pessoas (escolhendo entre as contas do servidor), troca papéis, tira pessoas e apaga a campanha. Todos podem sair, menos a única pessoa mestre. Sair e apagar pedem confirmação.
 - **Tempo real:** quando alguém muda uma campanha ou quem participa, a tela dos outros atualiza sozinha.
+- **Sua conta:** "Trocar senha" pede a senha atual, a nova e a confirmação. O PocketBase encerra todas as sessões da conta quando a senha muda, então o app entra de novo sozinho com a senha nova, e nos outros aparelhos a pessoa entra de novo.
 - **Servidor caiu:** aparece um aviso, e o app reconecta sozinho quando ele volta. Se o servidor estiver desligado ao abrir o app, a sessão fica guardada e o botão "Tentar de novo sem digitar a senha" retoma sem pedir a senha.
 
 Arquivos em `app/src/servidor/`:
@@ -113,7 +114,7 @@ Proteções que valem atrás do Funnel (migração `1795321002_hospedagem.js`):
 node pocketbase/testar-regras.mjs caminho/do/pocketbase
 ```
 
-O script sobe um PocketBase com dados temporários, cria contas de teste e confere 53 situações: quem vê, cria, altera e apaga o quê, o limite de tentativas por pessoa, o administrador barrado vindo de fora e a cópia do backup. No fim, apaga tudo. Ele nunca toca no `pb_data` de verdade. Sem caminho, usa o executável da pasta `pocketbase`. A verificação do GitHub roda o script em todo pull request, baixando o PocketBase da versão de `pocketbase/VERSAO` e conferindo o checksum publicado, então uma regra quebrada impede a entrada na `main`.
+O script sobe um PocketBase com dados temporários, cria contas de teste e confere 58 situações: quem vê, cria, altera e apaga o quê, a troca de senha, o limite de tentativas por pessoa, o administrador barrado vindo de fora e a cópia do backup. No fim, apaga tudo. Ele nunca toca no `pb_data` de verdade. Sem caminho, usa o executável da pasta `pocketbase`. A verificação do GitHub roda o script em todo pull request, baixando o PocketBase da versão de `pocketbase/VERSAO` e conferindo o checksum publicado, então uma regra quebrada impede a entrada na `main`.
 
 ## Próximos passos
 

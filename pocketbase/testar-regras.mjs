@@ -468,6 +468,124 @@ async function abrirTempoReal(token, topicos) {
   }
 }
 
+async function testarCamadaMestre({ admin, contas, Ana, Bruno, Carla, mapa, tokenGrupo }) {
+  console.log('\nCamada do mestre: quem vê')
+  const ordemPublica = async () => (await api('GET', `/api/collections/mapas/records/${mapa.id}`, { token: Ana })).dados?.ultimaOrdem
+  const lerMapa = async (token) => (await api('GET', `/api/collections/mapas/records/${mapa.id}`, { token })).dados
+  confere('o mapa nasce com a trava aberta', (await lerMapa(Ana))?.permissao === 'todos', (await lerMapa(Ana))?.permissao)
+  confere('o mestre lê a camada do mestre', (await contar(Ana, 'mapas_mestre', `mapa = "${mapa.id}"`)) === 1)
+
+  const tempoRealAna = await abrirTempoReal(Ana, ['lotes_mestre/*'])
+  const tempoRealBruno = await abrirTempoReal(Bruno, ['lotes_mestre/*'])
+
+  const oculto = (q, r) => pintar(q, r, 'ruinas', { marcadores: [{ id: `m${q}`, tipo: 'masmorra', nome: 'Cripta' }] })
+  const nota = (q, r, texto) => ({ q, r, antes: null, depois: { q, r, texto, rev: 1 } })
+  const ordemAntes = await ordemPublica()
+  const esconde = await gravarLote(Ana, novoLote(mapa.id, [], [], { privado: { ocultos: [oculto(60, 60), oculto(61, 61)], notas: [nota(60, 60, 'A cripta guarda o anel.')] } }))
+  confere(
+    'o mestre esconde hexágonos e escreve nota privada num lote só da camada dele',
+    esconde.ok && esconde.dados?.collectionName === 'lotes_mestre' && esconde.dados?.ordem === 1,
+    esconde.dados,
+  )
+  confere('esse lote não gasta número de ordem público', (await ordemPublica()) === ordemAntes)
+  confere('nem aparece entre os lotes públicos', (await contar(Ana, 'lotes', `loteId = "${esconde.dados?.loteId}"`)) === 0)
+  confere(
+    'o mestre vê os ocultos e a nota',
+    (await contar(Ana, 'hexagonos_ocultos', `mapa = "${mapa.id}"`)) === 2 && (await contar(Ana, 'notas_mestre', `mapa = "${mapa.id}"`)) === 1,
+  )
+  // Bruno é mestre na própria mesa: ele vê a camada do mestre de lá, mas nada da camada deste mapa.
+  const vistoBruno = await Promise.all(['mapas_mestre', 'hexagonos_ocultos', 'notas_mestre', 'lotes_mestre'].map((c) => contar(Bruno, c, `mapa = "${mapa.id}"`)))
+  confere('jogador não vê nada da camada do mestre, mesmo sendo mestre em outra campanha', vistoBruno.every((n) => n === 0), vistoBruno)
+  const vistoFora = await Promise.all(['mapas_mestre', 'hexagonos_ocultos', 'notas_mestre', 'lotes_mestre'].map((c) => contar(Carla, c, '')))
+  const vistoVisitante = await Promise.all(['mapas_mestre', 'hexagonos_ocultos', 'notas_mestre', 'lotes_mestre'].map((c) => contar(undefined, c, '')))
+  confere('quem está fora e visitante também não', [...vistoFora, ...vistoVisitante].every((n) => n === 0), [vistoFora, vistoVisitante])
+  const umOculto = (await api('GET', registros('hexagonos_ocultos', `mapa = "${mapa.id}"`), { token: Ana })).dados.items[0]
+  const abreOculto = await api('GET', `/api/collections/hexagonos_ocultos/records/${umOculto.id}`, { token: Bruno })
+  confere('jogador não abre um oculto nem pelo id', !abreOculto.ok, abreOculto.status)
+
+  let avisou = false
+  for (let i = 0; i < 40 && !avisou; i++) {
+    avisou = tempoRealAna.eventos.some((e) => e.event === 'lotes_mestre/*' && e.data.includes(esconde.dados.loteId))
+    if (!avisou) await esperar(50)
+  }
+  confere('o mestre recebe o lote da camada dele pelo tempo real', avisou)
+  await esperar(300)
+  confere('o jogador não recebe', !tempoRealBruno.eventos.some((e) => e.event === 'lotes_mestre/*'), tempoRealBruno.eventos)
+  await tempoRealAna.fechar()
+  await tempoRealBruno.fechar()
+
+  console.log('\nCamada do mestre: escrever')
+  const brunoEsconde = await gravarLote(Bruno, novoLote(mapa.id, [pintar(70, 70, 'floresta')], [], { privado: { ocultos: [oculto(71, 71)], notas: [] } }))
+  confere('jogador não manda parte privada', !brunoEsconde.ok && String(brunoEsconde.dados?.message).includes('só o mestre'), brunoEsconde.dados)
+  confere('e nada do lote dele entra', (await contar(admin, 'hexagonos', `mapa = "${mapa.id}" && q = 70`)) === 0)
+
+  const brunoPinta = await gravarLote(Bruno, novoLote(mapa.id, [pintar(60, 60, 'campo')]))
+  confere('jogador pinta onde há um oculto sem perceber nada', brunoPinta.ok, brunoPinta.dados)
+  confere('e o oculto continua lá', (await contar(Ana, 'hexagonos_ocultos', `mapa = "${mapa.id}" && q = 60`)) === 1)
+
+  const revelar = await gravarLote(
+    Ana,
+    novoLote(mapa.id, [pintar(61, 61, 'ruinas')], [], { privado: { ocultos: [{ q: 61, r: 61, antes: null, depois: null }], notas: [] } }),
+  )
+  const revelado = (await api('GET', registros('hexagonos', `mapa = "${mapa.id}" && q = 61 && r = 61`), { token: Bruno })).dados?.items?.[0]
+  confere('revelar põe o hexágono no público e tira do oculto num lote só', revelar.ok && revelado?.dados?.terreno === 'ruinas' && (await contar(Ana, 'hexagonos_ocultos', `mapa = "${mapa.id}" && q = 61`)) === 0, revelar.dados)
+  const publico = (await api('GET', registros('lotes', `loteId = "${revelar.dados?.loteId}"`), { token: Bruno })).dados?.items?.[0]
+  confere('o lote público que o jogador lê não tem a parte privada', publico && !JSON.stringify(publico).includes('ocultos') && !('privado' in publico), publico)
+  const parteDoMestre = (await api('GET', registros('lotes_mestre', `loteId = "${revelar.dados?.loteId}"`), { token: Ana })).dados?.items?.[0]
+  confere('a parte privada fica no histórico do mestre, com o "antes" do servidor', parteDoMestre?.ocultos?.[0]?.antes?.terreno === 'ruinas', parteDoMestre)
+
+  const ordens = { publica: await ordemPublica(), mestre: (await api('GET', registros('mapas_mestre', `mapa = "${mapa.id}"`), { token: Ana })).dados.items[0].ultimaOrdem }
+  const misturadoErrado = await gravarLote(Ana, novoLote(mapa.id, [pintar(80, 80, 'floresta')], [], { privado: { ocultos: [], notas: [nota(80, 80, 'x'.repeat(20001))] } }))
+  const ordensDepois = { publica: await ordemPublica(), mestre: (await api('GET', registros('mapas_mestre', `mapa = "${mapa.id}"`), { token: Ana })).dados.items[0].ultimaOrdem }
+  confere(
+    'lote com erro na parte privada é recusado inteiro, sem gastar número de nenhuma camada',
+    !misturadoErrado.ok && (await contar(admin, 'hexagonos', `mapa = "${mapa.id}" && q = 80`)) === 0 && JSON.stringify(ordens) === JSON.stringify(ordensDepois),
+    { status: misturadoErrado.status, ordens, ordensDepois },
+  )
+
+  const repetido = await gravarLote(Ana, { ...novoLote(mapa.id, [], [], { privado: { ocultos: [oculto(90, 90)], notas: [] } }), loteId: esconde.dados.loteId })
+  confere('lote só privado repetido responde o que já estava gravado', repetido.ok && repetido.dados?.id === esconde.dados?.id, repetido.dados)
+
+  console.log('\nCamada do mestre: importar e desfazer')
+  const brunoImporta = await gravarLote(Bruno, novoLote(mapa.id, [pintar(100, 100, 'floresta')], [], { tipo: 'importacao' }))
+  confere('jogador não importa', !brunoImporta.ok && String(brunoImporta.dados?.message).includes('só o mestre importa'), brunoImporta.dados)
+  const anaImporta = await gravarLote(Ana, novoLote(mapa.id, [pintar(100, 100, 'floresta')], [], { tipo: 'importacao' }))
+  confere('o mestre importa', anaImporta.ok && anaImporta.dados?.tipo === 'importacao', anaImporta.dados)
+
+  const doBruno = await gravarLote(Bruno, novoLote(mapa.id, [pintar(101, 101, 'deserto')]))
+  const desfazProprio = await gravarLote(Bruno, novoLote(mapa.id, [{ q: 101, r: 101, antes: null, depois: null }], [], { tipo: 'reversao', alvoId: doBruno.dados?.loteId }))
+  confere('jogador desfaz a própria edição', desfazProprio.ok && desfazProprio.dados?.alvoId === doBruno.dados?.loteId, desfazProprio.dados)
+  const desfazAna = await gravarLote(Bruno, novoLote(mapa.id, [{ q: 100, r: 100, antes: null, depois: null }], [], { tipo: 'reversao', alvoId: anaImporta.dados?.loteId }))
+  confere('jogador não desfaz a edição de outra pessoa', !desfazAna.ok && String(desfazAna.dados?.message).includes('só o mestre desfaz'), desfazAna.dados)
+  const anaDesfaz = await gravarLote(Ana, novoLote(mapa.id, [{ q: 101, r: 101, antes: null, depois: hexagono(101, 101, 'deserto') }], [], { tipo: 'reversao', alvoId: desfazProprio.dados?.loteId }))
+  confere('o mestre desfaz a edição de qualquer um', anaDesfaz.ok, anaDesfaz.dados)
+  const semAlvo = await gravarLote(Ana, novoLote(mapa.id, [pintar(102, 102, 'campo')], [], { tipo: 'reversao' }))
+  confere('reversão sem dizer o que desfaz é recusada', !semAlvo.ok, semAlvo.dados)
+  const alvoVelho = await gravarLote(Bruno, novoLote(mapa.id, [pintar(103, 103, 'campo')], [], { tipo: 'reversao', alvoId: 'lote-que-ja-saiu' }))
+  confere('jogador não desfaz o que já saiu do histórico', !alvoVelho.ok && String(alvoVelho.dados?.message).includes('7 dias'), alvoVelho.dados)
+
+  console.log('\nCamada do mestre: travar o mapa')
+  const brunoTrava = await api('PATCH', `/api/collections/mapas/records/${mapa.id}`, { token: Bruno, corpo: { permissao: 'mestre' } })
+  confere('jogador não trava o mapa', !brunoTrava.ok, brunoTrava.status)
+  const anaContador = await api('PATCH', `/api/collections/mapas/records/${mapa.id}`, { token: Ana, corpo: { ultimaOrdem: 1 } })
+  confere('nem o mestre mexe no contador de lotes', !anaContador.ok, anaContador.status)
+  const anaTrava = await api('PATCH', `/api/collections/mapas/records/${mapa.id}`, { token: Ana, corpo: { permissao: 'mestre' } })
+  confere('o mestre trava o mapa', anaTrava.ok && anaTrava.dados?.permissao === 'mestre', anaTrava.dados)
+  const travado = await gravarLote(Bruno, novoLote(mapa.id, [pintar(110, 110, 'floresta')]))
+  confere('com o mapa travado, jogador não edita', !travado.ok && String(travado.dados?.message).includes('só o mestre edita'), travado.dados)
+  const mestreEdita = await gravarLote(Ana, novoLote(mapa.id, [pintar(110, 110, 'floresta')]))
+  confere('e o mestre edita', mestreEdita.ok, mestreEdita.dados)
+  const tokenTravado = await api('PATCH', `/api/collections/tokens_grupo/records/${tokenGrupo.id}`, {
+    token: Bruno,
+    corpo: { q: 7, r: 7, ts: Date.now() + 10000, presente: true },
+  })
+  confere('o jogador ainda move o token com o mapa travado', tokenTravado.ok && tokenTravado.dados?.q === 7, tokenTravado.dados)
+  const destrava = await api('PATCH', `/api/collections/mapas/records/${mapa.id}`, { token: Ana, corpo: { permissao: 'todos' } })
+  const brunoVolta = await gravarLote(Bruno, novoLote(mapa.id, [pintar(111, 111, 'floresta')]))
+  confere('destravado, o jogador volta a editar', destrava.ok && brunoVolta.ok, brunoVolta.dados)
+  void contas
+}
+
 async function testarMapa({ admin, contas, Ana, Bruno, Carla, mesaBruno }) {
   console.log('\nMapa: nasce com a campanha')
   const mesa = (await api('POST', '/api/collections/campanhas/records', { token: Ana, corpo: { nome: 'Mesa do mapa' } })).dados
@@ -577,11 +695,13 @@ async function testarMapa({ admin, contas, Ana, Bruno, Carla, mesaBruno }) {
   confere('região com cor inválida é recusada', !cor.ok, cor.dados)
   const vazio = await gravarLote(Bruno, novoLote(mapa.id, []))
   confere('lote vazio é recusado', !vazio.ok, vazio.dados)
-  const demais = await gravarLote(
-    Bruno,
-    novoLote(mapa.id, Array.from({ length: 20001 }, (_, i) => ({ q: i, r: 0, antes: null, depois: null }))),
-  )
-  confere('lote acima do limite é recusado e pede para dividir', !demais.ok && String(demais.dados?.message).includes('Divida'), demais.dados)
+  const apagarMuitos = (n) => Array.from({ length: n }, (_, i) => ({ q: i, r: 0, antes: null, depois: null }))
+  const edicaoGrande = await gravarLote(Bruno, novoLote(mapa.id, apagarMuitos(2001)))
+  confere('edição comum acima de 2.000 mudanças é recusada e aponta a importação', !edicaoGrande.ok && String(edicaoGrande.dados?.message).includes('importação'), edicaoGrande.dados)
+  const importacaoDemais = await gravarLote(Ana, novoLote(mapa.id, apagarMuitos(20001), [], { tipo: 'importacao' }))
+  confere('importação acima de 20.000 é recusada e pede para dividir', !importacaoDemais.ok && String(importacaoDemais.dados?.message).includes('Divida'), importacaoDemais.dados)
+  const tipoInventado = await gravarLote(Bruno, novoLote(mapa.id, [pintar(1, 1, 'floresta')], [], { tipo: 'tudo-liberado' }))
+  confere('tipo de lote que não existe é recusado', !tipoInventado.ok, tipoInventado.dados)
 
   const carlaGrava = await gravarLote(Carla, novoLote(mapa.id, [pintar(40, 40, 'floresta')]))
   confere('quem está fora não grava lote no mapa', !carlaGrava.ok && (await contar(admin, 'hexagonos', `mapa = "${mapa.id}" && q = 40`)) === 0, carlaGrava.status)
@@ -656,13 +776,13 @@ async function testarMapa({ admin, contas, Ana, Bruno, Carla, mesaBruno }) {
   }
   const jaExistiam = new Set((await hexagonosDo(admin, mapa.id)).map((h) => `${h.q},${h.r}`))
   const esperados = (await contar(admin, 'hexagonos', `mapa = "${mapa.id}"`)) + grande.filter((m) => !jaExistiam.has(`${m.q},${m.r}`)).length
-  const loteGrande = novoLote(mapa.id, grande)
+  const loteGrande = novoLote(mapa.id, grande, [], { tipo: 'importacao' })
   const tamanho = Buffer.byteLength(JSON.stringify(loteGrande))
   const inicio = Date.now()
-  const gravouGrande = await gravarLote(Bruno, loteGrande)
+  const gravouGrande = await gravarLote(Ana, loteGrande)
   const duracao = Date.now() - inicio
   console.log(`  info  ${grande.length} hexágonos, ${(tamanho / 1024 / 1024).toFixed(1)} MB enviados, ${duracao} ms até a resposta`)
-  confere('um lote de 5000 hexágonos entra', gravouGrande.ok, gravouGrande.dados?.message ?? gravouGrande.status)
+  confere('uma importação de 5000 hexágonos do mestre entra num lote só', gravouGrande.ok, gravouGrande.dados?.message ?? gravouGrande.status)
   const guardados = await contar(admin, 'hexagonos', `mapa = "${mapa.id}"`)
   confere('e o servidor guarda todos', guardados === esperados, { guardados, esperados })
 
@@ -709,13 +829,15 @@ async function testarMapa({ admin, contas, Ana, Bruno, Carla, mesaBruno }) {
   const apagaToken = await api('DELETE', `/api/collections/tokens_grupo/records/${tokenGrupo.id}`, { token: Ana })
   confere('ninguém cria outro token nem apaga o do mapa', !outroToken.ok && !apagaToken.ok, [outroToken.status, apagaToken.status])
 
+  await testarCamadaMestre({ admin, contas, Ana, Bruno, Carla, mapa, tokenGrupo })
+
   console.log('\nMapa: apagar a campanha')
   const hexagonosNoMapa = await contar(admin, 'hexagonos', `mapa = "${mapa.id}"`)
   const inicioApagar = Date.now()
   const apagou = await api('DELETE', `/api/collections/campanhas/records/${mesa.id}`, { token: Ana })
   console.log(`  info  campanha com ${hexagonosNoMapa} hexágonos apagada em ${Date.now() - inicioApagar} ms`)
   const restos = await Promise.all(
-    [['mapas', `id = "${mapa.id}"`], ['hexagonos', `mapa = "${mapa.id}"`], ['regioes', `mapa = "${mapa.id}"`], ['lotes', `mapa = "${mapa.id}"`], ['tokens_grupo', `mapa = "${mapa.id}"`]].map(
+    [['mapas', `id = "${mapa.id}"`], ['hexagonos', `mapa = "${mapa.id}"`], ['regioes', `mapa = "${mapa.id}"`], ['lotes', `mapa = "${mapa.id}"`], ['tokens_grupo', `mapa = "${mapa.id}"`], ['mapas_mestre', `mapa = "${mapa.id}"`], ['hexagonos_ocultos', `mapa = "${mapa.id}"`], ['notas_mestre', `mapa = "${mapa.id}"`], ['lotes_mestre', `mapa = "${mapa.id}"`]].map(
       ([colecao, filtro]) => contar(admin, colecao, filtro),
     ),
   )
@@ -755,18 +877,22 @@ async function testarMigracaoELimpeza(dados) {
     confere('cada campanha que já existia ganha um mapa', mapas.length === campanhas.length, mapas)
     const tokens = await Promise.all(mapas.map((m) => contar(admin, 'tokens_grupo', `mapa = "${m.id}" && presente = false`)))
     confere('e o token do grupo dele', tokens.every((n) => n === 1), tokens)
+    const camadas = await Promise.all(mapas.map((m) => contar(admin, 'mapas_mestre', `mapa = "${m.id}"`)))
+    confere('e a camada do mestre, vazia', camadas.every((n) => n === 1), camadas)
+    confere('e a trava aberta', mapas.every((m) => m.permissao === 'todos'), mapas.map((m) => m.permissao))
 
     console.log('\nMapa: limpeza dos lotes antigos')
     const mapa = mapas[0].id
     const lotes = [await gravarLote(admin, novoLote(mapa, [pintar(0, 0, 'floresta')])), await gravarLote(admin, novoLote(mapa, [pintar(-1, 0, 'deserto')]))]
-    confere('lotes gravados antes da limpeza', lotes.every((r) => r.ok) && lotes[1].dados.ordem === 2, lotes.map((r) => r.status))
+    const privado = await gravarLote(admin, novoLote(mapa, [], [], { privado: { ocultos: [pintar(5, 5, 'ruinas')], notas: [] } }))
+    confere('lotes gravados antes da limpeza', lotes.every((r) => r.ok) && lotes[1].dados.ordem === 2 && privado.ok, lotes.map((r) => r.status))
     const limpeza = await api('POST', '/api/crons/limpar_lotes', { token: admin })
     let restantes = -1
     for (let i = 0; i < 40 && restantes !== 0; i++) {
       await esperar(100)
-      restantes = await contar(admin, 'lotes', `mapa = "${mapa}"`)
+      restantes = (await contar(admin, 'lotes', `mapa = "${mapa}"`)) + (await contar(admin, 'lotes_mestre', `mapa = "${mapa}"`))
     }
-    confere('a limpeza apaga os lotes mais velhos que o prazo', limpeza.ok && restantes === 0, { status: limpeza.status, restantes })
+    confere('a limpeza apaga os lotes mais velhos que o prazo, inclusive os do mestre', limpeza.ok && restantes === 0, { status: limpeza.status, restantes })
     confere('e o mapa continua igual, porque o estado fica nos hexágonos', (await contar(admin, 'hexagonos', `mapa = "${mapa}"`)) === 2)
     const depois = await gravarLote(admin, novoLote(mapa, [pintar(1, 0, 'colina')]))
     confere('a numeração continua de onde parou, sem recomeçar', depois.dados?.ordem === 3, depois.dados?.ordem)

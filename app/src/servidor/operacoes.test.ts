@@ -97,14 +97,19 @@ describe('nome da campanha', () => {
 })
 
 describe('mapa aberto', () => {
-  const mapa = { campanhaId: 'c1', geracao: 3 }
-  it('continua aberto na mesma sessão e na mesma campanha', () => {
-    expect(mapaContinuaAberto(mapa, { fase: 'conectado', campanhaAtualId: 'c1', geracao: 3 })).toBe(true)
+  const mapa = { campanhaId: 'c1', geracao: 3, papel: 'jogador' as const }
+  const campanhas = [{ id: 'c1', nome: 'Mesa', papel: 'jogador' as const }]
+  it('continua aberto na mesma sessão, na mesma campanha e com o mesmo papel', () => {
+    expect(mapaContinuaAberto(mapa, { fase: 'conectado', campanhaAtualId: 'c1', geracao: 3, campanhas })).toBe(true)
   })
   it('fecha ao trocar de campanha, sair ou trocar de servidor', () => {
-    expect(mapaContinuaAberto(mapa, { fase: 'conectado', campanhaAtualId: 'c2', geracao: 3 })).toBe(false)
-    expect(mapaContinuaAberto(mapa, { fase: 'conectado', campanhaAtualId: null, geracao: 3 })).toBe(false)
-    expect(mapaContinuaAberto(mapa, { fase: 'desconectado', campanhaAtualId: 'c1', geracao: 3 })).toBe(false)
-    expect(mapaContinuaAberto(mapa, { fase: 'conectado', campanhaAtualId: 'c1', geracao: 4 })).toBe(false)
+    expect(mapaContinuaAberto(mapa, { fase: 'conectado', campanhaAtualId: 'c2', geracao: 3, campanhas })).toBe(false)
+    expect(mapaContinuaAberto(mapa, { fase: 'conectado', campanhaAtualId: null, geracao: 3, campanhas })).toBe(false)
+    expect(mapaContinuaAberto(mapa, { fase: 'desconectado', campanhaAtualId: 'c1', geracao: 3, campanhas })).toBe(false)
+    expect(mapaContinuaAberto(mapa, { fase: 'conectado', campanhaAtualId: 'c1', geracao: 4, campanhas })).toBe(false)
+  })
+  it('fecha quando a pessoa vira mestre ou deixa de ser, porque a camada do mestre muda', () => {
+    const virouMestre = [{ id: 'c1', nome: 'Mesa', papel: 'mestre' as const }]
+    expect(mapaContinuaAberto(mapa, { fase: 'conectado', campanhaAtualId: 'c1', geracao: 3, campanhas: virouMestre })).toBe(false)
   })
 })

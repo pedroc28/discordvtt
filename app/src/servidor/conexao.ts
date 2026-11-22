@@ -488,20 +488,22 @@ export class ConexaoServidor {
 
   // ---------- mapa ----------
 
-  /** O mapa da campanha aberta. Null sem login ou sem campanha aberta. */
+  /** O mapa da campanha aberta, com a camada do mestre se a pessoa for mestre dela. Null sem login ou sem campanha aberta. */
   abrirRepositorioMapa(): RepositorioPocketBase | null {
-    const { fase, campanhaAtualId } = this.atual
-    if (fase !== 'conectado' || !campanhaAtualId) return null
-    const repositorio = new RepositorioPocketBase(this.clienteMapa(this.geracao), campanhaAtualId)
+    const { fase, campanhaAtualId, campanhas } = this.atual
+    const papel = campanhas.find((c) => c.id === campanhaAtualId)?.papel
+    if (fase !== 'conectado' || !campanhaAtualId || !papel) return null
+    const repositorio = new RepositorioPocketBase(this.clienteMapa(this.geracao), campanhaAtualId, { papel })
     this.mapasAbertos.push({ repositorio, geracao: this.geracao })
     return repositorio
   }
 
   private fecharMapasForaDaSessao() {
     if (!this.mapasAbertos.length) return
-    const sessao = { fase: this.atual.fase, campanhaAtualId: this.atual.campanhaAtualId, geracao: this.geracao }
+    const sessao = { fase: this.atual.fase, campanhaAtualId: this.atual.campanhaAtualId, geracao: this.geracao, campanhas: this.atual.campanhas }
     this.mapasAbertos = this.mapasAbertos.filter(({ repositorio, geracao }) => {
-      if (!repositorio.fechado && mapaContinuaAberto({ campanhaId: repositorio.campanhaId, geracao }, sessao)) return true
+      const mapa = { campanhaId: repositorio.campanhaId, geracao, papel: repositorio.papel }
+      if (!repositorio.fechado && mapaContinuaAberto(mapa, sessao)) return true
       void repositorio.fechar()
       return false
     })

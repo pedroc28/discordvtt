@@ -67,12 +67,14 @@ export function limparNomeCampanha(nome: string): string | null {
 }
 
 /**
- * Um mapa aberto continua valendo enquanto a pessoa está conectada, na mesma sessão e com a mesma
- * campanha aberta. Trocar de campanha, sair ou trocar de servidor fecha as assinaturas dele.
+ * Um mapa aberto continua valendo enquanto a pessoa está conectada, na mesma sessão, com a mesma campanha
+ * aberta e o mesmo papel nela. Trocar de campanha, sair, trocar de servidor ou virar mestre (ou deixar de
+ * ser) fecha as assinaturas dele: a camada do mestre depende do papel.
  */
 export function mapaContinuaAberto(
-  mapa: { campanhaId: string; geracao: number },
-  sessao: { fase: FaseConexao; campanhaAtualId: string | null; geracao: number },
+  mapa: { campanhaId: string; geracao: number; papel: Papel },
+  sessao: { fase: FaseConexao; campanhaAtualId: string | null; geracao: number; campanhas: MinhaCampanha[] },
 ): boolean {
-  return sessao.fase === 'conectado' && sessao.geracao === mapa.geracao && sessao.campanhaAtualId === mapa.campanhaId
+  if (sessao.fase !== 'conectado' || sessao.geracao !== mapa.geracao || sessao.campanhaAtualId !== mapa.campanhaId) return false
+  return sessao.campanhas.find((c) => c.id === mapa.campanhaId)?.papel === mapa.papel
 }

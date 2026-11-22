@@ -49,13 +49,17 @@ interface RepositorioMapa {
 ```
 
 - `Hexagono` tem `rios: number[]` e `estradas: number[]`: direções de aresta 0 (leste), 1 (sudeste) e 2 (sudoeste) em que há rio ou estrada saindo daquele hexágono. A aresta pertence ao hexágono dono (`arestaCanonica`). Dado antigo sem os campos vale como lista vazia.
-- `exportarTudo` é opcional. Sem ele, exportar leva só o que está carregado e o modo substituir da importação fica indisponível (mesclar funciona). Com servidor, o `RepositorioPocketBase` deve listar todos os hexágonos e regiões do mapa nele, respeitando a camada privada do mestre (um jogador não exporta o que não vê).
+- `exportarTudo` é opcional. Sem ele, exportar leva só o que está carregado e o modo substituir da importação fica indisponível (mesclar funciona). Com servidor, o `RepositorioPocketBase` lista todos os hexágonos e regiões públicos do mapa. A camada do mestre sai à parte, em `exportarCamadaMestre`, só para o mestre.
 - `TokenGrupo` é `{ q, r, ts, autor }`. Vale o `ts` mais recente. Não passa por `aplicar` nem entra no desfazer.
 - O servidor implementa `RepositorioPocketBase` em `app/src/servidor/`.
 - `aplicar` é atômico por lote. `assinar` entrega lotes de outros clientes, e o próprio eco é ignorado pelo `id` do lote.
 - A ordem em que os lotes chegam do servidor é a verdade.
 - Um chunk que falhou ao carregar não pode ser gravado como vazio por cima do verdadeiro.
 - A camada privada do mestre fica em coleções separadas, protegidas no servidor.
+- **Lote:** além de `id`, `autor`, `ts`, `mudancas` e `regioes`, o `Lote` tem três campos opcionais, combinados em 22/11/2026:
+  - `tipo`: `edicao` (o padrão, quando falta), `importacao` (só do mestre) ou `reversao`
+  - `alvoId`: na reversão, o id do lote desfeito. O de outra pessoa, só o mestre desfaz.
+  - `privado`: só o mestre manda. É `{ ocultos: Mudanca[]; notas: MudancaNota[] }`, e `MudancaNota` segue a convenção de `Mudanca` com `NotaPrivada` (`{ q, r, texto, rev }`) no antes e no depois. Revelar é um lote só: o hexágono entra em `mudancas` e sai de `privado.ocultos`.
 - **Chunk:** o tamanho do chunk (`TAMANHO_CHUNK = 16`) e o formato da chave (`chaveChunk`: `Math.floor(q / 16)` e `Math.floor(r / 16)`, juntos como `"cq,cr"`, sem `-0`) são contrato entre mapa e servidor. O servidor calcula a chave de cada hexágono do mesmo jeito (`pocketbase/pb_hooks/mapa.js`), e o `carregarChunk` pede por ela. Mudar qualquer um dos dois exige mudar o outro e migrar os hexágonos do servidor. Os casos com negativos conferidos pelos dois lados ficam em `app/src/servidor/casos-chunk.json`.
 - **Validação:** o `RepositorioPocketBase` valida o que chega do servidor com `normalizarHexagono`, `normalizarRegiao` e `normalizarToken` de `app/src/mapa/armazenamento.ts`, as mesmas que o mapa usa no navegador. Mudar o que elas aceitam muda também o que vem do servidor.
 
@@ -69,20 +73,32 @@ abrirRepositorioMapa(): RepositorioPocketBase | null  // mapa da campanha aberta
 class RepositorioPocketBase implements RepositorioMapa {
   // tudo da RepositorioMapa, inclusive exportarTudo e os três métodos do token, e mais:
   readonly campanhaId: string
-  readonly fechado: boolean        // fechado ao trocar de campanha, sair ou trocar de servidor
+  readonly papel: 'mestre' | 'jogador'
+  readonly ehMestre: boolean
+  readonly fechado: boolean        // fechado ao trocar de campanha ou de papel, sair ou trocar de servidor
   readonly desatualizado: boolean  // faltou um lote que o servidor já apagou
   aoDesatualizar(ouvinte: () => void): () => void
   fechar(): Promise<void>
+  // camada do mestre: para jogadores, devolvem vazio sem perguntar ao servidor
+  carregarChunkOculto(chaveDoChunk: string): Promise<Hexagono[]>
+  carregarNotasPrivadas(chaveDoChunk: string): Promise<NotaPrivada[]>
+  exportarCamadaMestre(): Promise<{ ocultos: Hexagono[]; notas: NotaPrivada[] }>
+  // trava do mapa
+  carregarPermissao(): Promise<'todos' | 'mestre'>
+  gravarPermissao(permissao: 'todos' | 'mestre'): Promise<void>  // só o mestre consegue
+  assinarPermissao(ouvinte: (permissao: 'todos' | 'mestre') => void): () => void
 }
 ```
 
-- Um mapa por campanha, por enquanto. Quem participa da campanha lê e edita.
+- Um mapa por campanha, por enquanto. Quem participa da campanha lê e edita, a não ser que o mestre trave o mapa (`permissao` igual a `mestre`): aí o servidor recusa as edições dos outros. O token do grupo continua livre.
+- **Camada do mestre:** para o mestre, `assinar` entrega também a parte privada dos lotes, como um lote à parte com o mesmo `id`, só com `privado` (`mudancas` e `regioes` vazias). Um lote com as duas partes chega ao mestre em dois pedaços, e o eco do próprio lote também: o controlador precisa reconhecer o mesmo `id` nas duas partes. Jogadores nunca recebem a parte privada. A parte pública e a privada têm numerações separadas, e cada uma chega na ordem dela.
+- **Permissões que o servidor confere:** parte privada, importação e trava são só do mestre. Reversão de lote de outra pessoa, só do mestre, e o jogador não desfaz um lote que já saiu do histórico de 7 dias. A recusa chega como erro de `aplicar`, com a mensagem do servidor ("o servidor recusou: só o mestre importa mapas.").
 - `assinar` entrega todos os lotes na ordem do servidor, inclusive o eco do próprio lote (o controlador ignora pelo `id`). Nenhum lote é entregue duas vezes nem fora de ordem: se falta um, o repositório busca no servidor antes de seguir.
 - `aplicar` com um lote já gravado (mesmo `id`) dá certo e não aplica de novo.
 - O autor de lotes e do token é o id da conta logada, posto pelo servidor. O controlador deve usar `useServidor().usuario.id` como autor, para o desfazer e o eco baterem.
 - `carregarChunk`, `carregarRegioes`, `exportarTudo` e o token falham com um `Error` quando o servidor não responde ou recusa. A mensagem diz a causa e o que fazer, em minúscula, para vir depois do que o mapa tentava.
 - Lotes com mais de 7 dias são apagados no servidor. Se o repositório precisar de um deles, ele para de entregar lotes, fica `desatualizado`, avisa `aoDesatualizar`, e a leitura passa a falhar pedindo para recarregar o mapa. Quem usa cria um repositório e um controlador novos.
-- Um lote tem no máximo 20 mil hexágonos e 16 MB. O servidor recusa um item fora do formato e, com ele, o lote inteiro.
+- Uma edição comum ou reversão tem no máximo 2.000 mudanças, somando hexágonos, ocultos e notas. A importação tem até 20 mil e 16 MB, num lote só. O servidor recusa um item fora do formato e, com ele, o lote inteiro.
 - `gravarToken(null)` grava a hora de quem tirou o token, e um aviso de token mais velho que o último entregue é ignorado.
 - **Testes contra o servidor de verdade:** um teste do mapa que precise do PocketBase usa os ajudantes de `app/src/servidor/teste-servidor.ts` (`entrarComoTeste`, `campanhaDeTeste` e `instalarEventSource`) e o nome do arquivo termina em `.servidor.test.ts`. Ele roda contra o `pocketbase/servidor-de-teste.mjs` na verificação do GitHub e é pulado no `npm test` comum. Detalhes em `docs/servidor/README.md`, seção "Servidor de teste".
 

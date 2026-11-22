@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ControladorMapa } from '../mapa/controlador'
 import { chaveChunk } from '../mapa/hex'
-import type { Hexagono, Lote, Regiao, TokenGrupo } from '../mapa/tipos'
+import type { Hexagono, Lote, NotaPrivada, Regiao, TokenGrupo } from '../mapa/tipos'
 import { RepositorioPocketBase, type Cancelar, type ClienteMapa, type ColecaoMapa, type EventoTempoReal, type FiltroServidor } from './repositorio-mapa'
 
 // Servidor de mentira com o mesmo comportamento do hook (pocketbase/pb_hooks/mapa.js): numera os lotes,
@@ -34,9 +34,13 @@ const esperar = (ms = 0) => new Promise((resolver) => setTimeout(resolver, ms))
 
 class ServidorFalso implements ClienteMapa {
   readonly endereco = 'https://servidor.teste'
-  mapa = { id: 'mapa1', campanha: 'campanha1', ultimaOrdem: 0 }
+  mapa = { id: 'mapa1', campanha: 'campanha1', ultimaOrdem: 0, permissao: 'todos' }
+  camadaMestre = { id: 'camada1', mapa: 'mapa1', ultimaOrdem: 0 }
   hexagonos = new Map<string, Registro>()
+  ocultos = new Map<string, Registro>()
+  notas = new Map<string, Registro>()
   regioes = new Map<string, Registro>()
+  lotesMestre: Registro[] = []
   token: Registro = { id: 'token1', mapa: 'mapa1', q: 0, r: 0, ts: 0, autor: '', presente: false }
   lotes: Registro[] = []
   assinaturas = new Map<number, { colecao: ColecaoMapa; ouvinte: (e: EventoTempoReal) => void }>()
@@ -66,10 +70,13 @@ class ServidorFalso implements ClienteMapa {
   async listar(colecao: ColecaoMapa, filtro: FiltroServidor): Promise<unknown[]> {
     await this.pedido()
     const v = filtro.valores
-    if (colecao === 'hexagonos') return [...this.hexagonos.values()].filter((h) => h.mapa === v.mapa && (v.chunk === undefined || h.chunk === v.chunk)).map(copia)
+    const porPosicao = { hexagonos: this.hexagonos, hexagonos_ocultos: this.ocultos, notas_mestre: this.notas }
+    if (colecao === 'hexagonos' || colecao === 'hexagonos_ocultos' || colecao === 'notas_mestre') {
+      return [...porPosicao[colecao].values()].filter((h) => h.mapa === v.mapa && (v.chunk === undefined || h.chunk === v.chunk)).map(copia)
+    }
     if (colecao === 'regioes') return [...this.regioes.values()].filter((h) => h.mapa === v.mapa).map(copia)
-    if (colecao === 'lotes') {
-      return this.lotes
+    if (colecao === 'lotes' || colecao === 'lotes_mestre') {
+      return (colecao === 'lotes' ? this.lotes : this.lotesMestre)
         .filter((l) => l.mapa === v.mapa && (l.ordem as number) > (v.desde as number) && (l.ordem as number) <= (v.ate as number))
         .sort((a, b) => (a.ordem as number) - (b.ordem as number))
         .map(copia)
@@ -82,6 +89,7 @@ class ServidorFalso implements ClienteMapa {
     const v = filtro.valores
     if (colecao === 'mapas') return v.campanha === this.mapa.campanha || v.id === this.mapa.id ? copia(this.mapa) : null
     if (colecao === 'tokens_grupo') return v.mapa === this.token.mapa ? copia(this.token) : null
+    if (colecao === 'mapas_mestre') return v.mapa === this.camadaMestre.mapa || v.id === this.camadaMestre.id ? copia(this.camadaMestre) : null
     return null
   }
 
@@ -93,6 +101,11 @@ class ServidorFalso implements ClienteMapa {
 
   async atualizar(colecao: ColecaoMapa, id: string, dados: Registro): Promise<unknown> {
     await this.pedido()
+    if (colecao === 'mapas' && id === this.mapa.id && typeof dados.permissao === 'string') {
+      this.mapa.permissao = dados.permissao
+      this.emitir('mapas', { acao: 'update', registro: copia(this.mapa) })
+      return copia(this.mapa)
+    }
     if (colecao !== 'tokens_grupo' || id !== this.token.id) throw erroDoServidor(404)
     if ((dados.ts as number) < (this.token.ts as number)) return copia(this.token)
     this.token = { ...this.token, ...dados, autor: 'eu' }
@@ -119,10 +132,43 @@ class ServidorFalso implements ClienteMapa {
     }
   }
 
-  /** O que o hook faz: numera, aplica e avisa. `autor` é quem está logado. */
+  /** O que o hook faz: separa a parte privada, numera cada camada, aplica e avisa. `autor` é quem está logado. */
   gravarLote(dados: Registro, autor: string): Registro {
-    const repetido = this.lotes.find((l) => l.loteId === dados.loteId)
+    const repetido = this.lotes.find((l) => l.loteId === dados.loteId) ?? this.lotesMestre.find((l) => l.loteId === dados.loteId)
     if (repetido) return copia(repetido)
+    const privado = dados.privado as Lote['privado'] | undefined
+    let resposta: Registro | null = null
+    if (privado && (privado.ocultos.length || privado.notas.length)) {
+      const ordemMestre = ++this.camadaMestre.ultimaOrdem
+      for (const m of privado.ocultos) {
+        if (m.depois) this.ocultos.set(`${m.q},${m.r}`, { mapa: this.mapa.id, q: m.q, r: m.r, chunk: chaveChunk(m), dados: copia(m.depois) })
+        else this.ocultos.delete(`${m.q},${m.r}`)
+      }
+      for (const m of privado.notas) {
+        if (m.depois) this.notas.set(`${m.q},${m.r}`, { mapa: this.mapa.id, q: m.q, r: m.r, chunk: chaveChunk(m), dados: copia(m.depois) })
+        else this.notas.delete(`${m.q},${m.r}`)
+      }
+      const registro = {
+        collectionName: 'lotes_mestre',
+        id: `mestre${ordemMestre}`,
+        mapa: this.mapa.id,
+        ordem: ordemMestre,
+        loteId: dados.loteId,
+        autor,
+        ts: dados.ts,
+        tipo: dados.tipo ?? 'edicao',
+        ocultos: copia(privado.ocultos),
+        notas: copia(privado.notas),
+      }
+      this.lotesMestre.push(registro)
+      this.emitir('lotes_mestre', { acao: 'create', registro: copia(registro) })
+      this.emitir('mapas_mestre', { acao: 'update', registro: copia(this.camadaMestre) })
+      resposta = registro
+    }
+    if (!(dados.mudancas as Lote['mudancas']).length && !(dados.regioes as Lote['regioes']).length) {
+      if (!resposta) throw erroDoServidor(400, 'Lote recusado: não tem nenhuma mudança.')
+      return copia(resposta)
+    }
     const ordem = ++this.mapa.ultimaOrdem
     for (const m of dados.mudancas as Lote['mudancas']) {
       const chave = `${m.q},${m.r}`
@@ -133,15 +179,18 @@ class ServidorFalso implements ClienteMapa {
       if (m.depois) this.regioes.set(m.id, { mapa: this.mapa.id, regiaoId: m.id, dados: copia(m.depois) })
       else this.regioes.delete(m.id)
     }
-    const registro = { ...copia(dados), id: `reg${ordem}`, mapa: this.mapa.id, ordem, autor }
+    const { privado: _privado, ...publico } = dados
+    void _privado
+    const registro = { ...copia(publico), collectionName: 'lotes', id: `reg${ordem}`, mapa: this.mapa.id, ordem, autor }
     this.lotes.push(registro)
     this.emitir('lotes', { acao: 'create', registro: copia(registro) })
+    this.emitir('mapas', { acao: 'update', registro: copia(this.mapa) })
     return copia(registro)
   }
 
   /** Lote gravado por outra pessoa. */
   deOutro(l: Lote) {
-    return this.gravarLote({ loteId: l.id, ts: l.ts, mudancas: l.mudancas, regioes: l.regioes }, 'outro')
+    return this.gravarLote({ loteId: l.id, ts: l.ts, mudancas: l.mudancas, regioes: l.regioes, ...(l.privado ? { privado: l.privado } : {}) }, 'outro')
   }
 
   emitir(colecao: ColecaoMapa, evento: EventoTempoReal) {
@@ -153,11 +202,26 @@ class ServidorFalso implements ClienteMapa {
     for (const a of [...this.assinaturas.values()]) if (a.colecao === colecao) a.ouvinte(copia(evento))
   }
 
-  /** Entrega os avisos presos, na ordem dos índices pedidos (ou todos, na ordem em que foram feitos). */
+  /**
+   * Entrega os avisos presos: todos, na ordem em que foram feitos, ou só os de lotes, na ordem dos índices
+   * pedidos (os avisos de contador se perdem).
+   */
   soltar(indices?: number[]) {
     const presos = this.presos
     this.presos = []
-    for (const i of indices ?? presos.map((_, i) => i)) this.entregar(presos[i].colecao, presos[i].evento)
+    if (!indices) {
+      for (const p of presos) this.entregar(p.colecao, p.evento)
+      return
+    }
+    const lotes = presos.filter((p) => p.colecao === 'lotes' || p.colecao === 'lotes_mestre')
+    for (const i of indices) this.entregar(lotes[i].colecao, lotes[i].evento)
+  }
+
+  /** Entrega só os avisos de contador presos (o mapa e a camada do mestre), e os de lotes se perdem. */
+  soltarContadores() {
+    const presos = this.presos
+    this.presos = []
+    for (const p of presos) if (p.colecao === 'mapas' || p.colecao === 'mapas_mestre') this.entregar(p.colecao, p.evento)
   }
 
   perder() {
@@ -172,11 +236,15 @@ class ServidorFalso implements ClienteMapa {
   apagarLotesAte(ordem: number) {
     this.lotes = this.lotes.filter((l) => (l.ordem as number) > ordem)
   }
+
+  apagarLotesDoMestreAte(ordem: number) {
+    this.lotesMestre = this.lotesMestre.filter((l) => (l.ordem as number) > ordem)
+  }
 }
 
 /** Repositório aberto, com os lotes entregues anotados. */
-async function abrir(servidor = new ServidorFalso()) {
-  const repo = new RepositorioPocketBase(servidor, 'campanha1', { esperaBuraco: 5 })
+async function abrir(servidor = new ServidorFalso(), papel: 'mestre' | 'jogador' = 'jogador') {
+  const repo = new RepositorioPocketBase(servidor, 'campanha1', { esperaBuraco: 5, papel })
   const recebidos: string[] = []
   repo.assinar((l) => recebidos.push(l.id))
   await repo.carregarRegioes()
@@ -349,7 +417,7 @@ describe('RepositorioPocketBase: token do grupo', () => {
 describe('RepositorioPocketBase: fechar', () => {
   it('fecha as assinaturas, e os pedidos seguintes falham explicando', async () => {
     const { servidor, repo } = await abrir()
-    expect(servidor.assinaturas.size).toBe(2)
+    expect(servidor.assinaturas.size).toBe(3)
     expect(servidor.reconexoes.size).toBe(1)
     await repo.fechar()
     expect(servidor.assinaturas.size).toBe(0)
@@ -382,6 +450,109 @@ describe('RepositorioPocketBase: fechar', () => {
     await expect(carregando).rejects.toThrow('você trocou de campanha ou saiu do servidor')
     expect(servidor.assinaturas.size).toBe(0)
     expect(servidor.reconexoes.size).toBe(0)
+  })
+})
+
+describe('RepositorioPocketBase: o contador do mapa', () => {
+  it('mostra que falta um lote mesmo sem nenhum lote seguinte chegar', async () => {
+    const { servidor, recebidos } = await abrir()
+    servidor.segurar = true
+    servidor.deOutro(pintar('a', 0, 0, 'a'))
+    servidor.soltarContadores()
+    await esperar(30)
+    expect(recebidos).toEqual(['a'])
+  })
+})
+
+describe('RepositorioPocketBase: camada do mestre', () => {
+  const oculto = (q: number, r: number): Hexagono => hexagono(q, r, 'ruinas')
+  const nota = (q: number, r: number, texto: string): NotaPrivada => ({ q, r, texto, rev: 1 })
+  const esconder = (id: string): Lote => ({
+    ...lote(id, []),
+    privado: { ocultos: [{ q: 3, r: 3, antes: null, depois: oculto(3, 3) }], notas: [{ q: 3, r: 3, antes: null, depois: nota(3, 3, 'O anel') }] },
+  })
+
+  it('o mestre recebe a parte privada como um lote à parte, com o mesmo id', async () => {
+    const { servidor, repo, recebidos } = await abrir(new ServidorFalso(), 'mestre')
+    const vistos: Lote[] = []
+    repo.assinar((l) => vistos.push(l))
+    servidor.deOutro({ ...esconder('x'), mudancas: [{ q: 1, r: 1, antes: null, depois: hexagono(1, 1, 'campo') }] })
+    expect(recebidos).toEqual(['x', 'x'])
+    const privado = vistos.find((l) => l.privado)
+    expect(privado?.mudancas).toEqual([])
+    expect(privado?.privado?.ocultos.map((m) => m.depois?.terreno)).toEqual(['ruinas'])
+    expect(privado?.privado?.notas.map((m) => m.depois?.texto)).toEqual(['O anel'])
+    expect(vistos.find((l) => !l.privado)?.mudancas).toHaveLength(1)
+  })
+
+  it('o jogador não assina nem recebe nada da camada do mestre', async () => {
+    const { servidor, repo, recebidos } = await abrir()
+    servidor.deOutro({ ...esconder('x'), mudancas: [{ q: 1, r: 1, antes: null, depois: hexagono(1, 1, 'campo') }] })
+    expect(recebidos).toEqual(['x'])
+    expect([...servidor.assinaturas.values()].some((a) => a.colecao === 'lotes_mestre')).toBe(false)
+    expect(repo.ehMestre).toBe(false)
+    expect(await repo.carregarChunkOculto('0,0')).toEqual([])
+    expect(await repo.carregarNotasPrivadas('0,0')).toEqual([])
+  })
+
+  it('um lote só da camada do mestre volta pela resposta e é entregue uma vez', async () => {
+    const { repo, recebidos } = await abrir(new ServidorFalso(), 'mestre')
+    await repo.aplicar(esconder('meu'))
+    expect(recebidos).toEqual(['meu'])
+  })
+
+  it('o mestre carrega os ocultos e as notas por chunk, e exporta a camada inteira', async () => {
+    const servidor = new ServidorFalso()
+    servidor.deOutro(esconder('x'))
+    const { repo } = await abrir(servidor, 'mestre')
+    expect(await repo.carregarChunkOculto('0,0')).toEqual([oculto(3, 3)])
+    expect(await repo.carregarNotasPrivadas('0,0')).toEqual([nota(3, 3, 'O anel')])
+    expect(await repo.carregarChunk('0,0')).toEqual([])
+    expect(await repo.exportarCamadaMestre()).toEqual({ ocultos: [oculto(3, 3)], notas: [nota(3, 3, 'O anel')] })
+  })
+
+  it('busca o que faltou na camada do mestre quando a conexão volta', async () => {
+    const { servidor, recebidos } = await abrir(new ServidorFalso(), 'mestre')
+    servidor.segurar = true
+    servidor.deOutro(esconder('a'))
+    servidor.deOutro(esconder('b'))
+    servidor.perder()
+    servidor.reconectar()
+    await esperar()
+    expect(recebidos).toEqual(['a', 'b'])
+  })
+
+  it('fica desatualizado se o que faltou na camada do mestre já foi apagado', async () => {
+    const { servidor, repo } = await abrir(new ServidorFalso(), 'mestre')
+    servidor.segurar = true
+    servidor.deOutro(esconder('a'))
+    servidor.perder()
+    servidor.apagarLotesDoMestreAte(1)
+    servidor.reconectar()
+    await esperar()
+    expect(repo.desatualizado).toBe(true)
+  })
+
+  it('manda tipo, alvo e parte privada para o servidor', async () => {
+    const { servidor, repo } = await abrir(new ServidorFalso(), 'mestre')
+    await repo.aplicar({ ...esconder('rev'), tipo: 'reversao', alvoId: 'antigo' })
+    expect(servidor.lotesMestre[0]).toMatchObject({ loteId: 'rev', tipo: 'reversao' })
+  })
+})
+
+describe('RepositorioPocketBase: trava do mapa', () => {
+  it('lê a trava, avisa quando muda e o mestre trava e destrava', async () => {
+    const { servidor, repo } = await abrir(new ServidorFalso(), 'mestre')
+    const vistas: string[] = []
+    repo.assinarPermissao((p) => vistas.push(p))
+    expect(await repo.carregarPermissao()).toBe('todos')
+    await repo.gravarPermissao('mestre')
+    expect(servidor.mapa.permissao).toBe('mestre')
+    expect(vistas).toEqual(['mestre'])
+    servidor.mapa.permissao = 'todos'
+    servidor.emitir('mapas', { acao: 'update', registro: copia(servidor.mapa) })
+    expect(vistas).toEqual(['mestre', 'todos'])
+    expect(await repo.carregarPermissao()).toBe('todos')
   })
 })
 

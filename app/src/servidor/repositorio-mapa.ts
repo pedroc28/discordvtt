@@ -8,25 +8,41 @@
 //   ordem do servidor (ver fila-lotes.ts). Se falta algum, o repositório busca no servidor.
 // - Se o lote que falta já foi apagado pela limpeza (7 dias), o mapa local não tem como ficar certo:
 //   o repositório para de entregar lotes e avisa quem estiver ouvindo `aoDesatualizar`.
+// - Camada do mestre: a parte privada de um lote (hexágonos ocultos e notas privadas) fica em coleções
+//   que só o mestre lê, com numeração própria. Para o mestre, o repositório tem uma segunda fila e entrega
+//   essa parte como um lote à parte, com o mesmo id. Para jogadores, ela simplesmente não existe.
 //
 // O repositório não usa o SDK do PocketBase direto: recebe um ClienteMapa, que o conexao.ts cria para
 // a sessão atual. Assim os testes usam um servidor falso, e o SDK continua num arquivo só.
 
 import { chaveChunk } from '../mapa/hex'
 import type { OuvinteLote, OuvinteToken, RepositorioMapa } from '../mapa/repositorio'
-import type { Hexagono, Lote, Regiao, TokenGrupo } from '../mapa/tipos'
+import type { Hexagono, Lote, NotaPrivada, Regiao, TokenGrupo } from '../mapa/tipos'
 import { MAPA_DESATUALIZADO, MAPA_FECHADO, MAPA_SEM_REGISTRO, mensagemDeErroMapa } from './erros'
 import { definirInicio, filaVazia, receberLote, temBuraco, type FilaLotes } from './fila-lotes'
+import type { LoteDoServidor, Papel, PermissaoMapa } from './tipos'
 import {
+  normalizarCamadaMestreDoServidor,
   normalizarHexagonoDoServidor,
   normalizarLista,
   normalizarLoteDoServidor,
+  normalizarLoteMestreDoServidor,
   normalizarMapaDoServidor,
+  normalizarNotaDoServidor,
   normalizarRegiaoDoServidor,
   normalizarTokenDoServidor,
 } from './validacao'
 
-export type ColecaoMapa = 'mapas' | 'hexagonos' | 'regioes' | 'tokens_grupo' | 'lotes'
+export type ColecaoMapa =
+  | 'mapas'
+  | 'hexagonos'
+  | 'regioes'
+  | 'tokens_grupo'
+  | 'lotes'
+  | 'mapas_mestre'
+  | 'hexagonos_ocultos'
+  | 'notas_mestre'
+  | 'lotes_mestre'
 
 /** Filtro do PocketBase com os valores à parte, para o cliente escapar (nunca montar o texto com os valores). */
 export interface FiltroServidor {
@@ -59,23 +75,43 @@ export interface ClienteMapa {
 }
 
 export interface OpcoesRepositorio {
+  /** Papel de quem usa o mapa nesta campanha. O mestre também recebe a camada do mestre. Padrão: jogador. */
+  papel?: Papel
   /** Quanto esperar (ms) por um lote que falta antes de ir buscá-lo. Pelo tempo real, a troca de ordem se resolve em milissegundos. */
   esperaBuraco?: number
 }
+
+export type OuvintePermissao = (permissao: PermissaoMapa) => void
 
 const ESPERA_BURACO = 500
 // Se a busca dos lotes que faltam falhar, tenta de novo com espera crescente, até este máximo.
 const ESPERA_MAXIMA_BUSCA = 30000
 
+/** Uma sequência de lotes com numeração própria: a pública, que todos recebem, e a do mestre. */
+interface Camada {
+  /** Coleção dos lotes desta camada. */
+  lotes: 'lotes' | 'lotes_mestre'
+  /** Coleção do registro que guarda o último número desta camada. */
+  contador: 'mapas' | 'mapas_mestre'
+  /** Id do registro do contador, conhecido depois de abrir. */
+  contadorId: string | null
+  normalizar: (bruto: unknown) => LoteDoServidor | null
+  fila: FilaLotes
+}
+
 export class RepositorioPocketBase implements RepositorioMapa {
   readonly campanhaId: string
+  readonly papel: Papel
   private cliente: ClienteMapa
   private esperaBuraco: number
   private abertura: Promise<string> | null = null
   private mapaId: string | null = null
-  private fila: FilaLotes = filaVazia()
+  private publica: Camada
+  private mestre: Camada | null
+  private permissaoAtual: PermissaoMapa = 'todos'
   private ouvintes = new Set<OuvinteLote>()
   private ouvintesToken = new Set<OuvinteToken>()
+  private ouvintesPermissao = new Set<OuvintePermissao>()
   private ouvintesDesatualizado = new Set<() => void>()
   private cancelamentos: Cancelar[] = []
   private tokenId: string | null = null
@@ -91,10 +127,16 @@ export class RepositorioPocketBase implements RepositorioMapa {
   constructor(cliente: ClienteMapa, campanhaId: string, opcoes: OpcoesRepositorio = {}) {
     this.cliente = cliente
     this.campanhaId = campanhaId
+    this.papel = opcoes.papel ?? 'jogador'
     this.esperaBuraco = opcoes.esperaBuraco ?? ESPERA_BURACO
+    this.publica = { lotes: 'lotes', contador: 'mapas', contadorId: null, normalizar: normalizarLoteDoServidor, fila: filaVazia() }
+    this.mestre =
+      this.papel === 'mestre'
+        ? { lotes: 'lotes_mestre', contador: 'mapas_mestre', contadorId: null, normalizar: normalizarLoteMestreDoServidor, fila: filaVazia() }
+        : null
   }
 
-  /** O repositório foi fechado (troca de campanha, saída do servidor) e não faz mais nada. */
+  /** O repositório foi fechado (troca de campanha, de papel, saída do servidor) e não faz mais nada. */
   get fechado() {
     return this.estaFechado
   }
@@ -104,20 +146,19 @@ export class RepositorioPocketBase implements RepositorioMapa {
     return this.estaDesatualizado
   }
 
+  /** Quem usa é mestre da campanha: recebe a camada do mestre e pode travar o mapa. */
+  get ehMestre() {
+    return this.mestre !== null
+  }
+
+  private get camadas(): Camada[] {
+    return this.mestre ? [this.publica, this.mestre] : [this.publica]
+  }
+
   // ---------- RepositorioMapa ----------
 
   carregarChunk(chaveDoChunk: string): Promise<Hexagono[]> {
-    return this.pedir(async () => {
-      const mapa = await this.abrir()
-      this.exigirAtualizado()
-      const brutos = await this.cliente.listar('hexagonos', {
-        expressao: 'mapa = {:mapa} && chunk = {:chunk}',
-        valores: { mapa, chunk: chaveDoChunk },
-      })
-      this.exigirAberto()
-      // O chunk vem calculado pelo servidor. Conferir de novo aqui protege o mapa se as duas contas divergirem.
-      return normalizarLista(brutos, normalizarHexagonoDoServidor).filter((h) => chaveChunk(h) === chaveDoChunk)
-    })
+    return this.pedir(async () => this.carregarPorChunk('hexagonos', chaveDoChunk))
   }
 
   carregarRegioes(): Promise<Regiao[]> {
@@ -147,7 +188,7 @@ export class RepositorioPocketBase implements RepositorioMapa {
   aplicar(lote: Lote): Promise<void> {
     return this.pedir(async () => {
       const mapa = await this.abrir()
-      // O autor e o número de ordem quem põe é o servidor. Se este mesmo lote já tiver sido gravado (por
+      // O autor e os números de ordem quem põe é o servidor. Se este mesmo lote já tiver sido gravado (por
       // exemplo, reenviado depois de a conexão cair), o servidor responde com o que já estava gravado.
       const registro = await this.cliente.criar('lotes', {
         mapa,
@@ -155,9 +196,17 @@ export class RepositorioPocketBase implements RepositorioMapa {
         ts: lote.ts,
         mudancas: lote.mudancas,
         regioes: lote.regioes,
+        ...(lote.tipo ? { tipo: lote.tipo } : {}),
+        ...(lote.alvoId ? { alvoId: lote.alvoId } : {}),
+        // A parte privada vai no corpo do pedido, e o servidor a separa (só o mestre pode mandar).
+        ...(lote.privado ? { privado: lote.privado } : {}),
       })
-      // A resposta já traz o número de ordem: entra na fila como se tivesse chegado pelo tempo real.
-      this.receberRegistro(registro)
+      // A resposta já traz o número de ordem: entra na fila como se tivesse chegado pelo tempo real. Um lote
+      // só com parte privada responde com o registro da camada do mestre.
+      const daCamadaDoMestre =
+        typeof registro === 'object' && registro !== null && 'collectionName' in registro && registro.collectionName === 'lotes_mestre'
+      const camada = daCamadaDoMestre ? this.mestre : this.publica
+      if (camada) this.receberRegistro(camada, registro)
     })
   }
 
@@ -195,6 +244,68 @@ export class RepositorioPocketBase implements RepositorioMapa {
     return () => this.ouvintesToken.delete(ouvinte)
   }
 
+  // ---------- camada do mestre (além do contrato) ----------
+
+  /** Hexágonos ocultos de um chunk. Para quem não é mestre, não há nenhum. */
+  carregarChunkOculto(chaveDoChunk: string): Promise<Hexagono[]> {
+    if (!this.mestre) return Promise.resolve([])
+    return this.pedir(async () => this.carregarPorChunk('hexagonos_ocultos', chaveDoChunk))
+  }
+
+  /** Notas privadas de um chunk. Para quem não é mestre, não há nenhuma. */
+  carregarNotasPrivadas(chaveDoChunk: string): Promise<NotaPrivada[]> {
+    if (!this.mestre) return Promise.resolve([])
+    return this.pedir(async () => {
+      const mapa = await this.abrir()
+      this.exigirAtualizado()
+      const brutos = await this.cliente.listar('notas_mestre', {
+        expressao: 'mapa = {:mapa} && chunk = {:chunk}',
+        valores: { mapa, chunk: chaveDoChunk },
+      })
+      this.exigirAberto()
+      return normalizarLista(brutos, normalizarNotaDoServidor).filter((n) => chaveChunk(n) === chaveDoChunk)
+    })
+  }
+
+  /** A camada do mestre inteira, para a exportação do mestre. Vazia para quem não é mestre. */
+  exportarCamadaMestre(): Promise<{ ocultos: Hexagono[]; notas: NotaPrivada[] }> {
+    if (!this.mestre) return Promise.resolve({ ocultos: [], notas: [] })
+    return this.pedir(async () => {
+      const mapa = await this.abrir()
+      this.exigirAtualizado()
+      const filtro = { expressao: 'mapa = {:mapa}', valores: { mapa } }
+      const [ocultos, notas] = await Promise.all([this.cliente.listar('hexagonos_ocultos', filtro), this.cliente.listar('notas_mestre', filtro)])
+      this.exigirAberto()
+      return { ocultos: normalizarLista(ocultos, normalizarHexagonoDoServidor), notas: normalizarLista(notas, normalizarNotaDoServidor) }
+    })
+  }
+
+  // ---------- trava do mapa (além do contrato) ----------
+
+  /** Quem edita o mapa agora: todos ou só o mestre. Quem confere de verdade é o servidor. */
+  carregarPermissao(): Promise<PermissaoMapa> {
+    return this.pedir(async () => {
+      await this.abrir()
+      return this.permissaoAtual
+    })
+  }
+
+  /** Trava ou destrava o mapa. Só o mestre consegue: para os outros, o servidor recusa. */
+  gravarPermissao(permissao: PermissaoMapa): Promise<void> {
+    return this.pedir(async () => {
+      const mapa = await this.abrir()
+      const registro = normalizarMapaDoServidor(await this.cliente.atualizar('mapas', mapa, { permissao }))
+      if (registro) this.mudarPermissao(registro.permissao)
+    })
+  }
+
+  /** Avisa quando o mestre trava ou destrava o mapa. Devolve a função que cancela. */
+  assinarPermissao(ouvinte: OuvintePermissao): () => void {
+    this.ouvintesPermissao.add(ouvinte)
+    this.abrir().catch(() => undefined)
+    return () => this.ouvintesPermissao.delete(ouvinte)
+  }
+
   // ---------- além do contrato ----------
 
   /** Chamado uma vez, se o mapa ficar desatualizado (ver `desatualizado`). Devolve a função que cancela. */
@@ -225,7 +336,10 @@ export class RepositorioPocketBase implements RepositorioMapa {
         // Falhou ao abrir: o próximo pedido tenta de novo do zero.
         this.abertura = null
         this.mapaId = null
-        this.fila = filaVazia()
+        for (const camada of this.camadas) {
+          camada.fila = filaVazia()
+          camada.contadorId = null
+        }
         await this.cancelarAssinaturas()
         throw erro
       })
@@ -243,28 +357,60 @@ export class RepositorioPocketBase implements RepositorioMapa {
 
     // Assina antes de ler onde a numeração está, para nenhum lote gravado no meio do caminho se perder.
     // Os que chegarem antes de a numeração ser conhecida esperam na fila.
-    await this.guardar(
-      this.cliente.assinar('lotes', filtro, (evento) => {
-        if (evento.acao === 'create') this.receberRegistro(evento.registro)
-      }),
-    )
+    for (const camada of this.camadas) {
+      await this.guardar(
+        this.cliente.assinar(camada.lotes, filtro, (evento) => {
+          if (evento.acao === 'create') this.receberRegistro(camada, evento.registro)
+        }),
+      )
+    }
     await this.guardar(
       this.cliente.assinar('tokens_grupo', filtro, (evento) => {
         if (evento.acao === 'update') this.receberToken(evento.registro)
       }),
     )
+    // O mapa muda quando o mestre trava ou destrava, e o contador sobe a cada lote: se ele passar do último
+    // lote entregue, falta algum, mesmo que nenhum lote seguinte chegue para mostrar o buraco.
+    await this.guardar(
+      this.cliente.assinar('mapas', { expressao: 'id = {:id}', valores: { id: achado.id } }, (evento) => {
+        if (evento.acao === 'update') this.receberContador(this.publica, evento.registro)
+      }),
+    )
+    const mestre = this.mestre
+    if (mestre) {
+      await this.guardar(
+        this.cliente.assinar('mapas_mestre', filtro, (evento) => {
+          if (evento.acao === 'update') this.receberContador(mestre, evento.registro)
+        }),
+      )
+    }
     await this.guardar(this.cliente.aoReconectar(() => void this.buscarFaltando()))
 
     // Os lotes até aqui já estão nos hexágonos que o mapa vai carregar depois.
     const atual = normalizarMapaDoServidor(await this.cliente.primeiro('mapas', { expressao: 'id = {:id}', valores: { id: achado.id } }))
     this.exigirAberto()
     if (!atual) throw new Error(MAPA_SEM_REGISTRO)
+    let inicioMestre = 0
+    if (mestre) {
+      const camada = normalizarCamadaMestreDoServidor(await this.cliente.primeiro('mapas_mestre', filtro))
+      this.exigirAberto()
+      if (!camada) throw new Error(MAPA_SEM_REGISTRO)
+      mestre.contadorId = camada.id
+      inicioMestre = camada.ultimaOrdem
+    }
     this.mapaId = atual.id
-    const { fila, prontos } = definirInicio(this.fila, atual.ultimaOrdem)
-    this.fila = fila
-    this.entregar(prontos)
-    if (temBuraco(this.fila)) this.agendarBusca(this.esperaBuraco)
+    this.publica.contadorId = atual.id
+    this.mudarPermissao(atual.permissao)
+    this.iniciarCamada(this.publica, atual.ultimaOrdem)
+    if (mestre) this.iniciarCamada(mestre, inicioMestre)
     return atual.id
+  }
+
+  private iniciarCamada(camada: Camada, ultimaOrdem: number) {
+    const { fila, prontos } = definirInicio(camada.fila, ultimaOrdem)
+    camada.fila = fila
+    this.entregar(prontos)
+    if (temBuraco(camada.fila)) this.agendarBusca(this.esperaBuraco)
   }
 
   /** Guarda a função que cancela uma assinatura. Se o repositório fechou enquanto assinava, cancela na hora. */
@@ -288,16 +434,45 @@ export class RepositorioPocketBase implements RepositorioMapa {
     return registro.id
   }
 
-  // ---------- lotes que chegam ----------
+  private async carregarPorChunk(colecao: 'hexagonos' | 'hexagonos_ocultos', chaveDoChunk: string): Promise<Hexagono[]> {
+    const mapa = await this.abrir()
+    this.exigirAtualizado()
+    const brutos = await this.cliente.listar(colecao, { expressao: 'mapa = {:mapa} && chunk = {:chunk}', valores: { mapa, chunk: chaveDoChunk } })
+    this.exigirAberto()
+    // O chunk vem calculado pelo servidor. Conferir de novo aqui protege o mapa se as duas contas divergirem.
+    return normalizarLista(brutos, normalizarHexagonoDoServidor).filter((h) => chaveChunk(h) === chaveDoChunk)
+  }
 
-  private receberRegistro(bruto: unknown) {
+  // ---------- o que chega do servidor ----------
+
+  private receberRegistro(camada: Camada, bruto: unknown) {
     if (this.estaFechado || this.estaDesatualizado) return
-    const recebido = normalizarLoteDoServidor(bruto)
+    const recebido = camada.normalizar(bruto)
     if (!recebido) return
-    const { fila, prontos } = receberLote(this.fila, recebido.ordem, recebido.lote)
-    this.fila = fila
+    const { fila, prontos } = receberLote(camada.fila, recebido.ordem, recebido.lote)
+    camada.fila = fila
     this.entregar(prontos)
-    if (temBuraco(this.fila)) this.agendarBusca(this.esperaBuraco)
+    if (temBuraco(camada.fila)) this.agendarBusca(this.esperaBuraco)
+  }
+
+  private receberContador(camada: Camada, bruto: unknown) {
+    if (this.estaFechado || this.estaDesatualizado) return
+    let ultimaOrdem: number | null = null
+    if (camada === this.publica) {
+      const mapa = normalizarMapaDoServidor(bruto)
+      if (!mapa) return
+      this.mudarPermissao(mapa.permissao)
+      ultimaOrdem = mapa.ultimaOrdem
+    } else {
+      ultimaOrdem = normalizarCamadaMestreDoServidor(bruto)?.ultimaOrdem ?? null
+    }
+    if (ultimaOrdem !== null && camada.fila.ultima !== null && ultimaOrdem > camada.fila.ultima) this.agendarBusca(this.esperaBuraco)
+  }
+
+  private mudarPermissao(permissao: PermissaoMapa) {
+    if (permissao === this.permissaoAtual) return
+    this.permissaoAtual = permissao
+    for (const ouvinte of [...this.ouvintesPermissao]) ouvinte(permissao)
   }
 
   private entregar(lotes: Lote[]) {
@@ -343,7 +518,7 @@ export class RepositorioPocketBase implements RepositorioMapa {
     this.timerBusca = null
   }
 
-  /** Busca no servidor os lotes que faltam. Chamado quando há buraco na fila e quando a conexão volta. */
+  /** Busca no servidor os lotes que faltam. Chamado quando há buraco numa fila e quando a conexão volta. */
   private buscarFaltando(): Promise<void> {
     if (this.buscando) {
       this.buscarDeNovo = true
@@ -370,27 +545,32 @@ export class RepositorioPocketBase implements RepositorioMapa {
   }
 
   private async buscar() {
+    for (const camada of this.camadas) await this.buscarNaCamada(camada)
+  }
+
+  private async buscarNaCamada(camada: Camada) {
     const mapa = this.mapaId
-    const desde = this.fila.ultima
-    if (this.estaFechado || this.estaDesatualizado || !mapa || desde === null) return
-    const atual = normalizarMapaDoServidor(await this.cliente.primeiro('mapas', { expressao: 'id = {:id}', valores: { id: mapa } }))
-    if (!atual || this.estaFechado || this.estaDesatualizado || atual.ultimaOrdem <= desde) return
+    const desde = camada.fila.ultima
+    if (this.estaFechado || this.estaDesatualizado || !mapa || !camada.contadorId || desde === null) return
+    const bruto = await this.cliente.primeiro(camada.contador, { expressao: 'id = {:id}', valores: { id: camada.contadorId } })
+    const contador = camada === this.publica ? normalizarMapaDoServidor(bruto) : normalizarCamadaMestreDoServidor(bruto)
+    if (!contador || this.estaFechado || this.estaDesatualizado || contador.ultimaOrdem <= desde) return
     const brutos = await this.cliente.listar(
-      'lotes',
-      { expressao: 'mapa = {:mapa} && ordem > {:desde} && ordem <= {:ate}', valores: { mapa, desde, ate: atual.ultimaOrdem } },
+      camada.lotes,
+      { expressao: 'mapa = {:mapa} && ordem > {:desde} && ordem <= {:ate}', valores: { mapa, desde, ate: contador.ultimaOrdem } },
       'ordem',
     )
-    for (const bruto of brutos) this.receberRegistro(bruto)
+    for (const registro of brutos) this.receberRegistro(camada, registro)
     if (this.estaFechado || this.estaDesatualizado) return
     // Se ainda falta algo até o último número que o servidor deu, a limpeza já apagou esses lotes.
-    if (this.fila.ultima === null || this.fila.ultima < atual.ultimaOrdem) this.marcarDesatualizado()
+    if (camada.fila.ultima === null || camada.fila.ultima < contador.ultimaOrdem) this.marcarDesatualizado()
   }
 
   private marcarDesatualizado() {
     if (this.estaDesatualizado) return
     this.estaDesatualizado = true
     this.pararBusca()
-    this.fila = filaVazia()
+    for (const camada of this.camadas) camada.fila = filaVazia()
     for (const ouvinte of [...this.ouvintesDesatualizado]) ouvinte()
     this.ouvintesDesatualizado.clear()
   }

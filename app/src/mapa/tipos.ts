@@ -82,6 +82,37 @@ export interface MudancaRegiao {
   depois: Regiao | null
 }
 
+/** Nota de um hexágono que só o mestre lê. Fica fora do Hexagono, numa coleção do servidor só do mestre. */
+export interface NotaPrivada {
+  q: number
+  r: number
+  texto: string
+  rev: number
+}
+
+/** Uma alteração numa nota privada. Mesma convenção de `Mudanca`. */
+export interface MudancaNota {
+  q: number
+  r: number
+  antes: NotaPrivada | null
+  depois: NotaPrivada | null
+}
+
+/**
+ * O que um lote muda na camada do mestre: hexágonos ocultos (com os marcadores deles) e notas privadas.
+ * Só o mestre manda. O servidor separa esta parte e nunca a entrega a jogadores.
+ */
+export interface PartePrivada {
+  ocultos: Mudanca[]
+  notas: MudancaNota[]
+}
+
+/**
+ * `edicao` é o comum. `importacao` é só do mestre e aceita lotes maiores. `reversao` desfaz o lote `alvoId`:
+ * o de outra pessoa, só o mestre desfaz.
+ */
+export type TipoLote = 'edicao' | 'importacao' | 'reversao'
+
 /** Um passo de edição, como uma pincelada inteira. É a unidade de rede e de desfazer. */
 export interface Lote {
   id: string
@@ -89,6 +120,12 @@ export interface Lote {
   ts: number
   mudancas: Mudanca[]
   regioes: MudancaRegiao[]
+  /** Sem o campo, vale `edicao`. */
+  tipo?: TipoLote
+  /** Na reversão: o id do lote desfeito. */
+  alvoId?: string
+  /** Só o mestre: a parte do lote na camada do mestre (ver `PartePrivada`). */
+  privado?: PartePrivada
 }
 
 /** Campos de um hexágono que a interface edita. Ficam de fora as coordenadas e a revisão. */

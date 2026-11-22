@@ -241,7 +241,7 @@ function canonico(v: unknown): string {
  * Não dá para usar a revisão: desfazer e refazer sobem a revisão, e o passo anterior da pilha
  * pareceria alterado por outra pessoa.
  */
-function mesmoEstado(a: object | null, b: object | null): boolean {
+export function mesmoConteudo(a: object | null, b: object | null): boolean {
   if (!a || !b) return a === b
   const { rev: _a, ...ra } = a as Record<string, unknown>
   const { rev: _b, ...rb } = b as Record<string, unknown>
@@ -273,7 +273,7 @@ export function reverterLote(
   let conflitos = 0
   for (const m of original.mudancas) {
     const atual = leitor.ler(m.q, m.r)
-    if (!mesmoEstado(atual, m.depois)) {
+    if (!mesmoConteudo(atual, m.depois)) {
       conflitos++
       continue
     }
@@ -283,7 +283,7 @@ export function reverterLote(
   }
   for (const m of original.regioes) {
     const atual = leitor.lerRegiao(m.id)
-    if (!mesmoEstado(atual, m.depois)) {
+    if (!mesmoConteudo(atual, m.depois)) {
       conflitos++
       continue
     }

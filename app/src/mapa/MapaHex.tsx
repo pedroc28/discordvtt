@@ -3,7 +3,8 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useAparencia } from '../nucleo/aparencia'
-import { carregarCamera, autorLocal, salvarCamera, CAMERA_INICIAL } from './armazenamento'
+import { carregarCamera, autorLocal, salvarCamera, metaPadrao, CAMERA_INICIAL } from './armazenamento'
+import { lerArquivo, nomeDoArquivo, terrenosDesconhecidos, type ArquivoMapa, type ModoImportacao, type ResumoLeitura } from './arquivo'
 import { zoomEm } from './camera'
 import { ControladorMapa, novoId } from './controlador'
 import { EntradaMapa, type Ferramenta } from './entrada'
@@ -88,6 +89,15 @@ export function MapaHex() {
   const [motor, setMotor] = useState<Motor | null>(null)
   const [erroCarga, setErroCarga] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  /** Arquivo de mapa lido e esperando o jogador escolher mesclar, substituir ou cancelar. */
+  const [importando, setImportando] = useState<{
+    nome: string
+    arquivo: ArquivoMapa
+    resumo: ResumoLeitura
+    desconhecidos: [string, number][]
+  } | null>(null)
+  const [ocupado, setOcupado] = useState(false)
+  const entradaArquivoRef = useRef<HTMLInputElement>(null)
 
   const [ferramenta, setFerramenta] = useState<Ferramenta>('pintar')
   const [terreno, setTerreno] = useState('planicie')
@@ -285,6 +295,74 @@ export function MapaHex() {
     [motor],
   )
 
+  // ----- exportar e importar o mapa -----
+  const exportarMapa = useCallback(async () => {
+    if (!motor || ocupado) return
+    setOcupado(true)
+    try {
+      const meta = { ...metaPadrao(MAPA_ID), tileset: motor.tileset.def.id }
+      const arquivo = await motor.ctrl.exportar(meta)
+      const blob = new Blob([JSON.stringify(arquivo)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = nomeDoArquivo(meta.nome)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setAviso(`Mapa exportado: ${arquivo.hexagonos.length} hexágonos e ${arquivo.regioes.length} regiões.`)
+    } catch (e) {
+      setAviso(`Não consegui exportar o mapa: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setOcupado(false)
+    }
+  }, [motor, ocupado])
+
+  const escolherArquivo = useCallback(
+    async (arquivo: File | undefined) => {
+      if (!arquivo || !motor) return
+      if (arquivo.size > 60 * 1024 * 1024) {
+        setAviso('Esse arquivo é grande demais para ser um mapa (mais de 60 MB). Escolha um arquivo exportado pelo mapa.')
+        return
+      }
+      const lido = lerArquivo(await arquivo.text())
+      if (!lido.ok) {
+        setAviso(lido.erro)
+        return
+      }
+      const conhecidos = new Set(motor.tileset.def.terrenos.map((t) => t.id))
+      setImportando({
+        nome: arquivo.name,
+        arquivo: lido.arquivo,
+        resumo: lido.resumo,
+        desconhecidos: [...terrenosDesconhecidos(lido.arquivo, conhecidos)],
+      })
+    },
+    [motor],
+  )
+
+  const confirmarImportacao = useCallback(
+    async (modo: ModoImportacao) => {
+      if (!motor || !importando || ocupado) return
+      setOcupado(true)
+      try {
+        const { aplicados, removidos } = await motor.ctrl.importar(importando.arquivo, modo)
+        setImportando(null)
+        setAviso(
+          aplicados + removidos === 0
+            ? 'O mapa já estava igual ao arquivo, nada mudou.'
+            : `Importado: ${aplicados} hexágonos${removidos ? ` e ${removidos} removidos` : ''}. Ctrl+Z desfaz.`,
+        )
+      } catch (e) {
+        setAviso(`Não consegui importar: ${e instanceof Error ? e.message : String(e)}`)
+      } finally {
+        setOcupado(false)
+      }
+    },
+    [motor, importando, ocupado],
+  )
+
   const irParaInicio = useCallback(() => motor?.render.definirCamera({ ...CAMERA_INICIAL }), [motor])
 
   const novaRegiao = useCallback(() => {
@@ -434,6 +512,25 @@ export function MapaHex() {
             <Icone nome="olho" />
           </button>
         </div>
+        <div className="grupo-botoes">
+          <button type="button" className="botao-icone" title="Exportar o mapa para um arquivo" aria-label="Exportar mapa" disabled={!motor || ocupado} onClick={exportarMapa}>
+            <Icone nome="baixar" />
+          </button>
+          <button type="button" className="botao-icone" title="Importar um mapa de um arquivo" aria-label="Importar mapa" disabled={!motor || ocupado} onClick={() => entradaArquivoRef.current?.click()}>
+            <Icone nome="subir" />
+          </button>
+          <input
+            ref={entradaArquivoRef}
+            type="file"
+            accept="application/json,.json"
+            hidden
+            onChange={(e) => {
+              void escolherArquivo(e.target.files?.[0])
+              // Limpa para poder escolher o mesmo arquivo de novo.
+              e.target.value = ''
+            }}
+          />
+        </div>
       </header>
 
       <div className="mapa__corpo">
@@ -523,6 +620,41 @@ export function MapaHex() {
               <span>Passe o cursor sobre o mapa</span>
             )}
           </div>
+
+          {importando && (
+            <div className="mapa__importar" role="dialog" aria-label="Importar mapa">
+              <h2>Importar mapa</h2>
+              <p>
+                <b>{importando.nome}</b>: {importando.resumo.hexagonos} hexágonos e {importando.resumo.regioes} regiões
+                {importando.arquivo.meta.nome ? ` do mapa "${importando.arquivo.meta.nome}"` : ''}.
+              </p>
+              {importando.resumo.descartados > 0 && (
+                <p className="mapa__importar-alerta">
+                  {importando.resumo.descartados} item(ns) do arquivo estavam quebrados e vão ficar de fora.
+                </p>
+              )}
+              {importando.desconhecidos.length > 0 && (
+                <p className="mapa__importar-alerta">
+                  Terrenos que a arte atual não tem (aparecem em cinza):{' '}
+                  {importando.desconhecidos.map(([id, n]) => `${id} (${n})`).join(', ')}.
+                </p>
+              )}
+              <p className="mapa__importar-dica">
+                Mesclar põe o arquivo por cima do mapa e mantém o resto. Substituir deixa o mapa igual ao arquivo e apaga o que não estiver nele. Os dois podem ser desfeitos com Ctrl+Z.
+              </p>
+              <div className="mapa__importar-botoes">
+                <button type="button" className="botao-topo principal" disabled={ocupado} onClick={() => void confirmarImportacao('mesclar')}>
+                  Mesclar com o mapa
+                </button>
+                <button type="button" className="botao-topo" disabled={ocupado} onClick={() => void confirmarImportacao('substituir')}>
+                  Substituir o mapa
+                </button>
+                <button type="button" className="botao-topo" disabled={ocupado} onClick={() => setImportando(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
 
           {aviso && (
             <div className="mapa__aviso" role="status">

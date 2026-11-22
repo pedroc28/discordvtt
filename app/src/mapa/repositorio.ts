@@ -20,6 +20,11 @@ export interface RepositorioMapa {
   aplicar(lote: Lote): Promise<void>
   /** Recebe lotes feitos por outros clientes. Retorna a função que cancela. */
   assinar(ouvinte: OuvinteLote): () => void
+  /**
+   * Tudo o que o mapa tem, inclusive chunks que ninguém abriu. Opcional: serve à exportação e ao modo
+   * "substituir" da importação. Sem ele, a exportação leva só o que está carregado e o "substituir" não existe.
+   */
+  exportarTudo?(): Promise<{ hexagonos: Hexagono[]; regioes: Regiao[] }>
   // O token do grupo é opcional: sem estes três métodos ele vive só na memória deste cliente.
   /** Posição atual do token do grupo, ou null se não há. */
   carregarToken?(): Promise<TokenGrupo | null>
@@ -85,6 +90,13 @@ export class RepositorioMemoria implements RepositorioMapa {
   assinar(ouvinte: OuvinteLote): () => void {
     this.ouvintes.add(ouvinte)
     return () => this.ouvintes.delete(ouvinte)
+  }
+
+  async exportarTudo(): Promise<{ hexagonos: Hexagono[]; regioes: Regiao[] }> {
+    await this.esperar()
+    const hexagonos: Hexagono[] = []
+    for (const chunk of this.chunks.values()) for (const h of chunk.values()) hexagonos.push(structuredClone(h))
+    return { hexagonos, regioes: [...this.regioes.values()].map((r) => ({ ...r })) }
   }
 
   async carregarToken(): Promise<TokenGrupo | null> {

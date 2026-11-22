@@ -5,6 +5,7 @@
 // O desfazer é seletivo: só reverte o que ainda está como o lote deixou (ver operacoes.ts).
 
 import { ArmazemMapa } from './armazem'
+import { montarArquivo, planejarImportacao, type ArquivoMapa, type ModoImportacao } from './arquivo'
 import { chaveChunk, type Aresta, type Hex } from './hex'
 import {
   fundirMudancas,
@@ -21,7 +22,7 @@ import {
   reverterLote,
 } from './operacoes'
 import type { RepositorioMapa } from './repositorio'
-import type { Lote, Mudanca, MudancaRegiao, PatchHexagono, PatchRegiao, TokenGrupo } from './tipos'
+import type { Hexagono, Lote, MapaMeta, Mudanca, MudancaRegiao, PatchHexagono, PatchRegiao, Regiao, TokenGrupo } from './tipos'
 
 const LIMITE_HISTORICO = 200
 const LIMITE_ECOS = 300
@@ -269,6 +270,58 @@ export class ControladorMapa {
   excluirRegiao(id: string): Lote | null {
     const m = mudancaExcluirRegiao(this.armazem, id)
     return m ? this.editar({ regioes: [m] }) : null
+  }
+
+  /**
+   * Monta o arquivo de exportação com o mapa inteiro. Se o repositório sabe listar tudo (`exportarTudo`),
+   * leva também os chunks que ninguém abriu. Senão leva só o que está carregado.
+   */
+  async exportar(meta: MapaMeta): Promise<ArquivoMapa> {
+    await this.carregarRegioes()
+    let hexagonos: Hexagono[]
+    let regioes: Regiao[]
+    if (this.repo.exportarTudo) {
+      const tudo = await this.repo.exportarTudo()
+      hexagonos = tudo.hexagonos
+      regioes = tudo.regioes
+      // Edições que ainda não chegaram ao repositório valem mais do que o que ele devolveu.
+      const porChave = new Map(hexagonos.map((h) => [`${h.q},${h.r}`, h]))
+      for (const h of this.armazem.todosOsHexagonos()) porChave.set(`${h.q},${h.r}`, h)
+      hexagonos = [...porChave.values()]
+      const porId = new Map(regioes.map((r) => [r.id, r]))
+      for (const r of this.armazem.listarRegioes()) porId.set(r.id, r)
+      regioes = [...porId.values()]
+    } else {
+      hexagonos = [...this.armazem.todosOsHexagonos()]
+      regioes = this.armazem.listarRegioes()
+    }
+    return montarArquivo(meta, hexagonos, regioes, this.token)
+  }
+
+  /**
+   * Importa um arquivo de mapa como UM passo do histórico (dá para desfazer). `mesclar` põe o conteúdo do
+   * arquivo por cima, `substituir` deixa o mapa igual ao arquivo (apaga o que não está nele, e põe o token
+   * onde o arquivo diz). O modo `substituir` exige um repositório com `exportarTudo`.
+   */
+  async importar(arquivo: ArquivoMapa, modo: ModoImportacao): Promise<{ aplicados: number; removidos: number }> {
+    let existente: { hexagonos: Hexagono[]; regioes: Regiao[] } | undefined
+    if (modo === 'substituir') {
+      if (!this.repo.exportarTudo) throw new Error('Este mapa não consegue listar tudo o que tem, então não dá para substituir. Use mesclar.')
+      existente = await this.repo.exportarTudo()
+    }
+    // Os chunks mexidos precisam estar carregados para o "antes" (e o desfazer) saírem certos.
+    const chunks = new Set<string>()
+    for (const h of arquivo.hexagonos) chunks.add(chaveChunk(h))
+    for (const h of existente?.hexagonos ?? []) chunks.add(chaveChunk(h))
+    await Promise.all([...chunks].map((c) => this.garantirChunk(c)))
+    await this.carregarRegioes()
+    const plano = planejarImportacao(this.armazem, arquivo, modo, existente)
+    this.editar({ mudancas: plano.mudancas, regioes: plano.regioes })
+    if (modo === 'substituir') {
+      if (arquivo.token) this.moverToken(arquivo.token)
+      else this.tirarToken()
+    }
+    return { aplicados: plano.aplicados, removidos: plano.removidos }
   }
 
   /** Desfaz o último lote seu. Retorna quantos itens foram pulados por conflito. */

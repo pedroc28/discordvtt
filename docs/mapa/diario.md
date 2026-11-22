@@ -84,6 +84,7 @@ Mudanças em relação ao plano inicial, decididas durante a construção:
 - **Lote 12** (delta, cidade murada, ruínas) feito, mais `praia-inteira` e `falesia-inteira` (sem lado do mar fixo). Cidade e ruínas foram compostas por script sobre a planície, porque o PixelLab só devolve esses objetos soltos.
 - **Lote 13** (terra arrasada, floresta encantada, cogumelos) feito: 6 variantes em uma chamada (15 gerações). Não resta SVG de terreno na pasta `pixel`.
 - **Lote 14** (planície de cristais) feito, e com ele **os 45 terrenos têm arte em pixel art**. Os 14 lotes custaram cerca de 400 gerações no PixelLab (média de 30 por lote, contando os refeitos). Ficam como pontos a melhorar o contorno escuro nas arestas de baixo da `floresta-outono` e as transições entre terrenos. Os ícones de marcador continuam em SVG.
+- **Exportar e importar o mapa** em JSON, com mesclar ou substituir, validação, aviso de terreno desconhecido e desfazer em um passo (18 testes novos). O repositório ganhou o método opcional `exportarTudo`.
 - **Transições entre terrenos desligadas** no tileset `pixel` (decisão do usuário, 22/11/2026). O código e o campo `transicoes` continuam, e basta pôr `true` para voltar. Antes disso, foram feitas por código: pontilhado ordenado numa faixa junto da borda, com o vizinho espelhado, sem arte nova e para qualquer par de terrenos. 8 testes novos.
 - **Token, rios e estradas em pixel art.** O token do grupo virou um sprite (três aventureiros sobre uma base), definido por `token` no `tileset.json`. Rios e estradas passaram a ser desenhados pixel a pixel num tileset `pixelart`, com contorno, brilho e salpicos. 4 gerações no PixelLab.
 - **Ícones de marcador em pixel art:** os 12 ícones (cidade, vila, castelo, masmorra, ruína, torre, templo, acampamento, porto, tesouro, perigo, ponto) trocados por PNGs de 64 × 64 feitos com `create_image_pixen` (1 geração cada, 14 no total). O tileset gerado por script continua com os selos em SVG.
@@ -140,7 +141,7 @@ Depende de seu amigo montar o PocketBase, o login e os papéis por mesa (mestre 
 
 - **Arte final** de terrenos e ícones, no formato descrito no README do módulo.
 - **Vários mapas** por mesa (mundo, cidade, masmorra) e escala por mapa (1 hexágono = X km).
-- **Exportar e importar** o mapa em JSON (já existem as funções de validação).
+- **Exportar e importar** o mapa em JSON: feito.
 - **Cache de bitmap por chunk**, se o desenho pesar em mapas grandes.
 - **Teste em celular de verdade**, e depois um teste automático de interface (por exemplo, Playwright) para os fluxos principais.
 

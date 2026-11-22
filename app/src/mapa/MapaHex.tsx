@@ -19,14 +19,17 @@ import { RepositorioLocal } from './repositorio-local'
 import { Tileset } from './tileset'
 
 const MAPA_ID = 'principal'
-/** Tileset em uso. Para testar outra arte sem mexer no código, abra o mapa com `?tileset=<pasta>` no endereço. */
+/**
+ * Tileset em uso: a arte em pixel art (`pixel`). Para ver outra pasta sem mexer no código, abra o mapa com
+ * `?tileset=<pasta>` no endereço, por exemplo `?tileset=padrao` para o tileset gerado por script.
+ */
 function urlDoTileset(): string {
-  let id = 'padrao'
+  let id = 'pixel'
   try {
     const pedido = new URLSearchParams(window.location.search).get('tileset')
     if (pedido && /^[a-z0-9-]+$/.test(pedido)) id = pedido
   } catch {
-    // sem endereço legível: fica o padrão
+    // sem endereço legível: fica a arte em pixel art
   }
   return `${import.meta.env.BASE_URL}tilesets/${id}/tileset.json`
 }

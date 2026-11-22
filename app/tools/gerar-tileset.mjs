@@ -403,8 +403,103 @@ ${topo}
 `
 }
 
+// ---------- marcadores ----------
+// Ícones redondos de 128×128 px: um selo colorido com um desenho branco por cima.
+
+const ESCURO = '#1a1a1a'
+
+/** Traço grosso com contorno escuro, para desenhos feitos de linhas. */
+const traco = (d, largura = 9) =>
+  `<path d="${d}" fill="none" stroke="${ESCURO}" stroke-width="${largura + 7}" stroke-linecap="round" stroke-linejoin="round"/>` +
+  `<path d="${d}" fill="none" stroke="#fff" stroke-width="${largura}" stroke-linecap="round" stroke-linejoin="round"/>`
+
+const MARCADORES = [
+  {
+    id: 'cidade',
+    nome: 'Cidade',
+    cor: '#c9772a',
+    desenho: `<rect x="30" y="64" width="20" height="32"/><rect x="78" y="58" width="20" height="38"/><rect x="50" y="46" width="28" height="50"/><polygon points="50,46 64,31 78,46"/><g fill="${ESCURO}" stroke="none"><rect x="56" y="56" width="6" height="8"/><rect x="66" y="56" width="6" height="8"/><rect x="56" y="72" width="6" height="8"/><rect x="66" y="72" width="6" height="8"/></g>`,
+  },
+  {
+    id: 'vila',
+    nome: 'Vila',
+    cor: '#8d6a3f',
+    desenho: `<polygon points="64,32 99,62 90,62 90,96 38,96 38,62 29,62"/><rect x="57" y="72" width="14" height="24" fill="${ESCURO}" stroke="none"/>`,
+  },
+  {
+    id: 'castelo',
+    nome: 'Castelo',
+    cor: '#7a5aa6',
+    desenho: `<rect x="30" y="46" width="24" height="50"/><rect x="74" y="46" width="24" height="50"/><rect x="50" y="64" width="28" height="32"/><rect x="30" y="36" width="7" height="10"/><rect x="43" y="36" width="7" height="10"/><rect x="74" y="36" width="7" height="10"/><rect x="87" y="36" width="7" height="10"/><path d="M57 96V82a7 7 0 0 1 14 0V96z" fill="${ESCURO}" stroke="none"/>`,
+  },
+  {
+    id: 'masmorra',
+    nome: 'Masmorra',
+    cor: '#4b4f5e',
+    desenho: `<path d="M32 98V62a32 32 0 0 1 64 0V98z"/><path d="M45 98V64a19 19 0 0 1 38 0V98z" fill="${ESCURO}" stroke="none"/><path d="M45 90h38M45 82h38" stroke="#fff" stroke-width="3" opacity="0.5"/>`,
+  },
+  {
+    id: 'ruina',
+    nome: 'Ruína',
+    cor: '#6f7f6a',
+    desenho: `<rect x="30" y="72" width="15" height="24"/><polygon points="52,96 52,50 60,44 66,54 66,96"/><rect x="74" y="62" width="15" height="34"/><rect x="26" y="96" width="70" height="7"/>`,
+  },
+  {
+    id: 'torre',
+    nome: 'Torre',
+    cor: '#3d78b5',
+    desenho: `<polygon points="48,98 52,46 76,46 80,98"/><rect x="45" y="35" width="38" height="13"/><rect x="60" y="60" width="8" height="16" fill="${ESCURO}" stroke="none"/><path d="M64 35V19l17 6-17 6"/>`,
+  },
+  {
+    id: 'templo',
+    nome: 'Templo',
+    cor: '#b8892a',
+    desenho: `<polygon points="64,30 100,52 28,52"/><rect x="32" y="56" width="64" height="7"/><rect x="36" y="66" width="10" height="26"/><rect x="59" y="66" width="10" height="26"/><rect x="82" y="66" width="10" height="26"/><rect x="30" y="94" width="68" height="8"/>`,
+  },
+  {
+    id: 'acampamento',
+    nome: 'Acampamento',
+    cor: '#4a8f4d',
+    desenho: `<polygon points="64,32 100,94 28,94"/><polygon points="64,58 78,94 50,94" fill="${ESCURO}" stroke="none"/>`,
+  },
+  {
+    id: 'porto',
+    nome: 'Porto',
+    cor: '#2c7fa0',
+    desenho: `${traco('M64 46V98M44 62H84M32 80Q38 98 64 98Q90 98 96 80', 8)}<circle cx="64" cy="36" r="8" fill="none" stroke="${ESCURO}" stroke-width="15"/><circle cx="64" cy="36" r="8" fill="none" stroke="#fff" stroke-width="8"/>`,
+  },
+  {
+    id: 'tesouro',
+    nome: 'Tesouro',
+    cor: '#b58a00',
+    desenho: traco('M40 40L88 88M88 40L40 88', 12),
+  },
+  {
+    id: 'perigo',
+    nome: 'Perigo',
+    cor: '#c0392b',
+    desenho: `<polygon points="64,30 101,96 27,96"/><rect x="60" y="52" width="8" height="24" rx="3" fill="${ESCURO}" stroke="none"/><circle cx="64" cy="85" r="5" fill="${ESCURO}" stroke="none"/>`,
+  },
+  {
+    id: 'ponto',
+    nome: 'Ponto de interesse',
+    cor: '#d6336c',
+    desenho: `<path d="M64 100C64 100 35 72 35 54a29 29 0 0 1 58 0C93 72 64 100 64 100z"/><circle cx="64" cy="54" r="10" fill="${ESCURO}" stroke="none"/>`,
+  },
+]
+
+function montarMarcador(m) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+<circle cx="64" cy="64" r="60" fill="${m.cor}" stroke="${ESCURO}" stroke-width="6"/>
+<circle cx="64" cy="64" r="53" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="2"/>
+<g fill="#fff" stroke="${ESCURO}" stroke-width="3.5" stroke-linejoin="round">${m.desenho}</g>
+</svg>
+`
+}
+
 rmSync(saida, { recursive: true, force: true })
 mkdirSync(saida, { recursive: true })
+mkdirSync(join(saida, 'marcadores'), { recursive: true })
 
 const manifesto = {
   id: 'padrao',
@@ -413,6 +508,7 @@ const manifesto = {
   largura: L,
   altura: A,
   terrenos: [],
+  marcadores: [],
 }
 
 for (const t of TERRENOS) {
@@ -425,5 +521,13 @@ for (const t of TERRENOS) {
   manifesto.terrenos.push({ id: t.id, nome: t.nome, cor: t.cor, extra: t.extra, arquivos })
 }
 
+for (const m of MARCADORES) {
+  const arquivo = `marcadores/${m.id}.svg`
+  writeFileSync(join(saida, arquivo), montarMarcador(m))
+  manifesto.marcadores.push({ id: m.id, nome: m.nome, arquivo })
+}
+
 writeFileSync(join(saida, 'tileset.json'), JSON.stringify(manifesto, null, 2) + '\n')
-console.log(`Tileset gerado: ${TERRENOS.length} terrenos, ${TERRENOS.length * VARIANTES} imagens em ${saida}`)
+console.log(
+  `Tileset gerado: ${TERRENOS.length} terrenos (${TERRENOS.length * VARIANTES} imagens) e ${MARCADORES.length} marcadores em ${saida}`,
+)

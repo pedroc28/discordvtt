@@ -12,6 +12,14 @@ export interface DefTerreno {
   arquivos: string[]
 }
 
+/** Ícone de marcador (cidade, masmorra...). Qualquer tamanho, de preferência quadrado e com fundo transparente. */
+export interface DefMarcador {
+  id: string
+  nome: string
+  /** Caminho da imagem, relativo à pasta do tileset.json. */
+  arquivo: string
+}
+
 export interface DefTileset {
   id: string
   nome: string
@@ -21,6 +29,7 @@ export interface DefTileset {
   /** Altura do hexágono sem o extra, em px. */
   altura: number
   terrenos: DefTerreno[]
+  marcadores: DefMarcador[]
 }
 
 type Obj = Record<string, unknown>
@@ -46,6 +55,14 @@ export function normalizarTileset(bruto: unknown): DefTileset | null {
     })
   }
   if (!terrenos.length) return null
+  const marcadores: DefMarcador[] = []
+  const marcadoresVistos = new Set<string>()
+  for (const m of Array.isArray(bruto.marcadores) ? bruto.marcadores : []) {
+    if (!ehObj(m) || typeof m.id !== 'string' || !m.id || marcadoresVistos.has(m.id)) continue
+    if (typeof m.arquivo !== 'string' || !m.arquivo) continue
+    marcadoresVistos.add(m.id)
+    marcadores.push({ id: m.id, nome: texto(m.nome, m.id), arquivo: m.arquivo })
+  }
   return {
     id: texto(bruto.id, 'tileset'),
     nome: texto(bruto.nome, 'Tileset'),
@@ -53,6 +70,7 @@ export function normalizarTileset(bruto: unknown): DefTileset | null {
     largura: positivo(bruto.largura, 256),
     altura: positivo(bruto.altura, 296),
     terrenos,
+    marcadores,
   }
 }
 
@@ -68,6 +86,8 @@ export function variantePara(q: number, r: number, quantidade: number): number {
 export class Tileset {
   private fontes = new Map<string, CanvasImageSource[]>()
   private porId = new Map<string, DefTerreno>()
+  private fontesMarcadores = new Map<string, CanvasImageSource>()
+  private marcadoresPorId = new Map<string, DefMarcador>()
 
   readonly def: DefTileset
   private base: string
@@ -76,6 +96,7 @@ export class Tileset {
     this.def = def
     this.base = base
     for (const t of def.terrenos) this.porId.set(t.id, t)
+    for (const m of def.marcadores) this.marcadoresPorId.set(m.id, m)
   }
 
   static async carregar(urlManifesto: string): Promise<Tileset> {
@@ -97,6 +118,19 @@ export class Tileset {
     return t && t.arquivos.length ? this.base + t.arquivos[indice % t.arquivos.length] : null
   }
 
+  marcador(id: string): DefMarcador | undefined {
+    return this.marcadoresPorId.get(id)
+  }
+
+  urlMarcador(id: string): string | null {
+    const m = this.marcadoresPorId.get(id)
+    return m ? this.base + m.arquivo : null
+  }
+
+  imagemMarcador(id: string): CanvasImageSource | null {
+    return this.fontesMarcadores.get(id) ?? null
+  }
+
   imagem(id: string, q: number, r: number): CanvasImageSource | null {
     const lista = this.fontes.get(id)
     return lista?.length ? lista[variantePara(q, r, lista.length)] : null
@@ -104,6 +138,26 @@ export class Tileset {
 
   /** Imagem que falha ao carregar é ignorada: o hexágono aparece só com a cor de reserva. */
   private async carregarImagens() {
+    await Promise.all([
+      ...this.def.marcadores.map(async (m) => {
+        try {
+          const img = new Image()
+          img.src = this.base + m.arquivo
+          await img.decode()
+          const c = document.createElement('canvas')
+          c.width = img.naturalWidth || 128
+          c.height = img.naturalHeight || 128
+          c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+          this.fontesMarcadores.set(m.id, c)
+        } catch {
+          // ícone ausente: o marcador aparece como um círculo simples
+        }
+      }),
+      this.carregarTerrenos(),
+    ])
+  }
+
+  private async carregarTerrenos() {
     await Promise.all(
       this.def.terrenos.map(async (t) => {
         const prontas: CanvasImageSource[] = []

@@ -1,14 +1,17 @@
-// Tela do mapa hexagonal: barra de ferramentas, paleta de terrenos e o canvas.
+// Tela do mapa hexagonal: barra de ferramentas, paletas, canvas e painéis.
 // A lógica fica em controlador.ts, renderizador.ts e entrada.ts. Aqui só se junta tudo.
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useAparencia } from '../ficha/aparencia'
 import { carregarCamera, autorLocal, salvarCamera, CAMERA_INICIAL } from './armazenamento'
 import { zoomEm } from './camera'
-import { ControladorMapa } from './controlador'
+import { ControladorMapa, novoId } from './controlador'
 import { EntradaMapa, type Ferramenta } from './entrada'
 import type { Hex } from './hex'
 import { Icone, type NomeIcone } from './Icones'
+import { InspetorHexagono } from './InspetorHexagono'
+import { CORES_REGIAO } from './operacoes'
+import { EditorDeRegiao, ListaDeRegioes } from './Regioes'
 import { Renderizador, type CoresMapa } from './renderizador'
 import { RepositorioLocal } from './repositorio-local'
 import { Tileset } from './tileset'
@@ -27,6 +30,8 @@ const FERRAMENTAS: { id: Ferramenta; rotulo: string; icone: NomeIcone; tecla: st
   { id: 'navegar', rotulo: 'Navegar', icone: 'navegar', tecla: 'V' },
   { id: 'pintar', rotulo: 'Pintar', icone: 'pincel', tecla: 'B' },
   { id: 'apagar', rotulo: 'Apagar', icone: 'borracha', tecla: 'E' },
+  { id: 'regiao', rotulo: 'Região', icone: 'regiao', tecla: 'R' },
+  { id: 'marcador', rotulo: 'Marcador', icone: 'marcador', tecla: 'M' },
 ]
 
 const PINCEIS = [
@@ -44,6 +49,8 @@ function lerCores(el: HTMLElement): CoresMapa {
 const ehCampoDeTexto = (alvo: EventTarget | null) =>
   alvo instanceof HTMLElement && (alvo.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName))
 
+const usaPincel = (f: Ferramenta) => f === 'pintar' || f === 'apagar' || f === 'regiao'
+
 export function MapaHex() {
   const { escuro } = useAparencia()
   const raizRef = useRef<HTMLDivElement>(null)
@@ -56,11 +63,64 @@ export function MapaHex() {
 
   const [ferramenta, setFerramenta] = useState<Ferramenta>('pintar')
   const [terreno, setTerreno] = useState('planicie')
+  const [marcadorAtivo, setMarcadorAtivo] = useState('')
+  /** Região que a ferramenta Região pinta. Null = tirar da região. Undefined = ainda não escolheu. */
+  const [regiaoAtiva, setRegiaoAtiva] = useState<string | null | undefined>(undefined)
+  const [regiaoEditando, setRegiaoEditando] = useState<string | null>(null)
   const [raio, setRaio] = useState(0)
   const [grade, setGrade] = useState(true)
+  const [mostrarRegioes, setMostrarRegioes] = useState(true)
   const [hover, setHover] = useState<Hex | null>(null)
   const [selecionado, setSelecionado] = useState<Hex | null>(null)
   const [zoom, setZoom] = useState(CAMERA_INICIAL.zoom)
+
+  // ----- ações que mexem na seleção e nos painéis -----
+  const limparSelecao = useCallback(() => {
+    motor?.render.definirSelecao(null)
+    setSelecionado(null)
+  }, [motor])
+
+  const selecionar = useCallback(
+    (h: Hex) => {
+      motor?.render.definirSelecao(h)
+      setSelecionado(h)
+      setRegiaoEditando(null)
+      if (window.matchMedia('(max-width: 720px)').matches) motor?.render.trazerParaCima(h)
+    },
+    [motor],
+  )
+  const aoSelecionarRef = useRef<(h: Hex) => void>(() => {})
+  useEffect(() => {
+    aoSelecionarRef.current = selecionar
+  })
+
+  const escolherFerramenta = useCallback(
+    (f: Ferramenta) => {
+      setFerramenta(f)
+      // O painel do hexágono cobriria a paleta e atrapalharia pintar: sai da frente.
+      if (f === 'pintar' || f === 'apagar' || f === 'regiao') limparSelecao()
+      if (f !== 'regiao') setRegiaoEditando(null)
+    },
+    [limparSelecao],
+  )
+
+  const aoMarcarRef = useRef<(h: Hex) => void>(() => {})
+  useEffect(() => {
+    aoMarcarRef.current = (h) => {
+      if (!motor) return
+      const existente = motor.ctrl.armazem.ler(h.q, h.r)
+      if (!existente) {
+        setAviso('Pinte o terreno deste hexágono antes de colocar um marcador nele.')
+        return
+      }
+      if (marcadorAtivo) {
+        motor.ctrl.editarHexagono(h.q, h.r, {
+          marcadores: [...existente.marcadores, { id: novoId(), tipo: marcadorAtivo, nome: '' }],
+        })
+      }
+      selecionar(h)
+    }
+  })
 
   // ----- montar o motor -----
   useEffect(() => {
@@ -77,9 +137,10 @@ export function MapaHex() {
         const repo = new RepositorioLocal(MAPA_ID)
         const ctrl = new ControladorMapa(repo, autorLocal())
         ctrl.aoErro = setAviso
+        void ctrl.carregarRegioes()
         const camera = carregarCamera(MAPA_ID)
         const render = new Renderizador(canvas, ctrl, tileset, camera, lerCores(raiz))
-        const entrada = new EntradaMapa(canvas, render, ctrl, { ferramenta: 'pintar', terreno: 'planicie', raio: 0 })
+        const entrada = new EntradaMapa(canvas, render, ctrl, { ferramenta: 'pintar', terreno: 'planicie', regiaoId: null, raio: 0 })
 
         const medir = () => {
           const r = palco.getBoundingClientRect()
@@ -96,11 +157,10 @@ export function MapaHex() {
           salvar = window.setTimeout(() => salvarCamera(MAPA_ID, c), 300)
         }
         setZoom(camera.zoom)
+        setMarcadorAtivo(tileset.def.marcadores[0]?.id ?? '')
         entrada.aoPassar = setHover
-        entrada.aoSelecionar = (h) => {
-          render.definirSelecao(h)
-          setSelecionado(h)
-        }
+        entrada.aoMarcar = (h) => aoMarcarRef.current(h)
+        entrada.aoSelecionar = (h) => aoSelecionarRef.current(h)
 
         const m = { ctrl, render, entrada, tileset }
         if (import.meta.env.DEV) (window as unknown as { __mapa?: Motor }).__mapa = m
@@ -126,40 +186,55 @@ export function MapaHex() {
     }
   }, [])
 
+  // ----- stores externos: histórico, contagem, regiões, hexágonos -----
+  useSyncExternalStore(
+    useCallback((cb: () => void) => (motor ? motor.ctrl.ouvirHistorico(cb) : () => {}), [motor]),
+    () => motor?.ctrl.versaoHistorico ?? 0,
+  )
+  // Redesenha quando qualquer hexágono muda: o texto de status e a dica de mapa vazio dependem disso.
+  useSyncExternalStore(
+    useCallback((cb: () => void) => (motor ? motor.ctrl.armazem.ouvir(() => cb()) : () => {}), [motor]),
+    () => motor?.ctrl.armazem.versao ?? 0,
+  )
+  const total = motor?.ctrl.armazem.total ?? 0
+  const versaoRegioes = useSyncExternalStore(
+    useCallback((cb: () => void) => (motor ? motor.ctrl.armazem.ouvirRegioes(cb) : () => {}), [motor]),
+    () => motor?.ctrl.armazem.versaoRegioes ?? 0,
+  )
+
+  // Região escolhida que foi excluída (por mim ou por outro jogador) volta a "não escolhida".
+  const regiaoAtivaValida =
+    regiaoAtiva && motor && versaoRegioes >= 0 && !motor.ctrl.armazem.lerRegiao(regiaoAtiva) ? undefined : regiaoAtiva
+
   // ----- sincronizar opções com o motor -----
+  const ferramentaEfetiva: Ferramenta = ferramenta === 'regiao' && regiaoAtivaValida === undefined ? 'navegar' : ferramenta
   useEffect(() => {
     if (!motor) return
-    motor.entrada.definirOpcoes({ ferramenta, terreno, raio })
-  }, [motor, ferramenta, terreno, raio])
+    motor.entrada.definirOpcoes({ ferramenta: ferramentaEfetiva, terreno, regiaoId: regiaoAtivaValida ?? null, raio })
+  }, [motor, ferramentaEfetiva, terreno, regiaoAtivaValida, raio, versaoRegioes])
 
   useEffect(() => {
     motor?.render.definirGrade(grade)
   }, [motor, grade])
 
   useEffect(() => {
+    motor?.render.definirMostrarRegioes(mostrarRegioes)
+  }, [motor, mostrarRegioes])
+
+  useEffect(() => {
     if (motor && raizRef.current) motor.render.definirCores(lerCores(raizRef.current))
   }, [motor, escuro])
-
-  // ----- histórico e contagem como "stores" externos -----
-  useSyncExternalStore(
-    useCallback((cb: () => void) => (motor ? motor.ctrl.ouvirHistorico(cb) : () => {}), [motor]),
-    () => motor?.ctrl.versaoHistorico ?? 0,
-  )
-  const total = useSyncExternalStore(
-    useCallback((cb: () => void) => (motor ? motor.ctrl.armazem.ouvir(() => cb()) : () => {}), [motor]),
-    () => motor?.ctrl.armazem.total ?? 0,
-  )
 
   const desfazer = useCallback(() => {
     if (!motor) return
     const conflitos = motor.ctrl.desfazer()
-    if (conflitos) setAviso(`${conflitos} hexágono(s) ficaram como estão: outra pessoa mexeu neles depois de você.`)
+    if (conflitos) setAviso(`${conflitos} item(ns) ficaram como estão: outra pessoa mexeu neles depois de você.`)
   }, [motor])
 
   const refazer = useCallback(() => {
     if (!motor) return
     const conflitos = motor.ctrl.refazer()
-    if (conflitos) setAviso(`${conflitos} hexágono(s) ficaram como estão: outra pessoa mexeu neles depois de você.`)
+    if (conflitos) setAviso(`${conflitos} item(ns) ficaram como estão: outra pessoa mexeu neles depois de você.`)
   }, [motor])
 
   const zoomPor = useCallback(
@@ -172,6 +247,16 @@ export function MapaHex() {
   )
 
   const irParaInicio = useCallback(() => motor?.render.definirCamera({ ...CAMERA_INICIAL }), [motor])
+
+  const novaRegiao = useCallback(() => {
+    if (!motor) return
+    const n = motor.ctrl.armazem.listarRegioes().length
+    const id = motor.ctrl.criarRegiao({ nome: `Região ${n + 1}`, cor: CORES_REGIAO[n % CORES_REGIAO.length] })
+    if (!id) return
+    setRegiaoAtiva(id)
+    setRegiaoEditando(id)
+    limparSelecao()
+  }, [motor, limparSelecao])
 
   // ----- teclado -----
   const tecladoRef = useRef<(e: KeyboardEvent) => void>(() => {})
@@ -189,9 +274,11 @@ export function MapaHex() {
         refazer()
       } else if (ctrl || e.altKey) {
         return
-      } else if (k === 'v') setFerramenta('navegar')
-      else if (k === 'b') setFerramenta('pintar')
-      else if (k === 'e') setFerramenta('apagar')
+      } else if (k === 'v') escolherFerramenta('navegar')
+      else if (k === 'b') escolherFerramenta('pintar')
+      else if (k === 'e') escolherFerramenta('apagar')
+      else if (k === 'r') escolherFerramenta('regiao')
+      else if (k === 'm') escolherFerramenta('marcador')
       else if (k === 'g') setGrade((g) => !g)
       else if (k === '[') setRaio((r) => Math.max(0, r - 1))
       else if (k === ']') setRaio((r) => Math.min(2, r + 1))
@@ -199,8 +286,8 @@ export function MapaHex() {
       else if (k === '+' || k === '=') zoomPor(1.25)
       else if (k === '-') zoomPor(0.8)
       else if (k === 'escape') {
-        motor?.render.definirSelecao(null)
-        setSelecionado(null)
+        limparSelecao()
+        setRegiaoEditando(null)
       }
     }
   })
@@ -217,9 +304,11 @@ export function MapaHex() {
   }, [aviso])
 
   const terrenos = motor?.tileset.def.terrenos ?? []
+  const marcadores = motor?.tileset.def.marcadores ?? []
   const noCursor = hover ?? selecionado
   const hexNoCursor = noCursor ? motor?.ctrl.armazem.ler(noCursor.q, noCursor.r) : null
   const nomeTerreno = hexNoCursor ? (motor?.tileset.terreno(hexNoCursor.terreno)?.nome ?? hexNoCursor.terreno) : null
+  const regiaoNoCursor = hexNoCursor?.regiaoId ? motor?.ctrl.armazem.lerRegiao(hexNoCursor.regiaoId) : null
 
   return (
     <div className="mapa" ref={raizRef}>
@@ -232,7 +321,7 @@ export function MapaHex() {
               role="radio"
               aria-checked={ferramenta === f.id}
               title={`${f.rotulo} (${f.tecla})`}
-              onClick={() => setFerramenta(f.id)}
+              onClick={() => escolherFerramenta(f.id)}
             >
               <Icone nome={f.icone} />
               <span className="mapa__rotulo">{f.rotulo}</span>
@@ -240,7 +329,7 @@ export function MapaHex() {
           ))}
         </div>
 
-        {ferramenta !== 'navegar' && (
+        {usaPincel(ferramenta) && (
           <div className="modo" role="radiogroup" aria-label="Tamanho do pincel">
             {PINCEIS.map((p) => (
               <button
@@ -283,30 +372,44 @@ export function MapaHex() {
           <button type="button" className="botao-icone" title="Mostrar grade (G)" aria-label="Mostrar grade" aria-pressed={grade} onClick={() => setGrade((g) => !g)}>
             <Icone nome="grade" />
           </button>
+          <button type="button" className="botao-icone" title="Mostrar regiões" aria-label="Mostrar regiões" aria-pressed={mostrarRegioes} onClick={() => setMostrarRegioes((v) => !v)}>
+            <Icone nome="olho" />
+          </button>
         </div>
       </header>
 
       <div className="mapa__corpo">
-        <aside className="mapa__paleta" aria-label="Terrenos">
-          {terrenos.map((t) => {
-            const url = motor?.tileset.urlArquivo(t.id)
-            return (
-              <button
-                key={t.id}
-                type="button"
-                className="mapa-terreno"
-                aria-pressed={terreno === t.id}
-                title={t.nome}
-                onClick={() => {
-                  setTerreno(t.id)
-                  if (ferramenta !== 'pintar') setFerramenta('pintar')
-                }}
-              >
-                {url ? <img src={url} alt="" draggable={false} /> : <span className="mapa-terreno__cor" style={{ background: t.cor }} />}
+        <aside className="mapa__paleta" aria-label={ferramenta === 'regiao' ? 'Regiões' : ferramenta === 'marcador' ? 'Marcadores' : 'Terrenos'}>
+          {ferramenta === 'regiao' && motor ? (
+            <ListaDeRegioes ctrl={motor.ctrl} ativa={regiaoAtivaValida} aoEscolher={setRegiaoAtiva} aoEditar={(id) => { setRegiaoEditando(id); limparSelecao() }} aoCriar={novaRegiao} />
+          ) : ferramenta === 'marcador' ? (
+            marcadores.map((t) => (
+              <button key={t.id} type="button" className="mapa-terreno" aria-pressed={marcadorAtivo === t.id} title={t.nome} onClick={() => setMarcadorAtivo(t.id)}>
+                <img src={motor?.tileset.urlMarcador(t.id) ?? undefined} alt="" draggable={false} />
                 <span>{t.nome}</span>
               </button>
-            )
-          })}
+            ))
+          ) : (
+            terrenos.map((t) => {
+              const url = motor?.tileset.urlArquivo(t.id)
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  className="mapa-terreno"
+                  aria-pressed={terreno === t.id}
+                  title={t.nome}
+                  onClick={() => {
+                    setTerreno(t.id)
+                    if (ferramenta !== 'pintar') escolherFerramenta('pintar')
+                  }}
+                >
+                  {url ? <img src={url} alt="" draggable={false} /> : <span className="mapa-terreno__cor" style={{ background: t.cor }} />}
+                  <span>{t.nome}</span>
+                </button>
+              )
+            })
+          )}
         </aside>
 
         <div className="mapa__palco" ref={palcoRef}>
@@ -327,6 +430,8 @@ export function MapaHex() {
                   {noCursor.q}, {noCursor.r}
                 </b>
                 <span>{nomeTerreno ?? 'vazio'}</span>
+                {hexNoCursor?.nome && <span>· {hexNoCursor.nome}</span>}
+                {regiaoNoCursor && <span>· {regiaoNoCursor.nome}</span>}
               </>
             ) : (
               <span>Passe o cursor sobre o mapa</span>
@@ -339,6 +444,11 @@ export function MapaHex() {
             </div>
           )}
         </div>
+
+        {motor && selecionado && !regiaoEditando && (
+          <InspetorHexagono key={`${selecionado.q},${selecionado.r}`} ctrl={motor.ctrl} tileset={motor.tileset} hex={selecionado} aoFechar={limparSelecao} />
+        )}
+        {motor && regiaoEditando && <EditorDeRegiao key={regiaoEditando} ctrl={motor.ctrl} id={regiaoEditando} aoFechar={() => setRegiaoEditando(null)} />}
       </div>
     </div>
   )

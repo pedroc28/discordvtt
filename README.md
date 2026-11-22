@@ -43,7 +43,7 @@ Para evitar conflitos, combinem quem mexe em quais arquivos.
 - [ ] Painel do mestre
 - [ ] Chat de voz e de texto
 - [x] Mapa hexagonal infinito: pintar terreno, desfazer por jogador, sincronia entre abas, toque e mouse (fases 0 e 1)
-- [ ] Mapa hexagonal: notas por hexágono, regiões e marcadores (fase 2)
+- [x] Mapa hexagonal: nome e nota por hexágono, regiões com hierarquia e marcadores (fase 2)
 - [ ] Mapa hexagonal: rios, estradas, token do grupo e régua (fase 3)
 - [ ] Mapa hexagonal no servidor: papéis, camada privada do mestre, presença (fase 4, depende da base)
 - [ ] Mesa com tokens

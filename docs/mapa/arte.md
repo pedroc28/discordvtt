@@ -2,7 +2,7 @@
 
 Guia para quem gera a arte dos terrenos do mapa com o PixelLab (o agente de arte, ou uma pessoa). É autossuficiente: com este arquivo e o `docs/mapa/manual.md` dá para fazer todos os tiles sem perguntar nada. O formato técnico do tileset está no manual, na seção "Tilesets". Aqui está o que desenhar, como pedir ao PixelLab, como conferir e onde guardar.
 
-Estado: **18 de 43 tiles feitos**: água, planície e montanha (teste) e os lotes 1 a 5 (`campo`, `colina`, `savana`, `estepe`, `charneca`, `pomar`, `floresta`, `floresta-densa`, `bosque`, `taiga`, `floresta-outono`, `floresta-nevada`, `selva`, `floresta-morta`, `pico-nevado`). Faltam 25 da lista da seção 7.
+Estado: **21 de 43 tiles feitos**: água, planície e montanha (teste) e os lotes 1 a 6 (`campo`, `colina`, `savana`, `estepe`, `charneca`, `pomar`, `floresta`, `floresta-densa`, `bosque`, `taiga`, `floresta-outono`, `floresta-nevada`, `selva`, `floresta-morta`, `pico-nevado`, `rochoso`, `planalto`, `canion`). Faltam 22 da lista da seção 7.
 
 ## 1. Estilo
 
@@ -210,7 +210,7 @@ Marque aqui ao aprovar (`[x]`) e anote o job do PixelLab.
 - [x] Lote 3: `floresta` (5 variantes), `floresta-densa` (2), `bosque` (2). Jobs `c198dde2-cc18-4e38-80c5-5e8880f95a4c` e `978b3710-1498-4330-a3de-da0022773c33`. A primeira tentativa (job `e3809673-c29c-48e5-9a98-ddc95b9fc459`) foi descartada. As duas florestas de pinheiros que saíram na primeira rodada (job `c198dde2-...`, imagens 1 e 4) servem de ponto de partida para a `taiga`
 - [x] Lote 4: `taiga` (2 variantes), `floresta-outono` (2), `floresta-nevada` (2). Job `f600b8f5-93cb-4457-ab3c-064415f2426c`, uma chamada só (15 gerações), usando a receita de floresta do lote 3. Ponto fraco: o outono mostra uma fina borda escura nas arestas de baixo, que desenha o contorno do hexágono quando há muitos juntos
 - [x] Lote 5: `selva` (2 variantes), `floresta-morta` (2), `pico-nevado` (2). Job `413dd74c-956e-44b5-874f-cd6bb1d082f6`, uma chamada (15 gerações). Ponto fraco: as duas variantes de `pico-nevado` são quase iguais e os picos formam uma grade quando há muitos hexágonos juntos. Vale refazer com 3 descrições de composições diferentes (um pico grande, dois picos, cordilheira baixa)
-- [ ] Lote 6: `rochoso`, `planalto`, `canion`
+- [x] Lote 6: `rochoso` (2 variantes), `planalto` (2), `canion` (2). Job `92a20a44-1fd2-4c7a-88d9-16f401e557c4`, uma chamada (15 gerações). Limites que ficam: o planalto é um objeto por hexágono e aparece em grade se pintado em massa (o certo é usar poucos), e a fenda do cânion não continua de um hexágono para o vizinho. Para cânions longos, vale testar a transição `tile_feature="tileset"` (seção 9)
 - [ ] Lote 7: `vulcao`, `campo-de-lava`, `deserto`
 - [ ] Lote 8: `dunas`, `oasis`, `salar`
 - [ ] Lote 9: `pantano`, `mangue`, `agua-rasa`

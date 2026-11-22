@@ -2,7 +2,7 @@
 
 Guia para quem gera a arte dos terrenos do mapa com o PixelLab (o agente de arte, ou uma pessoa). É autossuficiente: com este arquivo e o `docs/mapa/manual.md` dá para fazer todos os tiles sem perguntar nada. O formato técnico do tileset está no manual, na seção "Tilesets". Aqui está o que desenhar, como pedir ao PixelLab, como conferir e onde guardar.
 
-Estado: **3 de 43 tiles feitos** (água, planície e montanha, como teste). Faltam os 40 da lista da seção 6.
+Estado: **6 de 43 tiles feitos**: água, planície e montanha (teste) e o lote 1 (`campo`, `colina`, `savana`). Faltam 37 da lista da seção 7.
 
 ## 1. Estilo
 
@@ -51,11 +51,17 @@ Ferramenta: `create_tiles_pro`. Configuração que funcionou:
 | `tile_height` | **não usar** | acrescenta a laje de espessura e deforma o hexágono |
 | `palette` | não usar no começo | o estilo vem dos tiles de referência (seção 4) |
 
-**Rendimento:** uma chamada com 3 descrições numeradas devolve **6 imagens** (2 por descrição) e custa 15 gerações. Peça sempre **3 terrenos por chamada**. Para os 40 tiles são cerca de 14 chamadas, perto de 210 gerações.
+**Rendimento:** uma chamada com 3 descrições numeradas devolve **6 imagens** (em geral 2 por descrição, às vezes de 1 a 3) e custa 15 gerações. Peça **3 terrenos por chamada**. Para os 40 tiles são cerca de 14 chamadas, perto de 210 gerações. Se um terreno sair com menos de 2 variantes, ou com variantes parecidas demais, refaça só ele numa chamada com **3 descrições do mesmo terreno com detalhes diferentes** (por exemplo, "duas acácias", "três acácias e pedras", "uma acácia e um cupinzeiro"). O mapa repete a variante em grade, então quanto mais variantes melhor: 2 é o mínimo, 3 a 6 é o ideal para terrenos que cobrem áreas grandes (planície, savana, água).
 
 **Como escrever a descrição** (em inglês, o PixelLab entende melhor). Numere cada tile e use sempre esta estrutura:
 
 > `N). <nome> hex tile, <o que é, visto de cima>, <2 ou 3 detalhes concretos>, <regra de luz e cor>, <regra de borda>`
+
+**Erros que já aconteceram, para não repetir:**
+
+- Descrever **um objeto só** ("one large acacia tree") faz o PixelLab desenhar o objeto solto, sem chão e sem hexágono. Sempre diga `ground fully covering the whole hexagon`.
+- **Não use `style_images` com `hex_pointy`.** O modo de estilo ignora a forma, devolve `square_topdown` e acrescenta uma laje escura embaixo do hexágono, que não serve para o mapa. O estilo se mantém repetindo no prompt a cor e a luz das âncoras (seção 1).
+- Sombras azul-esverdeadas fortes demais fazem relevo parecer lago (aconteceu nas colinas). Peça `gentle darker green shadows`.
 
 Frases de borda e luz que devem aparecer sempre:
 
@@ -76,7 +82,7 @@ Exemplo real (o que gerou os três tiles de teste, job `d2d59d22-b0f4-4ed8-96f5-
 O risco de uma série longa é cada lote sair com uma "mão" diferente. Para evitar:
 
 1. Os 6 tiles de teste (já em `app/public/tilesets/pixel/`) são a **referência de estilo**.
-2. Na primeira chamada de cada lote, tente o **modo de estilo**: `style_images` com 2 ou 3 tiles já aprovados (um contínuo e um com objetos) e `style_options` com `color_palette`, `outline`, `detail` e `shading` ligados. Nesse modo os parâmetros de forma são ignorados e o tamanho vem da imagem. **Confira se o hexágono continua certo** (128 × 128, cantos transparentes). Se o formato quebrar, volte ao modo de forma da seção 3 e compense escrevendo no prompt as cores das âncoras.
+2. **Não use o modo de estilo** (`style_images`): foi testado no lote 1 e quebra o formato (ver "Erros que já aconteceram" na seção 3). Use sempre o modo de forma da seção 3 e escreva no prompt as cores e a luz das âncoras.
 3. Depois de aprovar cada lote, acrescente ao grupo de referência um tile novo de cada família (floresta, deserto, neve...).
 4. Se o estilo derivar mesmo assim, extraia a paleta dos tiles aprovados com `pixelart_workbench` (`extract-palette`) e passe como `palette` nas chamadas seguintes.
 
@@ -99,7 +105,7 @@ Dica de teste rápido: `lint` e `score` do `pixelart_workbench` apontam pixels s
 
 1. Baixe os PNGs e guarde em `app/public/tilesets/pixel/` como `<id>-1.png`, `<id>-2.png`.
 2. No `tileset.json` dessa pasta, no terreno de mesmo `id`, troque `arquivos` pelos PNGs, ajuste `cor` para a **cor média** do tile (é o que aparece enquanto a imagem carrega e esconde frestas) e deixe `extra` em `0`. O tileset já tem `"pixelart": true`.
-3. Terreno novo (que não existe ainda): acrescente um item em `terrenos` com `id`, `nome`, `cor`, `extra` e `arquivos`.
+3. Terreno novo (que não existe ainda): acrescente um item em `terrenos` com `id`, `nome`, `cor`, `extra`, `arquivos`, `pasta` e `tags`. A `pasta` e as `tags` de cada um dos 43 terrenos já estão prontas em `app/tools/catalogo-terrenos.json`: **copie de lá**, sem inventar (ver a seção 8). Cada terreno tem no mínimo 3 tags.
 4. Para ver no mapa, abra o site com `?tileset=pixel` no fim do endereço, por exemplo `http://localhost:5173/discordvtt/?tileset=pixel`. Sem isso o mapa usa o tileset gerado por script.
 5. Quando a pasta `pixel` estiver completa, a troca definitiva é mudar o `id` padrão em `urlDoTileset()` (`MapaHex.tsx`) de `padrao` para `pixel`.
 
@@ -196,7 +202,7 @@ Ordem sugerida: faça por família, 3 por chamada, na ordem da tabela. Cada linh
 Marque aqui ao aprovar (`[x]`) e anote o job do PixelLab.
 
 - [x] Teste: `oceano`, `planicie`, `montanha` (2 variantes cada), job `d2d59d22-b0f4-4ed8-96f5-3ff232ecc1e5`
-- [ ] Lote 1: `campo`, `colina`, `savana`
+- [x] Lote 1: `campo` (3 variantes), `colina` (3), `savana` (6). Jobs `8ec2399c-36ab-48e3-b990-04fd7f42799c` (campo), `85eca2ec-a1df-4e09-b0ca-80b536d0ff7e` (colina) e `b623aeb6-9cd0-4937-acb9-d0409fe86a9a` (savana). Pontos fracos: o chão verde do `campo` é liso e as colinas ainda têm pouco relevo
 - [ ] Lote 2: `estepe`, `charneca`, `pomar`
 - [ ] Lote 3: `floresta`, `floresta-densa`, `bosque`
 - [ ] Lote 4: `taiga`, `floresta-outono`, `floresta-nevada`
@@ -211,7 +217,16 @@ Marque aqui ao aprovar (`[x]`) e anote o job do PixelLab.
 - [ ] Lote 13: `terra-arrasada`, `floresta-encantada`, `cogumelos`
 - [ ] Lote 14: `cristais`
 
-## 8. Depois dos 43
+## 8. Pastas e tags na paleta
+
+A paleta de terrenos do mapa divide os tiles em **pastas** e tem **pesquisa por nome ou tag**. A pasta e as tags de cada terreno vêm do `tileset.json` (campos `pasta` e `tags`, e a lista `pastas` no topo). O catálogo dos 43 terrenos, que é a fonte única, fica em `app/tools/catalogo-terrenos.json`, e o gerador do tileset padrão lê dele.
+
+- **Pastas:** Terra aberta, Florestas, Montanhas e rochas, Desertos e áridos, Águas e pântanos, Gelo e frio, Costa, Obra humana, Fantasia e perigo.
+- **Tags:** minúsculas, em português, com acento, de 3 a 5 por terreno. Servem para achar o tile por **clima** (`frio`, `quente`, `temperado`, `tropical`), **relevo ou material** (`rocha`, `areia`, `neve`, `lama`, `água`), **uso no jogo** (`perigoso`, `difícil`, `navegável`, `civilizado`, `caça`, `magia`) e **o nome do bioma** (`savana`, `taiga`, `deserto`).
+- **Terreno novo fora da lista:** acrescente primeiro ao catálogo (pasta existente e pelo menos 3 tags, reaproveitando as tags já usadas antes de criar uma nova) e depois ao `tileset.json`. Tag nova só se nenhuma existente serve.
+- A pesquisa ignora acento e maiúsculas, aceita várias palavras (todas precisam casar com o nome, o nome da pasta ou uma tag) e há chips de tag clicáveis, que combinam entre si (o terreno precisa ter todas as tags marcadas).
+
+## 9. Depois dos 43
 
 - **Transições.** Hoje, onde dois terrenos se encontram há um corte seco na borda do hexágono. O PixelLab tem `tile_feature="tileset"` com `hex_pointy`, que gera um conjunto de 32 tiles de costa que se encaixam (por exemplo grama para água). Vale testar para a costa, que é a emenda mais visível.
 - **Objetos que passam do hexágono.** Montanhas e árvores altas podem ganhar `extra` (pixels a mais no topo da imagem) para os picos subirem por cima do hexágono de cima. Hoje todos ficam dentro do hexágono.

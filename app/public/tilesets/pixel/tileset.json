@@ -4,6 +4,44 @@
   "orientacao": "pointy",
   "largura": 256,
   "altura": 296,
+  "pastas": [
+    {
+      "id": "terra-aberta",
+      "nome": "Terra aberta"
+    },
+    {
+      "id": "florestas",
+      "nome": "Florestas"
+    },
+    {
+      "id": "altos",
+      "nome": "Montanhas e rochas"
+    },
+    {
+      "id": "aridos",
+      "nome": "Desertos e áridos"
+    },
+    {
+      "id": "aguas",
+      "nome": "Águas e pântanos"
+    },
+    {
+      "id": "gelo",
+      "nome": "Gelo e frio"
+    },
+    {
+      "id": "costa",
+      "nome": "Costa"
+    },
+    {
+      "id": "humano",
+      "nome": "Obra humana"
+    },
+    {
+      "id": "fantasia",
+      "nome": "Fantasia e perigo"
+    }
+  ],
   "terrenos": [
     {
       "id": "planicie",
@@ -13,17 +51,33 @@
       "arquivos": [
         "planicie-1.png",
         "planicie-2.png"
+      ],
+      "pasta": "terra-aberta",
+      "tags": [
+        "planície",
+        "grama",
+        "campo aberto",
+        "temperado",
+        "fértil"
       ]
     },
     {
       "id": "campo",
       "nome": "Campos de cultivo",
-      "cor": "#c0b963",
+      "cor": "#828148",
       "extra": 0,
       "arquivos": [
-        "campo-1.svg",
-        "campo-2.svg",
-        "campo-3.svg"
+        "campo-1.png",
+        "campo-2.png",
+        "campo-3.png"
+      ],
+      "pasta": "terra-aberta",
+      "tags": [
+        "cultivo",
+        "fazenda",
+        "trigo",
+        "civilizado",
+        "fértil"
       ]
     },
     {
@@ -35,6 +89,14 @@
         "floresta-1.svg",
         "floresta-2.svg",
         "floresta-3.svg"
+      ],
+      "pasta": "florestas",
+      "tags": [
+        "floresta",
+        "árvores",
+        "temperado",
+        "folhas largas",
+        "caça"
       ]
     },
     {
@@ -46,17 +108,54 @@
         "floresta-densa-1.svg",
         "floresta-densa-2.svg",
         "floresta-densa-3.svg"
+      ],
+      "pasta": "florestas",
+      "tags": [
+        "floresta",
+        "árvores",
+        "denso",
+        "escuro",
+        "perigoso"
       ]
     },
     {
       "id": "colina",
       "nome": "Colinas",
-      "cor": "#98b95c",
+      "cor": "#88ad4e",
       "extra": 0,
       "arquivos": [
-        "colina-1.svg",
-        "colina-2.svg",
-        "colina-3.svg"
+        "colina-1.png",
+        "colina-2.png",
+        "colina-3.png"
+      ],
+      "pasta": "terra-aberta",
+      "tags": [
+        "colinas",
+        "relevo suave",
+        "grama",
+        "temperado"
+      ]
+    },
+    {
+      "id": "savana",
+      "nome": "Savana",
+      "cor": "#dda43a",
+      "extra": 0,
+      "arquivos": [
+        "savana-1.png",
+        "savana-2.png",
+        "savana-3.png",
+        "savana-4.png",
+        "savana-5.png",
+        "savana-6.png"
+      ],
+      "pasta": "terra-aberta",
+      "tags": [
+        "savana",
+        "seco",
+        "quente",
+        "grama alta",
+        "acácia"
       ]
     },
     {
@@ -67,6 +166,14 @@
       "arquivos": [
         "montanha-1.png",
         "montanha-2.png"
+      ],
+      "pasta": "altos",
+      "tags": [
+        "montanha",
+        "rocha",
+        "alto",
+        "neve",
+        "difícil"
       ]
     },
     {
@@ -78,6 +185,14 @@
         "pico-nevado-1.svg",
         "pico-nevado-2.svg",
         "pico-nevado-3.svg"
+      ],
+      "pasta": "altos",
+      "tags": [
+        "montanha",
+        "neve",
+        "gelo",
+        "alto",
+        "difícil"
       ]
     },
     {
@@ -89,6 +204,14 @@
         "deserto-1.svg",
         "deserto-2.svg",
         "deserto-3.svg"
+      ],
+      "pasta": "aridos",
+      "tags": [
+        "deserto",
+        "areia",
+        "quente",
+        "seco",
+        "árido"
       ]
     },
     {
@@ -100,6 +223,14 @@
         "pantano-1.svg",
         "pantano-2.svg",
         "pantano-3.svg"
+      ],
+      "pasta": "aguas",
+      "tags": [
+        "pântano",
+        "lama",
+        "úmido",
+        "sombrio",
+        "difícil"
       ]
     },
     {
@@ -111,6 +242,14 @@
         "agua-rasa-1.svg",
         "agua-rasa-2.svg",
         "agua-rasa-3.svg"
+      ],
+      "pasta": "aguas",
+      "tags": [
+        "água",
+        "raso",
+        "vau",
+        "navegável",
+        "claro"
       ]
     },
     {
@@ -121,6 +260,14 @@
       "arquivos": [
         "oceano-1.png",
         "oceano-2.png"
+      ],
+      "pasta": "aguas",
+      "tags": [
+        "água",
+        "oceano",
+        "profundo",
+        "navegável",
+        "mar"
       ]
     },
     {
@@ -132,6 +279,14 @@
         "tundra-1.svg",
         "tundra-2.svg",
         "tundra-3.svg"
+      ],
+      "pasta": "gelo",
+      "tags": [
+        "tundra",
+        "frio",
+        "neve",
+        "musgo",
+        "inverno"
       ]
     },
     {
@@ -143,6 +298,14 @@
         "terra-arrasada-1.svg",
         "terra-arrasada-2.svg",
         "terra-arrasada-3.svg"
+      ],
+      "pasta": "fantasia",
+      "tags": [
+        "arrasada",
+        "queimada",
+        "cinzas",
+        "perigoso",
+        "guerra"
       ]
     }
   ],

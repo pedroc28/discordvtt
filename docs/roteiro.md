@@ -34,6 +34,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Hospedagem: no ar para o grupo, de graça, com Tailscale Funnel no PC do Pedro e backup copiado para o Google Drive
 - [ ] `RepositorioPocketBase` para o mapa
 - [ ] Fichas sincronizadas: todos editando e vendo a mesma ficha em tempo real
+- [ ] Rodízio de anfitrião, se o grupo decidir: qualquer membro hospeda o servidor, um por vez, com troca de dados automática pelo Google Drive
 
 ## Fichas (os dois, congelada)
 

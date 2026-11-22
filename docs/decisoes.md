@@ -4,6 +4,7 @@ Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em ci
 
 ## 2026-11-22
 
+- **Rodízio de anfitrião só depois de mapa e fichas no servidor.** O grupo ainda vai decidir se quer que qualquer membro possa hospedar. Se quiser, o rodízio entra depois de mapa e fichas estarem no servidor e testados, para não misturar problemas de sincronia com problemas de troca de anfitrião. Até lá, o servidor fica portátil: tudo no `pb_data`, mudanças por migração e nada específico de um PC no banco. O plano está em `docs/servidor/README.md`.
 - **Painel de administrador só no PC do servidor.** Com o servidor na internet, a conta de administrador é o alvo mais valioso. A configuração "Superuser IPs" aceita o administrador só de `127.0.0.1`. O preço: administrar só no próprio PC, e não pelo celular.
 - **Backup a cada hora, com cópia numa pasta sincronizada com a nuvem.** O servidor mora num notebook, que pode estragar ou sumir. A cópia usa a nuvem que a pessoa já tem, sem serviço novo.
 - **Link de convite com o servidor preenchido (`?servidor=`).** Os amigos só abrem um link, sem digitar o endereço do Funnel.

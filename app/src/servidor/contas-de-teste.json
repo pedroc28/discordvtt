@@ -1,0 +1,10 @@
+{
+  "aviso": "Contas do servidor de teste (pocketbase/servidor-de-teste.mjs), que só existe enquanto o script roda. Nunca use estas senhas num servidor de verdade.",
+  "administrador": { "email": "admin@teste.local", "senha": "senha-do-admin-123" },
+  "campanha": "Mesa de teste",
+  "contas": [
+    { "id": "mestre", "nome": "Mestre", "email": "mestre@teste.local", "senha": "senha-de-teste-123", "papel": "mestre" },
+    { "id": "jogadora", "nome": "Jogadora", "email": "jogadora@teste.local", "senha": "senha-de-teste-123", "papel": "jogador" },
+    { "id": "jogador", "nome": "Jogador", "email": "jogador@teste.local", "senha": "senha-de-teste-123", "papel": "jogador" }
+  ]
+}

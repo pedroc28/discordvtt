@@ -189,6 +189,21 @@ node pocketbase/testar-regras.mjs caminho/do/pocketbase
 
 O script sobe um PocketBase com dados temporários, cria contas de teste e confere 119 situações: quem vê, cria, altera e apaga o quê, a troca de senha, o limite de tentativas por pessoa, o administrador barrado vindo de fora, a cópia do backup e o mapa (lotes, gravações ao mesmo tempo, lote recusado, lote repetido, chunk com negativos, tempo real, token, um lote de 5 mil hexágonos com a medição do tempo). Numa segunda rodada, ele sobe um servidor como os de antes do mapa, com campanhas, aplica a migração do mapa, confere que as campanhas antigas ganharam mapa e testa a limpeza dos lotes. No fim, apaga tudo. Ele nunca toca no `pb_data` de verdade. Sem caminho, usa o executável da pasta `pocketbase`. A verificação do GitHub roda o script em todo pull request, baixando o PocketBase da versão de `pocketbase/VERSAO` e conferindo o checksum publicado, então uma regra quebrada impede a entrada na `main`.
 
+## Servidor de teste
+
+Para testar o app contra um PocketBase de verdade sem tocar no servidor do grupo:
+
+```
+node pocketbase/servidor-de-teste.mjs caminho/do/pocketbase
+```
+
+O script sobe um PocketBase com dados temporários, com as migrações e os hooks do repositório, na porta 8092 (outra com `--porta=8093`). Ele cria três contas e a campanha "Mesa de teste", já com o mapa: um mestre e dois jogadores. As contas e senhas ficam em `app/src/servidor/contas-de-teste.json` e só valem para esse servidor. O script mostra o endereço, as contas e a senha do painel, e fica ligado até alguém apertar Ctrl+C, que desliga o servidor e apaga os dados.
+
+- **À mão:** com o app rodando (`npm run dev`, em `app/`), entre na aba Campanha com uma das contas e o endereço `http://127.0.0.1:8092`. Duas janelas, com contas diferentes, fazem dois jogadores.
+- **Nos testes:** os testes do app que precisam de um servidor de verdade terminam em `.servidor.test.ts` e rodam quando a variável `DISCORDVTT_SERVIDOR_TESTE` tem o endereço do servidor de teste. Sem ela, como no `npm test` comum, são pulados. Em `app/`: `DISCORDVTT_SERVIDOR_TESTE=http://127.0.0.1:8092 npx vitest run .servidor.test.ts`.
+- **Ajudantes** em `app/src/servidor/teste-servidor.ts`: `entrarComoTeste('mestre')` entra com uma das contas e devolve a conexão, `campanhaDeTeste(mestre, [jogadores])` cria uma campanha só para o teste e abre nela para todos, e `instalarEventSource()` dá ao Node o EventSource que o SDK usa no tempo real. Depois disso, `conexao.abrirRepositorioMapa()` devolve o `RepositorioPocketBase` daquela pessoa.
+- **Na verificação do GitHub:** depois do teste das regras, ela sobe o servidor de teste e roda todos os `.servidor.test.ts`. Hoje são os testes do `RepositorioPocketBase` em `repositorio-mapa.servidor.test.ts`: dois jogadores sincronizando, chunk com coordenadas negativas, lote reenviado, lote recusado, troca de campanha e saída do servidor.
+
 ## Próximos passos
 
 1. ~~Base: contas, campanhas e participantes, com migrações e regras.~~ Pronto.

@@ -83,12 +83,14 @@
     {
       "id": "floresta",
       "nome": "Floresta",
-      "cor": "#5f8f45",
+      "cor": "#37622e",
       "extra": 0,
       "arquivos": [
-        "floresta-1.svg",
-        "floresta-2.svg",
-        "floresta-3.svg"
+        "floresta-1.png",
+        "floresta-2.png",
+        "floresta-3.png",
+        "floresta-4.png",
+        "floresta-5.png"
       ],
       "pasta": "florestas",
       "tags": [
@@ -102,12 +104,11 @@
     {
       "id": "floresta-densa",
       "nome": "Floresta densa",
-      "cor": "#3c6232",
+      "cor": "#254627",
       "extra": 0,
       "arquivos": [
-        "floresta-densa-1.svg",
-        "floresta-densa-2.svg",
-        "floresta-densa-3.svg"
+        "floresta-densa-1.png",
+        "floresta-densa-2.png"
       ],
       "pasta": "florestas",
       "tags": [
@@ -116,6 +117,24 @@
         "denso",
         "escuro",
         "perigoso"
+      ]
+    },
+    {
+      "id": "bosque",
+      "nome": "Bosque claro",
+      "cor": "#4c8029",
+      "extra": 0,
+      "arquivos": [
+        "bosque-1.png",
+        "bosque-2.png"
+      ],
+      "pasta": "florestas",
+      "tags": [
+        "bosque",
+        "árvores",
+        "aberto",
+        "temperado",
+        "caça"
       ]
     },
     {

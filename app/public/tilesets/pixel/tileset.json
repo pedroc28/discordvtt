@@ -64,12 +64,15 @@
     {
       "id": "campo",
       "nome": "Campos de cultivo",
-      "cor": "#828148",
+      "cor": "#75602c",
       "extra": 0,
       "arquivos": [
         "campo-1.png",
         "campo-2.png",
-        "campo-3.png"
+        "campo-3.png",
+        "campo-4.png",
+        "campo-5.png",
+        "campo-6.png"
       ],
       "pasta": "terra-aberta",
       "tags": [
@@ -230,12 +233,15 @@
     {
       "id": "colina",
       "nome": "Colinas",
-      "cor": "#88ad4e",
+      "cor": "#5b9942",
       "extra": 0,
       "arquivos": [
         "colina-1.png",
         "colina-2.png",
-        "colina-3.png"
+        "colina-3.png",
+        "colina-4.png",
+        "colina-5.png",
+        "colina-6.png"
       ],
       "pasta": "terra-aberta",
       "tags": [
@@ -248,7 +254,7 @@
     {
       "id": "savana",
       "nome": "Savana",
-      "cor": "#dda43a",
+      "cor": "#cb952b",
       "extra": 0,
       "arquivos": [
         "savana-1.png",
@@ -330,11 +336,15 @@
     {
       "id": "montanha",
       "nome": "Montanhas",
-      "cor": "#67915f",
+      "cor": "#5a815e",
       "extra": 0,
       "arquivos": [
         "montanha-1.png",
-        "montanha-2.png"
+        "montanha-2.png",
+        "montanha-3.png",
+        "montanha-4.png",
+        "montanha-5.png",
+        "montanha-6.png"
       ],
       "pasta": "altos",
       "tags": [

@@ -1,0 +1,29 @@
+// Endereço do servidor. O padrão vem de VITE_POCKETBASE_URL (ver app/.env.example), mas a
+// pessoa pode trocar na tela de login. Assim o mesmo site de teste serve a qualquer servidor:
+// o PocketBase no próprio PC ou o endereço do Tailscale Funnel de quem hospeda.
+
+const configurado: unknown = import.meta.env.VITE_POCKETBASE_URL
+
+export const ENDERECO_PADRAO = normalizarEndereco(typeof configurado === 'string' ? configurado : '') ?? 'http://127.0.0.1:8090'
+
+// Endereços da própria máquina ou da rede de casa não têm certificado: sem esquema, viram http.
+// Todo o resto (como o endereço .ts.net do Funnel) vira https.
+const LOCAL = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|\[::1\])/i
+
+/** Endereço limpo e válido, ou null se o texto não for um endereço http ou https. */
+export function normalizarEndereco(texto: string): string | null {
+  let bruto = texto.trim()
+  if (!bruto) return null
+  if (!/^[a-z][a-z\d+.-]*:\/\//i.test(bruto)) bruto = `${LOCAL.test(bruto) ? 'http' : 'https'}://${bruto}`
+  let url: URL
+  try {
+    url = new URL(bruto)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+  if (!url.hostname || url.username || url.password) return null
+  // Caminho, busca e âncora não fazem sentido no endereço do servidor, exceto um caminho base.
+  const caminho = url.pathname.replace(/\/+$/, '')
+  return `${url.protocol}//${url.host}${caminho}`
+}

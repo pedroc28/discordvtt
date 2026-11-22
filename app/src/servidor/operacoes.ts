@@ -1,0 +1,53 @@
+// Funções puras sobre os dados do servidor: montam o que a tela mostra a partir do que
+// o PocketBase devolveu. Não fazem pedidos nem mudam o que receberam.
+
+import type { Campanha, MinhaCampanha, Papel, Participacao, ParticipanteVisivel, Usuario } from './tipos'
+
+const porNome = (a: { nome: string }, b: { nome: string }) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
+
+/** As campanhas do usuário, com o papel dele em cada uma, em ordem alfabética. */
+export function montarCampanhas(campanhas: Campanha[], minhasParticipacoes: Participacao[]): MinhaCampanha[] {
+  const papelPorCampanha = new Map(minhasParticipacoes.map((p) => [p.campanhaId, p.papel]))
+  return campanhas
+    .flatMap((c) => {
+      const papel = papelPorCampanha.get(c.id)
+      // Campanha sem participação do usuário não deveria chegar, mas não dá para mostrar sem papel.
+      return papel ? [{ ...c, papel }] : []
+    })
+    .sort(porNome)
+}
+
+/** Participantes de uma campanha com nome, mestres primeiro e depois em ordem alfabética. */
+export function montarParticipantes(participacoes: Participacao[], usuarios: Usuario[], euId: string | null): ParticipanteVisivel[] {
+  const nomes = new Map(usuarios.map((u) => [u.id, u.nome]))
+  return participacoes
+    .map((p) => ({ ...p, nome: nomes.get(p.usuarioId) ?? 'Pessoa sem nome', euMesmo: p.usuarioId === euId }))
+    .sort((a, b) => (a.papel === b.papel ? porNome(a, b) : a.papel === 'mestre' ? -1 : 1))
+}
+
+/** A campanha que fica aberta: a escolhida antes, se ainda existir, ou a primeira da lista. */
+export function campanhaValida(escolhida: string | null, campanhas: MinhaCampanha[]): string | null {
+  if (escolhida && campanhas.some((c) => c.id === escolhida)) return escolhida
+  return campanhas[0]?.id ?? null
+}
+
+/** A participação é a única de mestre: tirar ou rebaixar deixaria a campanha sem mestre. */
+export function ehUnicoMestre(participantes: Participacao[], participacaoId: string): boolean {
+  const alvo = participantes.find((p) => p.id === participacaoId)
+  if (!alvo || alvo.papel !== 'mestre') return false
+  return !participantes.some((p) => p.id !== participacaoId && p.papel === 'mestre')
+}
+
+/** Contas que ainda não estão na campanha, para o mestre escolher quem adicionar. */
+export function usuariosDisponiveis(usuarios: Usuario[], participantes: Participacao[]): Usuario[] {
+  const dentro = new Set(participantes.map((p) => p.usuarioId))
+  return usuarios.filter((u) => !dentro.has(u.id)).sort(porNome)
+}
+
+export const NOME_PAPEL: Record<Papel, string> = { mestre: 'Mestre', jogador: 'Jogador' }
+
+/** Nome de campanha aceito pelo servidor: sem espaços nas pontas e com até 80 letras. */
+export function limparNomeCampanha(nome: string): string | null {
+  const limpo = nome.trim().replace(/\s+/g, ' ')
+  return limpo && limpo.length <= 80 ? limpo : null
+}

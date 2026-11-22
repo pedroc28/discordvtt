@@ -1,11 +1,11 @@
 # Servidor
 
-Dono: Pedro. Passo 1 pronto: o PocketBase tem contas, campanhas e participantes (mestre ou jogador), com regras de acesso testadas. O app ainda não fala com o servidor: isso é o passo 2.
+Dono: Pedro. Passos 1 e 2 prontos: o PocketBase tem contas, campanhas e participantes (mestre ou jogador), com regras de acesso testadas, e o app tem a aba Campanha, com login, escolha da campanha e quem participa. O mapa e as fichas ainda não usam o servidor.
 
 ## Peças
 
 - **PocketBase**: um único executável com banco de dados, login, regras de acesso e tempo real. Fica em `pocketbase/`, com migrações e hooks no Git e o executável e os dados fora dele. A versão é fixa e fica em `pocketbase/VERSAO` (hoje, 0.40.6).
-- **Lado do app**: `app/src/servidor/`, com o cliente do PocketBase, o login e as implementações de repositório que as outras áreas usam (ver `docs/contratos.md`). Ainda vazio.
+- **Lado do app**: `app/src/servidor/`, com a conexão, o login, a aba Campanha e, mais adiante, as implementações de repositório que as outras áreas usam (ver `docs/contratos.md`). Usa o SDK oficial (`pocketbase` no npm, 0.29).
 - **Hospedagem**: o PocketBase roda no PC de quem hospeda e fica acessível pela internet com o Tailscale Funnel. O porquê está em `docs/decisoes.md`.
 
 ## Rodar no Windows
@@ -56,6 +56,30 @@ Hooks, em `pocketbase/pb_hooks/campanhas.pb.js`:
 
 Configurações, em `pocketbase/pb_migrations/1795321001_configuracoes.js`: nome do app e limite de tentativas ligado (padrão do PocketBase, com login limitado a 2 tentativas a cada 3 segundos por IP).
 
+## Aba Campanha
+
+- **Entrar:** servidor, e-mail e senha. O endereço vem preenchido com o `VITE_POCKETBASE_URL` (no site de teste, `http://127.0.0.1:8090`) e pode ser trocado, por exemplo pelo endereço `.ts.net` do Funnel. Sem esquema, endereço local vira `http://` e o resto vira `https://`. O app guarda o endereço e a sessão no navegador, separados por servidor.
+- **Sem entrar,** as fichas e o mapa continuam funcionando só no navegador.
+- **Campanhas:** a lista mostra as campanhas da pessoa e o papel dela em cada uma. A escolhida fica aberta e é lembrada. Qualquer pessoa cria uma campanha e vira mestre dela.
+- **Campanha aberta:** o mestre renomeia, chama pessoas (escolhendo entre as contas do servidor), troca papéis, tira pessoas e apaga a campanha. Todos podem sair, menos a única pessoa mestre. Sair e apagar pedem confirmação.
+- **Tempo real:** quando alguém muda uma campanha ou quem participa, a tela dos outros atualiza sozinha.
+- **Servidor caiu:** aparece um aviso, e o app reconecta sozinho quando ele volta. Se o servidor estiver desligado ao abrir o app, a sessão fica guardada e o botão "Tentar de novo sem digitar a senha" retoma sem pedir a senha.
+
+Arquivos em `app/src/servidor/`:
+
+| Arquivo | O que faz |
+| --- | --- |
+| `conexao.ts` | Único arquivo que usa o SDK. Login, sessão, leitura, ações e tempo real. Exporta `conexao` e `useServidor()`. |
+| `endereco.ts` | Endereço padrão e normalização do que a pessoa digita. |
+| `validacao.ts` | Converte e valida tudo o que chega do servidor. |
+| `erros.ts` | Mensagens de erro em português, por ação. |
+| `operacoes.ts` | Funções puras: campanhas com papel, ordem dos participantes, único mestre, contas disponíveis. |
+| `TelaCampanha.tsx`, `servidor.css`, `tela.ts` | A aba Campanha. |
+
+Respostas atrasadas não voltam a mudar a tela: cada login, saída ou troca de servidor muda a "geração" da conexão, e cada recarga tem um número. Só a resposta da geração e da recarga atuais vale.
+
+No site de teste, que é HTTPS, o Chrome pode perguntar se o site pode acessar dispositivos da rede local quando o endereço é `http://127.0.0.1:8090`. É preciso permitir. Com o Funnel isso não acontece, porque o endereço também é HTTPS.
+
 ## Testar as regras
 
 ```
@@ -67,7 +91,7 @@ O script sobe um PocketBase com dados temporários, cria contas de teste e confe
 ## Próximos passos
 
 1. ~~Base: contas, campanhas e participantes, com migrações e regras.~~ Pronto.
-2. **Login no app e escolha da campanha.** O endereço do servidor passa a ser escolhido na tela de login e guardado no navegador, com o `VITE_POCKETBASE_URL` como valor padrão. Assim o mesmo site de teste funciona com qualquer servidor. Entra o SDK do PocketBase como dependência, combinado antes.
+2. ~~Login no app e escolha da campanha, com o endereço do servidor configurável.~~ Pronto.
 3. **Hospedagem com Tailscale Funnel e backup**, testados com um amigo. Conferir nesse passo:
    - Atrás do Funnel, todos podem chegar ao PocketBase com o mesmo IP, e o limite de tentativas contaria o grupo inteiro como uma pessoa. Configurar o proxy confiável (`trustedProxy`) ou ajustar o limite.
    - Backup agendado do `pb_data`, com cópia fora do PC. O painel do PocketBase só restaura backups em Linux e macOS, então no Windows a restauração é trocar a pasta `pb_data` com o servidor desligado.

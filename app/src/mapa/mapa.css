@@ -1,51 +1,8 @@
 /* ==========================================================
-   Mapa hexagonal e navegação entre telas.
-   Usa as cores da interface (--ui-*, --acento) definidas em ficha.css.
+   Mapa hexagonal.
+   Usa as cores da interface (--ui-*, --acento) e os botões compartilhados
+   definidos em nucleo/tema.css.
    ========================================================== */
-
-/* ---------- navegação entre telas ---------- */
-
-.raiz {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.navegacao {
-  display: flex;
-  gap: 2px;
-  padding: 4px 12px 0;
-  background: var(--feltro-escuro);
-  flex: none;
-}
-
-.navegacao button {
-  border: 0;
-  background: transparent;
-  color: rgb(255 255 255 / 0.7);
-  padding: 6px 16px;
-  border-radius: 6px 6px 0 0;
-  font-weight: 600;
-}
-
-.navegacao button:hover {
-  color: #fff;
-}
-
-.navegacao button[aria-selected='true'] {
-  background: var(--ui-papel);
-  color: var(--ui-tinta);
-}
-
-.raiz__conteudo {
-  flex: 1;
-  min-height: 0;
-}
-
-.raiz__conteudo > .app,
-.raiz__conteudo > .mapa {
-  height: 100%;
-}
 
 /* ---------- mapa ---------- */
 

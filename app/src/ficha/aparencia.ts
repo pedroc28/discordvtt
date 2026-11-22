@@ -1,68 +1,9 @@
-// Tema da interface (claro, escuro ou o do sistema) e as cores da folha no modo escuro.
-// É preferência de quem está usando, então fica no navegador e não vai para o modelo.
+// Cores da folha no modo escuro. O tema em si (claro, escuro ou sistema)
+// fica no núcleo, compartilhado por todas as telas.
 
-import { useEffect, useState } from 'react'
 import type { Modelo } from './tipos'
 
-export type Tema = 'sistema' | 'claro' | 'escuro'
-
-export interface Aparencia {
-  tema: Tema
-  /** No modo escuro, mantém a folha com as cores originais do modelo. */
-  folhaClara: boolean
-}
-
-const CHAVE = 'fichas:aparencia'
-const CONSULTA_ESCURO = '(prefers-color-scheme: dark)'
-
-function carregar(): Aparencia {
-  const padrao: Aparencia = { tema: 'sistema', folhaClara: false }
-  try {
-    const bruto = JSON.parse(localStorage.getItem(CHAVE) ?? '{}') as Partial<Aparencia>
-    return {
-      tema: bruto.tema === 'claro' || bruto.tema === 'escuro' ? bruto.tema : 'sistema',
-      folhaClara: bruto.folhaClara === true,
-    }
-  } catch {
-    return padrao
-  }
-}
-
-const sistemaPrefereEscuro = () =>
-  typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(CONSULTA_ESCURO).matches
-
-export function useAparencia() {
-  const [aparencia, setAparencia] = useState(carregar)
-  const [sistemaEscuro, setSistemaEscuro] = useState(sistemaPrefereEscuro)
-
-  useEffect(() => {
-    if (!window.matchMedia) return
-    const consulta = window.matchMedia(CONSULTA_ESCURO)
-    const mudou = (e: MediaQueryListEvent) => setSistemaEscuro(e.matches)
-    consulta.addEventListener('change', mudou)
-    return () => consulta.removeEventListener('change', mudou)
-  }, [])
-
-  const escuro = aparencia.tema === 'escuro' || (aparencia.tema === 'sistema' && sistemaEscuro)
-
-  useEffect(() => {
-    document.documentElement.dataset.tema = escuro ? 'escuro' : 'claro'
-  }, [escuro])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(CHAVE, JSON.stringify(aparencia))
-    } catch {
-      // sem armazenamento: o tema só vale até fechar a página
-    }
-  }, [aparencia])
-
-  return {
-    ...aparencia,
-    escuro,
-    mudar: (patch: Partial<Aparencia>) => setAparencia((a) => ({ ...a, ...patch })),
-  }
-}
+export { useAparencia, type Tema } from '../nucleo/aparencia'
 
 /** Luminância relativa de uma cor #rgb ou #rrggbb. Null se não der para ler. */
 function luminancia(cor: string): number | null {

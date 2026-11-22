@@ -1,112 +1,105 @@
 # Regras do projeto DiscordVtt
 
-Este arquivo vale para as pessoas e para o Claude de cada um. Leia antes de mexer no código. Se uma regra atrapalhar, mude a regra aqui, num pull request próprio, em vez de ignorá-la.
+Este arquivo vale para o Claude do Pedro e para o Claude do GrifoCaolho. As pessoas só conversam com o Claude: criar branch, testar, abrir e juntar pull request é trabalho do Claude, seguindo os passos abaixo. Antes de mexer numa área, leia também o `CLAUDE.md` dela.
 
-## O que é o projeto
+Se uma regra atrapalhar, mude-a aqui, numa tarefa `geral`, e registre o motivo em `docs/decisoes.md`.
 
-Mesa virtual própria para o grupo de RPG: fichas editáveis para qualquer sistema, mapa e mesa compartilhados e ferramentas para o mestre. Roda no navegador do computador e do celular, sem pagar nenhum serviço.
+## O projeto
 
-Fora do escopo: chat de voz, chat de texto e transmissão de tela. A conversa acontece no Discord. Não proponha LiveKit, WebRTC nem Docker sem os dois combinarem antes.
+Mesa virtual própria para um grupo de RPG: fichas editáveis para qualquer sistema, mapa e mesa compartilhados e ferramentas para o mestre. Roda no navegador do computador e do celular, sem pagar nenhum serviço. É um hobby: o objetivo é gastar o tempo dos dois com RPG, não com administração.
 
-## Quem cuida de quê
+Fora do escopo: chat de voz, chat de texto e transmissão de tela. A conversa acontece no Discord. Não proponha LiveKit, WebRTC, Docker nem serviços pagos sem os dois combinarem antes.
 
-| Área | Pasta | Responsável |
+Site de teste, atualizado sozinho a cada mudança na `main`: https://pedroc28.github.io/discordvtt/
+
+## Áreas e donos
+
+| Área | O que é dela | Dono |
 | --- | --- | --- |
-| Mapa e mesa | `app/src/mapa/` (e futuras pastas da mesa) | GrifoCaolho |
-| Servidor e conexão | `pocketbase/`, `app/src/servidor/`, hospedagem | pedroc28 |
-| Fichas | `app/src/ficha/` | os dois, **congelada por enquanto** |
-| Arquivos compartilhados | ver abaixo | os dois |
+| `mapa` | `app/src/mapa/`, `app/public/tilesets/`, `app/tools/gerar-tileset.mjs`, `docs/mapa/` | GrifoCaolho |
+| `servidor` | `pocketbase/`, `app/src/servidor/`, `docs/servidor/`, hospedagem | Pedro (pedroc28) |
+| `ficha` | `app/src/ficha/`, `docs/fichas.md` | os dois, **congelada** |
+| `geral` | `app/src/nucleo/`, configurações do app, `.github/`, `scripts/`, `CLAUDE.md`, `README.md`, o resto de `docs/` | os dois |
 
-- Trabalhe só dentro da sua área. Para mexer na área do outro, combine antes e marque a pessoa no pull request.
-- A ficha não recebe mudanças até os dois voltarem a ela juntos. Correção de erro que impeça o app de funcionar é a exceção, sempre num pull request pequeno.
-- **Arquivos compartilhados**: `app/src/App.tsx`, `app/src/main.tsx`, `app/package.json`, `app/package-lock.json`, `app/vite.config.ts`, os `tsconfig*.json`, `app/index.html`, `README.md`, `CLAUDE.md` e a pasta `.github/`. Mudanças neles vão em pull requests pequenos e separados, com o motivo na descrição.
+- Cada pessoa trabalha na própria área. A responsabilidade pela divisão é delas, não há bloqueio automático.
+- A ficha só recebe mudanças quando os dois voltarem a ela juntos. Exceção: correção de algo que impeça o app de funcionar.
+- Se você não souber com quem está falando, pergunte antes de começar.
 
-## Stack
+## Como toda tarefa funciona
 
-- App: Vite, React 19 e TypeScript, em `app/`.
-- Testes: Vitest (`*.test.ts` ao lado do código).
-- Lint: oxlint.
-- Servidor (próxima etapa): PocketBase, um único executável. Sincronização em tempo real pelas assinaturas do PocketBase.
-- Sem bibliotecas de interface (nada de MUI, Tailwind, Bootstrap). Componentes e CSS são feitos à mão.
-- Dependência nova só com motivo claro na descrição do pull request. Prefira escrever 50 linhas a instalar um pacote.
+1. **Começar.** Clone o repositório se ainda não tiver e rode `scripts/comecar.sh <area> <nome-da-tarefa>`. Ele cria a branch `area/nome` a partir da `main` mais recente. Uma tarefa, uma branch.
+2. **Trabalhar.** Faça a mudança seguindo as regras deste arquivo e do `CLAUDE.md` da área. Commits em português, no imperativo, com título curto ("Adiciona régua de distância").
+3. **Documentar.** No mesmo trabalho, atualize:
+   - `docs/roteiro.md`, marcando o que ficou pronto
+   - a documentação da área (`docs/mapa/`, `docs/servidor/` ou `docs/fichas.md`)
+   - `docs/decisoes.md`, se houve uma decisão que muda o rumo do projeto
+   - `docs/contratos.md`, se mudou algo que outra área usa
+4. **Entregar.** Escreva a descrição do pull request seguindo `.github/pull_request_template.md` num arquivo temporário e rode `scripts/entregar.sh "Título" /tmp/descricao.md`. O script:
+   - traz a `main` mais recente
+   - roda lint, build e testes
+   - envia a branch e abre o pull request
+   - espera a verificação do GitHub e junta na `main` com squash
 
-## Comandos
+   Não existe revisão humana: se a verificação passa, entra.
+5. **Responder.** Diga à pessoa o que mudou, o link do pull request e o link do site de teste.
 
-Sempre dentro de `app/`:
+Se o script parar, conserte o que ele apontar e rode de novo. Conflito com a `main`: rode `git merge origin/main`, resolva preservando o trabalho dos dois lados, faça o commit e entregue de novo.
 
-```bash
-npm install         # depois de clonar ou quando o package.json mudar
-npm run dev         # app em http://localhost:5173
-npm run lint        # tem que passar sem avisos
-npm run build       # tem que passar (inclui a checagem de tipos)
-npm test            # tem que passar
-```
+## Quando a tarefa mexe na área do outro
 
-Antes de abrir um pull request, rode `lint`, `build` e `test`. O GitHub roda os três de novo em todo pull request.
+Isso não é proibido, mas nunca acontece em silêncio. Antes de alterar qualquer arquivo de outra área (ou da ficha congelada):
 
-## Fluxo no Git
+1. Pare e analise os riscos e as implicações: o que pode quebrar, que comportamento muda para o outro, se algum contrato de `docs/contratos.md` é afetado, se o trabalho em andamento do outro pode conflitar.
+2. Explique isso à pessoa em poucas linhas e pergunte se deve seguir.
+3. Se ela confirmar, faça a mudança mínima necessária e preencha a seção "Mexe na área do outro" da descrição do pull request com a análise. O outro fica sabendo pelo histórico de pull requests.
 
-- Nunca faça commit nem push direto na `main`. Toda mudança entra por pull request.
-- Uma branch por tarefa, com o prefixo da área: `mapa/...`, `servidor/...`, `ficha/...` ou `geral/...`. Exemplo: `mapa/notas-por-hexagono`.
-- Antes de começar, atualize a `main` (Fetch e Pull no GitHub Desktop). Se a sua branch ficar para trás, traga a `main` para ela (no GitHub Desktop: Branch, Update from default branch) e resolva os conflitos antes do merge.
-- Pull requests pequenos, de uma coisa só. Descrição em português dizendo o que muda, por quê e como testar.
-- Quem abre o pull request não faz o merge sozinho: o outro revisa e aprova.
-- Mensagens de commit em português, no imperativo, curtas no título: "Adiciona régua de distância", "Corrige zoom no celular". No corpo, explique o porquê quando não for óbvio.
+Mudanças em `geral` afetam os dois: faça a mesma análise e registre na descrição.
 
-## Padrão de arquitetura
+## Arquitetura
 
-As fichas e o mapa seguem o mesmo padrão. Mantenha-o em código novo:
+- **Telas.** Cada área registra suas telas num arquivo `tela.ts` na própria pasta, exportando `tela` (ver `app/src/nucleo/telas.ts`). O núcleo encontra sozinho: criar uma tela nova não exige mexer em arquivo compartilhado.
+- **Tema.** Variáveis de cor, temas claro e escuro e botões comuns (`.botao-icone`, `.botao-topo`, `.grupo-botoes`, `.espaco`) ficam em `app/src/nucleo/tema.css`. O tema atual vem de `useAparencia()` em `app/src/nucleo/aparencia.ts`. Use as variáveis (`--ui-papel`, `--ui-tinta`, `--ui-linha`, `--acento`, `--feltro` e as demais) para tudo funcionar nos dois temas.
+- **Dados.** JSON simples e serializável, com tipos explícitos no `tipos.ts` da área.
+- **Mudanças.** Sempre por funções puras (`operacoes.ts`) que devolvem o estado novo ou a lista de mudanças, sem alterar o que receberam.
+- **Interface.** Componentes React só leem o estado e chamam operações. Não fazem `fetch`, não falam com o PocketBase e não mexem no `localStorage` direto.
+- **Armazenamento.** Fica atrás de uma interface, como a `RepositorioMapa`. A versão do servidor entra como mais uma implementação, sem mudar o resto.
+- **Lógica sem React.** Fica fora dos componentes e ganha teste no Vitest (`*.test.ts` ao lado do código).
+- **Dados de fora.** Arquivo importado, servidor e `localStorage` são validados antes de usar.
 
-1. **Dados são JSON simples e serializáveis.** Tipos explícitos num `tipos.ts` da área. Nada de classes guardadas no estado.
-2. **Toda mudança passa por funções puras** (`operacoes.ts`): recebem o estado e devolvem o novo, ou devolvem a lista de mudanças. Nunca alteram o objeto recebido.
-3. **A interface só lê o estado e chama operações.** Componentes React não fazem `fetch`, não falam com o PocketBase e não mexem no `localStorage` direto.
-4. **O armazenamento fica atrás de uma interface.** No mapa é a `RepositorioMapa` (ver `app/src/mapa/README.md`): hoje há implementações em memória e no navegador, e a do PocketBase entra como mais uma, sem mudar o resto. As fichas vão seguir o mesmo caminho quando forem sincronizadas.
-5. **Lógica que não depende de React fica fora de componentes** e ganha teste no Vitest.
-6. Dados que vêm de fora (arquivo importado, servidor, `localStorage`) são validados antes de usar, como em `armazenamento.ts`.
-
-### Contrato entre o mapa e o servidor
-
-- O servidor implementa `RepositorioMapa` (`carregarChunk`, `aplicar`, `assinar`) numa classe `RepositorioPocketBase`, dentro de `app/src/servidor/`.
-- Mudanças na interface `RepositorioMapa` ou nos tipos `Lote`, `Mudanca` e `Hexagono` afetam os dois lados: discuta no pull request e marque o outro.
-- Dado secreto do mestre fica em coleção separada, protegida pelas regras de acesso do PocketBase. Esconder só na tela não conta como segredo.
+Os contratos entre áreas estão em `docs/contratos.md`.
 
 ## Código
 
-- Nomes em português, sem acento nos identificadores: `moverToken`, `chaveDoChunk`, `EditorDeFichas`. Termos técnicos consagrados podem ficar em inglês (`chunk`, `token`, `canvas`).
-- Comentários em português, explicando o porquê, não o óbvio.
-- TypeScript estrito: sem `any`, sem `@ts-ignore`. Use `unknown` e valide.
-- Estilo do código: sem ponto e vírgula no fim das linhas, aspas simples, dois espaços de indentação, como no código que já existe.
-- Arquivos pequenos e com uma responsabilidade. Se um componente passar de umas 300 linhas, divida.
+- App em `app/`: Vite, React 19, TypeScript, Vitest e oxlint. Comandos em `app/`: `npm run dev`, `npm run lint`, `npm run build`, `npm test`.
+- Nomes em português, sem acento nos identificadores (`moverToken`, `chaveDoChunk`). Termos técnicos consagrados podem ficar em inglês.
+- Comentários em português, explicando o porquê.
+- TypeScript estrito: sem `any` e sem `@ts-ignore`. Use `unknown` e valide.
+- Estilo: sem ponto e vírgula no fim das linhas, aspas simples, dois espaços. Siga o código existente.
+- Sem bibliotecas de interface (MUI, Tailwind, Bootstrap). Dependência nova só perguntando antes à pessoa, com o motivo na descrição do pull request.
+- O CSS é global: prefixe as classes com o nome da área (`.mapa__...`, `.servidor__...`).
 
 ## Interface e textos
 
 - Todo texto visível em português do Brasil, com acentos corretos.
-- Nos textos da interface e na documentação, não use ponto e vírgula nem travessão (—). Prefira frases curtas, vírgulas e dois-pontos.
-- Botões dizem o que fazem: "Exportar modelo", não "OK". Mensagens de erro dizem o que aconteceu e como resolver.
-- O visual não pode ter cara de app gerado por IA: nada de gradientes roxos, cards genéricos com sombra em tudo, emojis como ícone ou textos de marketing. A identidade atual é uma mesa de feltro verde com papel em cima e acento framboesa.
-- Use as variáveis de tema de `app/src/ficha/ficha.css` (`--ui-papel`, `--ui-tinta`, `--ui-linha`, `--acento`, `--feltro` e as demais). Assim tudo funciona nos temas claro e escuro sem código extra.
-- O CSS é global: prefixe as classes com o nome da área (`.mapa__...`, `.servidor__...`) para não colidir com as da ficha.
-- Ícones são SVG desenhados à mão, no mesmo traço dos que já existem (`Icones.tsx`).
+- Nos textos da interface e na documentação, não use ponto e vírgula nem travessão. Prefira frases curtas, vírgulas e dois-pontos.
+- Botões dizem o que fazem ("Exportar modelo", não "OK"). Mensagens de erro dizem o que aconteceu e como resolver.
+- Nada de cara de app gerado por IA: sem gradientes roxos, cards genéricos com sombra, emojis como ícone ou textos de marketing. A identidade é mesa de feltro verde, papel e acento framboesa.
+- Ícones são SVG desenhados à mão, no traço dos que já existem.
+- Tudo funciona no celular: toque, telas a partir de 360 px, alvos de pelo menos 32 px, Pointer Events.
+- Botões só com ícone têm `aria-label`. Foco do teclado sempre visível. Respeite `prefers-reduced-motion`.
 
-## Celular e acessibilidade
+## Segredos
 
-- Tudo precisa funcionar no navegador do celular: toque, telas a partir de 360 px de largura e alvos de toque de pelo menos 32 px.
-- Use Pointer Events para mouse, toque e caneta juntos.
-- Botões só com ícone precisam de `aria-label`. Foco do teclado sempre visível. O que dá para fazer com mouse, dá para fazer com teclado sempre que fizer sentido.
-- Respeite `prefers-reduced-motion`.
+- O repositório é público. Nunca coloque senha, token ou chave nele, nem em commit antigo.
+- Configuração local fica em `app/.env`, ignorado pelo Git. O modelo é `app/.env.example`.
+- Variáveis `VITE_` são visíveis no navegador: nunca ponha segredo nelas.
+- Dado secreto do mestre fica em coleção protegida pelas regras de acesso do PocketBase. Esconder só na tela não conta.
 
-## Segredos e configuração
+## Nunca
 
-- Nunca coloque senha, token ou chave no repositório. Isso inclui a senha de administrador do PocketBase e tokens de túnel ou de hospedagem.
-- Configuração local fica em `app/.env`, que o Git ignora. O modelo, sem segredos, é `app/.env.example`.
-- Variáveis que o navegador lê precisam começar com `VITE_` e são públicas: nunca ponha segredo nelas.
+- Commit ou push direto na `main`, ou push forçado em qualquer branch.
+- Mexer em branch que não é da tarefa atual.
+- Alterar configurações do repositório no GitHub (só o Pedro, pelo site).
+- Juntar um pull request com a verificação falhando.
 
-## Para o Claude
-
-- Leia este arquivo e o `README.md` da área antes de mudar algo.
-- Antes de editar fora da área de quem está pedindo, avise e peça confirmação.
-- Não faça push na `main`. Trabalhe numa branch com o prefixo da área e entregue um pull request.
-- Rode `npm run lint`, `npm run build` e `npm test` em `app/` antes de dizer que terminou, e conserte o que falhar.
-- Não adicione dependências sem perguntar.
-- Ao terminar uma etapa, atualize o roteiro no `README.md` e o `README.md` da área.
-- Escreva nas mesmas regras de texto deste arquivo: português do Brasil com acentos, sem ponto e vírgula e sem travessão.
+Branches juntadas são apagadas sozinhas pelo GitHub. O Claude não consegue apagar branches nem mudar configurações daqui: se algo assim for necessário, peça ao Pedro.

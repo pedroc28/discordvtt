@@ -1,12 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import './fontes'
-import './ficha/ficha.css'
-import './mapa/mapa.css'
-import App from './App.tsx'
+import './nucleo/fontes'
+import './nucleo/tema.css'
+import { Raiz } from './nucleo/Raiz'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <Raiz />
   </StrictMode>,
 )

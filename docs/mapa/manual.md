@@ -2,7 +2,7 @@
 
 Mapa compartilhado, construído pelos jogadores: terreno, nome e nota por hexágono, regiões e marcadores. Ainda por vir: rios, estradas, token do grupo e régua. Pensado desde o começo para vários jogadores ao mesmo tempo, no computador e no celular.
 
-Este é o manual do módulo. O histórico do projeto (decisões, o que foi feito por fase, problemas achados e próximos passos) está em [`docs/mapa-hexagonal.md`](../../../docs/mapa-hexagonal.md).
+Este é o manual do módulo. O histórico do projeto (decisões, o que foi feito por fase, problemas achados e próximos passos) está em [`diario.md`](diario.md).
 
 Tudo roda sem servidor por enquanto: o mapa fica no IndexedDB do navegador, e abas abertas ao mesmo tempo se comportam como jogadores diferentes (assim o caminho de sincronização já é exercitado).
 
@@ -101,7 +101,7 @@ Para o servidor, basta uma classe nova (`RepositorioPocketBase`) e trocar a linh
 
 ## Tilesets (trocar a arte)
 
-Um tileset é uma pasta em `public/tilesets/<id>/` com um `tileset.json` e as imagens. **Trocar a arte não exige mexer em código**: ponha as imagens novas, ajuste o JSON e (para usar de verdade) troque a constante `URL_TILESET` em `MapaHex.tsx`.
+Um tileset é uma pasta em `app/public/tilesets/<id>/` com um `tileset.json` e as imagens. **Trocar a arte não exige mexer em código**: ponha as imagens novas, ajuste o JSON e (para usar de verdade) troque a constante `URL_TILESET` em `MapaHex.tsx`.
 
 ```jsonc
 {
@@ -133,7 +133,7 @@ Um tileset é uma pasta em `public/tilesets/<id>/` com um `tileset.json` e as im
 
 **Ícones de marcador.** Imagens quadradas com fundo transparente, de qualquer tamanho (o tileset padrão usa 128×128, em selo redondo). Um hexágono mostra até 3 marcadores lado a lado, e um "+N" se houver mais. Marcador sem imagem aparece como um círculo simples.
 
-**Tileset gerado.** A arte atual é provisória e vem de `tools/gerar-tileset.mjs` (`npm run tileset`), que desenha 13 terrenos com 3 variantes cada e 12 ícones de marcador, em SVG. Rodar de novo apaga e refaz `public/tilesets/padrao/`, então **não edite esses arquivos à mão**: copie a pasta com outro nome para a arte nova.
+**Tileset gerado.** A arte atual é provisória e vem de `app/tools/gerar-tileset.mjs` (`npm run tileset`), que desenha 13 terrenos com 3 variantes cada e 12 ícones de marcador, em SVG. Rodar de novo apaga e refaz `app/public/tilesets/padrao/`, então **não edite esses arquivos à mão**: copie a pasta com outro nome para a arte nova.
 
 ## Testes
 

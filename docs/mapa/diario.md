@@ -4,7 +4,7 @@ Registro do projeto do mapa hexagonal infinito e compartilhado do DiscordVtt. Se
 
 Última atualização: 21/11/2026. Estado: **fases 0, 1 e 2 prontas** e enviadas ao GitHub. Fases 3 e 4 pendentes.
 
-Para o detalhe técnico do código (padrões, fluxo de uma edição, formato do tileset, como ligar o servidor), leia [`app/src/mapa/README.md`](../app/src/mapa/README.md). Este documento é o **diário e o mapa do caminho**; aquele é o **manual do módulo**.
+Para o detalhe técnico do código (padrões, fluxo de uma edição, formato do tileset, como ligar o servidor), leia [`manual.md`](manual.md). Este documento é o **diário e o mapa do caminho**; aquele é o **manual do módulo**.
 
 ---
 

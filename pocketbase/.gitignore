@@ -1,0 +1,4 @@
+# Executável e dados do PocketBase ficam só na máquina de quem roda o servidor
+pocketbase
+pocketbase.exe
+pb_data/

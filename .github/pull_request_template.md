@@ -1,27 +1,21 @@
 ## O que muda
 
-<!-- Uma ou duas frases. -->
+<!-- Uma ou duas frases para quem só vai ler isto. -->
 
 ## Por quê
 
-<!-- O problema que isto resolve ou a etapa do roteiro. -->
+<!-- A etapa do roteiro ou o problema que isto resolve. -->
 
 ## Como testar
 
-1. 
-2. 
+<!-- O que abrir no site de teste e o que deve acontecer. -->
 
 ## Área
 
-- [ ] Mapa e mesa
-- [ ] Servidor e conexão
-- [ ] Fichas (combinado com os dois)
-- [ ] Arquivos compartilhados
+<!-- mapa, servidor, ficha ou geral -->
 
-## Conferido
+## Mexe na área do outro
 
-- [ ] `npm run lint`, `npm run build` e `npm test` passam em `app/`
-- [ ] Testei no navegador do computador
-- [ ] Testei no celular, ou a mudança não afeta o celular
-- [ ] Funciona nos temas claro e escuro
-- [ ] Nenhuma senha, token ou `.env` no commit
+<!-- "Não", ou a análise de riscos e implicações que foi mostrada à pessoa antes de seguir. -->
+
+🤖 Feito pelo Claude seguindo o CLAUDE.md.

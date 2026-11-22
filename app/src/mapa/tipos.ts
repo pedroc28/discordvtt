@@ -22,8 +22,26 @@ export interface Hexagono {
   nome: string
   nota: string
   marcadores: Marcador[]
+  /**
+   * Arestas deste hexágono por onde passa um rio: 0 leste, 1 sudeste, 2 sudoeste. Cada aresta pertence ao
+   * hexágono "dono" (ver `arestaCanonica`), então as outras três direções ficam guardadas no vizinho.
+   */
+  rios: number[]
+  /** Igual a `rios`, para estradas. A estrada liga o centro do hexágono ao do vizinho dessa direção. */
+  estradas: number[]
   /** Número da revisão, sobe a cada alteração. Ordena versões (o servidor vai usar); o desfazer compara conteúdo. */
   rev: number
+}
+
+/**
+ * Onde está o grupo no mapa. É estado pequeno e muito mutável: não entra em lotes nem no desfazer.
+ * Vale o mais recente (`ts`).
+ */
+export interface TokenGrupo {
+  q: number
+  r: number
+  ts: number
+  autor: string
 }
 
 /** Área nomeada do mapa. Regiões são globais: não pertencem a um chunk. */

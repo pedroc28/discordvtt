@@ -5,7 +5,7 @@
 // O desfazer é seletivo: só reverte o que ainda está como o lote deixou (ver operacoes.ts).
 
 import { ArmazemMapa } from './armazem'
-import { chaveChunk, type Hex } from './hex'
+import { chaveChunk, type Aresta, type Hex } from './hex'
 import {
   fundirMudancas,
   fundirMudancasRegiao,
@@ -14,13 +14,14 @@ import {
   mudancaEditarRegiao,
   mudancaExcluirRegiao,
   mudancasApagar,
+  mudancasArestas,
   mudancasPintar,
   mudancasRegiaoDosHexagonos,
   regiaoNova,
   reverterLote,
 } from './operacoes'
 import type { RepositorioMapa } from './repositorio'
-import type { Lote, Mudanca, MudancaRegiao, PatchHexagono, PatchRegiao } from './tipos'
+import type { Lote, Mudanca, MudancaRegiao, PatchHexagono, PatchRegiao, TokenGrupo } from './tipos'
 
 const LIMITE_HISTORICO = 200
 const LIMITE_ECOS = 300
@@ -62,6 +63,16 @@ export class Traco {
   /** Põe os hexágonos que existem numa região, ou tira de qualquer região com null. */
   regiao(hexes: readonly Hex[], regiaoId: string | null) {
     this.aplicar(mudancasRegiaoDosHexagonos(this.ctrl.armazem, this.carregados(hexes), regiaoId))
+  }
+
+  /** Liga ou tira rio nas arestas. Só vale onde os dois hexágonos existem (ao ligar). */
+  rio(arestas: readonly Aresta[], ligar: boolean) {
+    this.aplicar(mudancasArestas(this.ctrl.armazem, arestas, 'rios', ligar))
+  }
+
+  /** Liga ou tira estrada nas arestas (cada uma liga o centro de dois hexágonos vizinhos). */
+  estrada(arestas: readonly Aresta[], ligar: boolean) {
+    this.aplicar(mudancasArestas(this.ctrl.armazem, arestas, 'estradas', ligar))
   }
 
   get vazio() {
@@ -110,7 +121,13 @@ export class ControladorMapa {
   private regioesPendentes: MudancaRegiao[] = []
   private ultimoGrupo: { grupo: string; tempo: number; loteId: string } | null = null
   private ouvintesHistorico = new Set<() => void>()
+  private ouvintesToken = new Set<() => void>()
   private cancelarAssinatura: () => void
+  private cancelarAssinaturaToken: () => void
+  /** Onde está o grupo. Fora do histórico: mover o token não é desfeito pelo Ctrl+Z. */
+  token: TokenGrupo | null = null
+  /** Sobe a cada mudança do token. */
+  versaoToken = 0
   /** Sobe a cada mudança no histórico. Serve de "versão" para a interface. */
   versaoHistorico = 0
 
@@ -121,6 +138,7 @@ export class ControladorMapa {
     this.repo = repo
     this.autor = autor
     this.cancelarAssinatura = repo.assinar((lote) => this.receber(lote))
+    this.cancelarAssinaturaToken = repo.assinarToken?.((t) => this.definirToken(t, false)) ?? (() => {})
   }
 
   get podeDesfazer() {
@@ -133,6 +151,43 @@ export class ControladorMapa {
   ouvirHistorico(ouvinte: () => void): () => void {
     this.ouvintesHistorico.add(ouvinte)
     return () => this.ouvintesHistorico.delete(ouvinte)
+  }
+
+  ouvirToken(ouvinte: () => void): () => void {
+    this.ouvintesToken.add(ouvinte)
+    return () => this.ouvintesToken.delete(ouvinte)
+  }
+
+  /** Busca o token no repositório (uma vez, na abertura). Sem suporte do repositório, o token fica só na memória. */
+  async carregarToken(): Promise<void> {
+    try {
+      const t = (await this.repo.carregarToken?.()) ?? null
+      // Se alguém moveu o token enquanto carregava, vale o mais recente.
+      if (t && (!this.token || t.ts > this.token.ts)) this.definirToken(t, false)
+    } catch (e) {
+      this.aoErro(`Não consegui carregar o token do grupo: ${mensagemDe(e)}`)
+    }
+  }
+
+  /** Põe o token do grupo no hexágono. Todos veem a mudança. */
+  moverToken(h: Hex) {
+    this.definirToken({ q: h.q, r: h.r, ts: Date.now(), autor: this.autor }, true)
+  }
+
+  /** Tira o token do mapa. */
+  tirarToken() {
+    this.definirToken(null, true)
+  }
+
+  private definirToken(t: TokenGrupo | null, gravar: boolean) {
+    // Um aviso atrasado de outro cliente não pode sobrepor uma posição mais nova.
+    if (!gravar && t && this.token && t.ts < this.token.ts) return
+    this.token = t
+    this.versaoToken++
+    for (const o of [...this.ouvintesToken]) o()
+    if (gravar) {
+      this.repo.gravarToken?.(t)?.catch((e) => this.aoErro(`Não consegui salvar o token: ${mensagemDe(e)}`))
+    }
   }
 
   /** Carrega o chunk se ainda não estiver. Pode ser chamado à vontade. */
@@ -287,6 +342,7 @@ export class ControladorMapa {
 
   destruir() {
     this.cancelarAssinatura()
+    this.cancelarAssinaturaToken()
   }
 
   private reverter(sentido: 'desfazer' | 'refazer'): number {

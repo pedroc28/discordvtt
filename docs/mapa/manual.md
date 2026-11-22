@@ -1,6 +1,6 @@
 # Mapa hexagonal infinito
 
-Mapa compartilhado, construído pelos jogadores: terreno, nome e nota por hexágono, regiões e marcadores. Ainda por vir: rios, estradas, token do grupo e régua. Pensado desde o começo para vários jogadores ao mesmo tempo, no computador e no celular.
+Mapa compartilhado, construído pelos jogadores: terreno, nome e nota por hexágono, regiões, marcadores, rios, estradas, token do grupo e régua de distância. Pensado desde o começo para vários jogadores ao mesmo tempo, no computador e no celular.
 
 Este é o manual do módulo. O histórico do projeto (decisões, o que foi feito por fase, problemas achados e próximos passos) está em [`diario.md`](diario.md).
 
@@ -21,12 +21,16 @@ Aba **Mapa**, no topo do app.
 | Pintar região | ferramenta Região (R): escolha ou crie uma região na lista e pinte os hexágonos que já existem. "Sem região" tira hexágonos da região | idem |
 | Editar região | lápis ao lado dela na lista: nome, cor, "faz parte de" (reino › província), descrição e exclusão | idem |
 | Colocar marcador | ferramenta Marcador (M): escolha o ícone e toque no hexágono (ele precisa ter terreno) | idem |
+| Desenhar rio | ferramenta Rio (I): arraste pelas bordas dos hexágonos. A borda mais perto do cursor ganha o rio (ela aparece destacada antes). O modo "Tirar" apaga | idem |
+| Desenhar estrada | ferramenta Estrada (D): arraste de hexágono em hexágono, e a estrada liga o centro de um ao do vizinho. Modo "Tirar" apaga | idem |
+| Token do grupo | ferramenta Token (T): toque num hexágono e o token vai para lá, para todos. "Ir até o token" centraliza o mapa, "Tirar o token" o remove | idem |
+| Medir distância | ferramenta Régua (L): toque no começo e no fim, e o mapa mostra a distância em hexágonos. Um terceiro toque recomeça, Esc limpa | idem |
 | Esconder as cores das regiões | botão do olho | idem |
 | Tamanho do pincel | 1, 7 ou 19 hexágonos (teclas `[` e `]`) | idem |
 | Desfazer, refazer | Ctrl+Z, Ctrl+Shift+Z | botões |
 | Grade, início | G, 0 | botões |
 
-Desfazer é **por jogador**: só desfaz o que você fez, e pula hexágonos que outra pessoa mexeu depois (o app avisa quantos).
+Desfazer é **por jogador**: só desfaz o que você fez, e pula hexágonos que outra pessoa mexeu depois (o app avisa quantos). Uma risca de rio ou de estrada é um passo só. Mover o token e a régua **não** entram no desfazer.
 
 ## Padrões
 
@@ -34,7 +38,11 @@ Desfazer é **por jogador**: só desfaz o que você fez, e pula hexágonos que o
 
 **Mapa esparso e chunks.** Só existe o que foi construído. Os hexágonos são agrupados em *chunks* de 16×16 coordenadas axiais (`chunkDe`), que são a unidade de carregar, guardar e, no futuro, sincronizar. O renderizador só pede ao controlador os chunks da área visível.
 
-**Arestas.** Rios e estradas (fase 3) passam pelas arestas. Cada aresta é compartilhada por dois hexágonos, então só o "dono" a identifica: a aresta leste, sudeste ou sudoeste de cada hexágono (`arestaCanonica`). As outras três pertencem ao vizinho.
+**Arestas, rios e estradas.** Rios e estradas passam pelas arestas. Cada aresta é compartilhada por dois hexágonos, então só o "dono" a identifica: a aresta leste, sudeste ou sudoeste de cada hexágono (`arestaCanonica`). As outras três pertencem ao vizinho. O dado fica **dentro do hexágono dono**, nos campos `rios` e `estradas` (listas de direções 0, 1 e 2), como os marcadores: apagar o hexágono leva o que é dele, e o desfazer traz de volta. O rio é desenhado na borda, a estrada liga os centros dos dois hexágonos. **Só se liga onde os dois hexágonos da aresta existem**, e só aparece enquanto os dois existirem (se um for apagado, o dado fica guardado e volta se ele for pintado de novo). Tirar é sempre permitido. Pintar o terreno de um hexágono mantém os rios e estradas dele. O traço do rio escolhe a aresta mais próxima do cursor (`arestaMaisProxima`) e amostra o caminho do dedo em passos curtos (`arestasEntrePontos`), e o da estrada segue os hexágonos pelos quais o dedo passa (`arestasDoCaminho`).
+
+**Token do grupo.** Um alfinete que mostra onde o grupo está. É estado pequeno e muito mutável, então **não é um lote**: não entra no desfazer e vale o mais recente (`ts`). O `RepositorioMapa` o guarda por três métodos opcionais (`carregarToken`, `gravarToken`, `assinarToken`). O repositório local usa um registro no IndexedDB e um segundo BroadcastChannel (`discordvtt-mapa:principal:token`). Sem esses métodos, o token existe só na memória.
+
+**Régua.** Só local: dois toques medem a distância em hexágonos (`regua.ts`, usando `distancia` e `linha`). Não é guardada nem sincronizada. Converter para quilômetros fica para quando o mapa tiver escala numérica (hoje `MapaMeta.escala` é texto livre).
 
 **Lotes.** Quem edita nunca altera o mapa direto. As operações puras (`operacoes.ts`) devolvem *mudanças* (`antes` e `depois` de cada hexágono), e uma pincelada vira um **lote** (`Lote`). O lote é a unidade de rede, de gravação e de desfazer, e carrega mudanças de hexágonos e de regiões. O desfazer só reverte um item se o conteúdo dele ainda for o que o lote deixou (a revisão `rev` sobe a cada alteração e ordena versões, mas não serve para comparar: desfazer também a sobe). Quem desfaz um passo seu cria outro lote, e refazer é desfazer esse.
 
@@ -54,12 +62,13 @@ camera.ts            posição e zoom da câmera (pura)
 tipos.ts             Hexagono, Mudanca, Lote, MapaMeta
 operacoes.ts         pintar, editar, regiões, fundir mudanças, desfazer seletivo (puras)
 armazem.ts           hexágonos (por chunk) e regiões carregados. É o que o desenho lê
-repositorio.ts       interface RepositorioMapa + versão em memória
+repositorio.ts       interface RepositorioMapa (com os métodos opcionais do token) + versão em memória
 repositorio-local.ts IndexedDB + BroadcastChannel (avisa as outras abas)
 controlador.ts       junta tudo: traço, histórico por jogador, lotes recebidos
 tileset.ts           carrega o tileset (manifesto + imagens)
 renderizador.ts      desenha no canvas 2D
 entrada.ts           mouse, toque e caneta (Pointer Events)
+regua.ts             régua de distância (pura)
 armazenamento.ts     validação de dados externos e preferências locais
 MapaHex.tsx          tela: barra de ferramentas, paletas, canvas, painéis
 InspetorHexagono.tsx painel do hexágono (nome, terreno, região, marcadores, nota)
@@ -88,6 +97,10 @@ interface RepositorioMapa {
   carregarRegioes(): Promise<Regiao[]>
   aplicar(lote: Lote): Promise<void>
   assinar(ouvinte: (lote: Lote) => void): () => void
+  // opcionais, para o token do grupo
+  carregarToken?(): Promise<TokenGrupo | null>
+  gravarToken?(token: TokenGrupo | null): Promise<void>
+  assinarToken?(ouvinte: (token: TokenGrupo | null) => void): () => void
 }
 ```
 
@@ -98,6 +111,8 @@ Para o servidor, basta uma classe nova (`RepositorioPocketBase`) e trocar a linh
 - A ordem em que os lotes chegam do servidor é a verdade: o armazém aplica sem conferir revisão.
 - Hoje, se um chunk falha ao carregar, o controlador o trata como vazio para não repetir o pedido a cada quadro. Com servidor isso precisa mudar: um chunk vazio por falha de rede não pode ser gravado por cima do verdadeiro.
 - O PocketBase assina por coleção, não por chunk: o cliente filtra o que não está visível.
+- O hexágono ganhou `rios` e `estradas` (listas de números). A coleção de hexágonos precisa guardá-los, e dado sem esses campos vale como lista vazia.
+- O token do grupo precisa de um registro por mapa com `q`, `r`, `ts` e `autor`. A regra é "vale o `ts` mais recente".
 
 ## Tilesets (trocar a arte)
 
@@ -142,10 +157,10 @@ npm test            # uma vez
 npm run test:watch  # a cada alteração
 ```
 
-Cobrem a matemática de hexágonos (ida e volta pixel↔hex, anéis, linhas, arestas), a câmera, as operações, o desfazer entre dois jogadores e a validação de dados.
+Cobrem a matemática de hexágonos (ida e volta pixel↔hex, anéis, linhas, arestas), a câmera, as operações, o desfazer entre dois jogadores, rios e estradas (regras de onde ligam, desfazer, sincronia), o token do grupo, a régua e a validação de dados.
 
 ## Próximas fases
 
-- **3.** Rios e estradas pelas arestas, token do grupo, régua de distância.
+- **3.** Feita: rios, estradas, token do grupo e régua de distância.
 - **4.** Servidor: `RepositorioPocketBase`, papéis (jogador e mestre), camada privada do mestre, presença (cursores).
 - **Depois.** Se desenhar pesar com mapas grandes, guardar cada chunk num bitmap (cache invalidado ao editar).

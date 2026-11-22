@@ -265,6 +265,8 @@ describe('normalizar', () => {
       nome: '',
       nota: '',
       marcadores: [],
+      rios: [],
+      estradas: [],
       rev: 1,
     })
   })

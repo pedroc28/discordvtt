@@ -2,6 +2,12 @@
 
 Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em cima. Cada entrada diz o que foi decidido e por quê.
 
+## 2026-11-22
+
+- **Rios e estradas moram no hexágono dono da aresta.** Mesma razão dos marcadores: lotes, chunks e desfazer funcionam sem código novo. O preço: só se liga onde os dois hexágonos da aresta existem. O contrato `Hexagono` ganhou os campos `rios` e `estradas` (Pedro: a coleção de hexágonos do servidor precisa guardá-los).
+- **Token do grupo fora dos lotes.** É um estado só, muito mutável, e vale o mais recente. Entra no `RepositorioMapa` como três métodos opcionais (`carregarToken`, `gravarToken`, `assinarToken`), então a implementação do servidor continua compilando sem eles. Quando existir o PocketBase, vale uma coleção própria com um registro por mapa.
+- **Régua só local.** Cada jogador mede o que quiser, sem sincronizar.
+
 ## 2026-11-21
 
 - **Tudo automático na entrega.** Um pull request entra sozinho na `main` quando a verificação passa, sem revisão humana. As áreas são bem separadas, e a responsabilidade pela divisão é das pessoas. Quando uma tarefa mexe na área do outro, o Claude analisa os riscos, avisa antes e registra na descrição do pull request. Não há bloqueio automático por área.

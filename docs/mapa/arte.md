@@ -109,8 +109,7 @@ Dica de teste rápido: `lint` e `score` do `pixelart_workbench` apontam pixels s
 1. Baixe os PNGs e guarde em `app/public/tilesets/pixel/` como `<id>-1.png`, `<id>-2.png`.
 2. No `tileset.json` dessa pasta, no terreno de mesmo `id`, troque `arquivos` pelos PNGs, ajuste `cor` para a **cor média** do tile (é o que aparece enquanto a imagem carrega e esconde frestas) e deixe `extra` em `0`. O tileset já tem `"pixelart": true`.
 3. Terreno novo (que não existe ainda): acrescente um item em `terrenos` com `id`, `nome`, `cor`, `extra`, `arquivos`, `pasta` e `tags`. A `pasta` e as `tags` de cada um dos 43 terrenos já estão prontas em `app/tools/catalogo-terrenos.json`: **copie de lá**, sem inventar (ver a seção 8). Cada terreno tem no mínimo 3 tags.
-4. Para ver no mapa, abra o site com `?tileset=pixel` no fim do endereço, por exemplo `http://localhost:5173/discordvtt/?tileset=pixel`. Sem isso o mapa usa o tileset gerado por script.
-5. Quando a pasta `pixel` estiver completa, a troca definitiva é mudar o `id` padrão em `urlDoTileset()` (`MapaHex.tsx`) de `padrao` para `pixel`.
+4. O mapa já usa a pasta `pixel` como padrão (função `urlDoTileset()` em `MapaHex.tsx`), então a arte aprovada aparece sozinha, sem parâmetro. Para comparar com o tileset gerado por script, abra com `?tileset=padrao` no fim do endereço.
 
 Registre no `docs/mapa/diario.md` o job do PixelLab de cada lote (para repetir ou ajustar) e marque na lista abaixo o que ficou pronto.
 

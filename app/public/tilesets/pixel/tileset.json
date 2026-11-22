@@ -159,6 +159,66 @@
       ]
     },
     {
+      "id": "estepe",
+      "nome": "Estepe",
+      "cor": "#8d8559",
+      "extra": 0,
+      "arquivos": [
+        "estepe-1.png",
+        "estepe-2.png",
+        "estepe-3.png",
+        "estepe-4.png",
+        "estepe-5.png"
+      ],
+      "pasta": "terra-aberta",
+      "tags": [
+        "estepe",
+        "frio",
+        "seco",
+        "grama baixa",
+        "ventoso"
+      ]
+    },
+    {
+      "id": "charneca",
+      "nome": "Charneca",
+      "cor": "#6c6640",
+      "extra": 0,
+      "arquivos": [
+        "charneca-1.png",
+        "charneca-2.png",
+        "charneca-3.png",
+        "charneca-4.png",
+        "charneca-5.png"
+      ],
+      "pasta": "terra-aberta",
+      "tags": [
+        "charneca",
+        "urze",
+        "úmido",
+        "sombrio",
+        "frio"
+      ]
+    },
+    {
+      "id": "pomar",
+      "nome": "Pomar e vinhedo",
+      "cor": "#5a6836",
+      "extra": 0,
+      "arquivos": [
+        "pomar-1.png",
+        "pomar-2.png"
+      ],
+      "pasta": "terra-aberta",
+      "tags": [
+        "pomar",
+        "vinhedo",
+        "cultivo",
+        "civilizado",
+        "fruta"
+      ]
+    },
+    {
       "id": "montanha",
       "nome": "Montanhas",
       "cor": "#67915f",

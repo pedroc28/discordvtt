@@ -2,7 +2,7 @@
 
 Guia para quem gera a arte dos terrenos do mapa com o PixelLab (o agente de arte, ou uma pessoa). É autossuficiente: com este arquivo e o `docs/mapa/manual.md` dá para fazer todos os tiles sem perguntar nada. O formato técnico do tileset está no manual, na seção "Tilesets". Aqui está o que desenhar, como pedir ao PixelLab, como conferir e onde guardar.
 
-Estado: **6 de 43 tiles feitos**: água, planície e montanha (teste) e o lote 1 (`campo`, `colina`, `savana`). Faltam 37 da lista da seção 7.
+Estado: **9 de 43 tiles feitos**: água, planície e montanha (teste), lote 1 (`campo`, `colina`, `savana`) e lote 2 (`estepe`, `charneca`, `pomar`). Faltam 34 da lista da seção 7.
 
 ## 1. Estilo
 
@@ -203,7 +203,7 @@ Marque aqui ao aprovar (`[x]`) e anote o job do PixelLab.
 
 - [x] Teste: `oceano`, `planicie`, `montanha` (2 variantes cada), job `d2d59d22-b0f4-4ed8-96f5-3ff232ecc1e5`
 - [x] Lote 1: `campo` (3 variantes), `colina` (3), `savana` (6). Jobs `8ec2399c-36ab-48e3-b990-04fd7f42799c` (campo), `85eca2ec-a1df-4e09-b0ca-80b536d0ff7e` (colina) e `b623aeb6-9cd0-4937-acb9-d0409fe86a9a` (savana). Pontos fracos: o chão verde do `campo` é liso e as colinas ainda têm pouco relevo
-- [ ] Lote 2: `estepe`, `charneca`, `pomar`
+- [x] Lote 2: `estepe` (5 variantes), `charneca` (5), `pomar` (2). Jobs `561500e6-6639-4cc6-b93c-a78641d30135` (os três) e `1dd001e5-585b-4718-90e5-ebb5f9246a72` (variantes extras de estepe e charneca). Receita que funcionou: pedir os três terrenos e, se algum sair com poucas variantes, uma segunda chamada com descrições do mesmo terreno mudando o detalhe (poça congelada, sem pedras grandes, arbustos amarelos)
 - [ ] Lote 3: `floresta`, `floresta-densa`, `bosque`
 - [ ] Lote 4: `taiga`, `floresta-outono`, `floresta-nevada`
 - [ ] Lote 5: `selva`, `floresta-morta`, `pico-nevado`

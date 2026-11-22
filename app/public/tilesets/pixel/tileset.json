@@ -471,6 +471,60 @@
       ]
     },
     {
+      "id": "dunas",
+      "nome": "Dunas altas",
+      "cor": "#bc865c",
+      "extra": 0,
+      "arquivos": [
+        "dunas-1.png",
+        "dunas-2.png"
+      ],
+      "pasta": "aridos",
+      "tags": [
+        "dunas",
+        "areia",
+        "quente",
+        "seco",
+        "deserto"
+      ]
+    },
+    {
+      "id": "oasis",
+      "nome": "Oásis",
+      "cor": "#b29656",
+      "extra": 0,
+      "arquivos": [
+        "oasis-1.png",
+        "oasis-2.png"
+      ],
+      "pasta": "aridos",
+      "tags": [
+        "oásis",
+        "água",
+        "palmeiras",
+        "deserto",
+        "descanso"
+      ]
+    },
+    {
+      "id": "salar",
+      "nome": "Planície de sal",
+      "cor": "#e0dee2",
+      "extra": 0,
+      "arquivos": [
+        "salar-1.png",
+        "salar-2.png"
+      ],
+      "pasta": "aridos",
+      "tags": [
+        "sal",
+        "seco",
+        "planície",
+        "branco",
+        "árido"
+      ]
+    },
+    {
       "id": "pantano",
       "nome": "Pântano",
       "cor": "#5f7143",

@@ -2,7 +2,7 @@
 
 Guia para quem gera a arte dos terrenos do mapa com o PixelLab (o agente de arte, ou uma pessoa). É autossuficiente: com este arquivo e o `docs/mapa/manual.md` dá para fazer todos os tiles sem perguntar nada. O formato técnico do tileset está no manual, na seção "Tilesets". Aqui está o que desenhar, como pedir ao PixelLab, como conferir e onde guardar.
 
-Estado: **24 de 43 tiles feitos**: água, planície e montanha (teste) e os lotes 1 a 7 (`campo`, `colina`, `savana`, `estepe`, `charneca`, `pomar`, `floresta`, `floresta-densa`, `bosque`, `taiga`, `floresta-outono`, `floresta-nevada`, `selva`, `floresta-morta`, `pico-nevado`, `rochoso`, `planalto`, `canion`, `vulcao`, `campo-de-lava`, `deserto`). Faltam 19 da lista da seção 7.
+Estado: **27 de 43 tiles feitos**: água, planície e montanha (teste) e os lotes 1 a 8 (`campo`, `colina`, `savana`, `estepe`, `charneca`, `pomar`, `floresta`, `floresta-densa`, `bosque`, `taiga`, `floresta-outono`, `floresta-nevada`, `selva`, `floresta-morta`, `pico-nevado`, `rochoso`, `planalto`, `canion`, `vulcao`, `campo-de-lava`, `deserto`, `dunas`, `oasis`, `salar`). Faltam 16 da lista da seção 7.
 
 ## 1. Estilo
 
@@ -212,7 +212,7 @@ Marque aqui ao aprovar (`[x]`) e anote o job do PixelLab.
 - [x] Lote 5: `selva` (2 variantes), `floresta-morta` (2), `pico-nevado` (2). Job `413dd74c-956e-44b5-874f-cd6bb1d082f6`, uma chamada (15 gerações). Ponto fraco: as duas variantes de `pico-nevado` são quase iguais e os picos formam uma grade quando há muitos hexágonos juntos. Vale refazer com 3 descrições de composições diferentes (um pico grande, dois picos, cordilheira baixa)
 - [x] Lote 6: `rochoso` (2 variantes), `planalto` (2), `canion` (2). Job `92a20a44-1fd2-4c7a-88d9-16f401e557c4`, uma chamada (15 gerações). Limites que ficam: o planalto é um objeto por hexágono e aparece em grade se pintado em massa (o certo é usar poucos), e a fenda do cânion não continua de um hexágono para o vizinho. Para cânions longos, vale testar a transição `tile_feature="tileset"` (seção 9)
 - [x] Lote 7: `vulcao` (1 variante, é um marco isolado), `campo-de-lava` (2), `deserto` (2). Job `1658043d-26c1-4348-9056-3f8d5168440a`, uma chamada (15 gerações). A outra variante do vulcão saiu com a fumaça como um cano cinza reto e foi descartada. As duas variantes do deserto são bem diferentes entre si (areia com dunas pequenas e dunas onduladas grandes), então a segunda já adianta a ideia do `dunas`
-- [ ] Lote 8: `dunas`, `oasis`, `salar`
+- [x] Lote 8: `dunas` (2 variantes), `oasis` (2), `salar` (2). Job `30db8647-c146-4cee-a8bf-840b97211562`, uma chamada (15 gerações). Ponto fraco: cada tile de dunas é uma duna enorme só, então pintar vários juntos forma uma grade de curvas em S. Funciona melhor misturado com `deserto`. Vale gerar mais 3 variantes de dunas menores e de direções diferentes
 - [ ] Lote 9: `pantano`, `mangue`, `agua-rasa`
 - [ ] Lote 10: `recife`, `tundra`, `geleira`
 - [ ] Lote 11: `mar-congelado`, `praia`, `falesia`

@@ -11,6 +11,7 @@ import type { ControladorMapa } from './controlador'
 import { limitarZoom, mundoParaTela, telaParaMundo, type Camera } from './camera'
 import { RAIZ3, TAMANHO_CHUNK, cantos, chave, hexParaPixel, pixelParaHex, vizinho, type Aresta, type Hex } from './hex'
 import { raizDaRegiao } from './operacoes'
+import { pixelsDaLinha, ruidoDoPixel } from './pixellinhas'
 import { medirRegua, textoDaMedida, type Regua } from './regua'
 import type { Regiao } from './tipos'
 import type { Tileset } from './tileset'
@@ -53,6 +54,8 @@ const RAIO_MIN_GRADE = 7
 const LIMITE_GRADE = 9000
 const LIMITE_CHUNKS = 400
 const COR_PADRAO_MARCADOR = '#d6336c'
+/** Largura, em pixels da arte, de um hexágono no tileset em pixel art. Define o tamanho do "pixel" de rios e estradas. */
+const RESOLUCAO_ARTE = 128
 const FONTE = "'Atkinson Hyperlegible Next', system-ui, sans-serif"
 
 export class Renderizador {
@@ -327,8 +330,12 @@ export class Renderizador {
     }
 
     // 4. rios e estradas (a estrada passa por cima do rio, como uma ponte)
-    this.desenharRios(visiveis, z)
-    this.desenharEstradas(visiveis, z)
+    if (this.tileset.def.pixelart) {
+      this.desenharLinhasPixel(visiveis, lim)
+    } else {
+      this.desenharRios(visiveis, z)
+      this.desenharEstradas(visiveis, z)
+    }
 
     // 5. marcadores e nomes dos hexágonos
     if (z >= ZOOM_SO_COR) this.desenharMarcadoresENomes(visiveis, z)
@@ -391,6 +398,81 @@ export class Renderizador {
 
     // 10. token do grupo, por cima de tudo
     this.desenharToken(z)
+  }
+
+  private camadaPixel: HTMLCanvasElement | null = null
+
+  /**
+   * Rios e estradas no estilo da arte: cada traço é feito pixel a pixel numa camada do tamanho da tela
+   * em "pixels da arte" (o mesmo tamanho dos pixels dos tiles) e ampliada sem suavizar. Rio azul com
+   * brilho, estrada de terra com salpicos. A estrada passa por cima do rio, como uma ponte.
+   */
+  private desenharLinhasPixel(visiveis: HexVisivel[], lim: { x0: number; x1: number; y0: number; y1: number }) {
+    const { ctx, R } = this
+    if (!visiveis.some((v) => v.rios.length || v.estradas.length)) return
+    const armazem = this.ctrl.armazem
+    const px = this.tileset.def.largura / RESOLUCAO_ARTE
+    const ox = Math.floor(lim.x0 / px) - 4
+    const oy = Math.floor(lim.y0 / px) - 4
+    const w = Math.ceil((lim.x1 - lim.x0) / px) + 9
+    const h = Math.ceil((lim.y1 - lim.y0) / px) + 9
+    if (w * h > 4_000_000) return
+    const c = (this.camadaPixel ??= document.createElement('canvas'))
+    if (c.width !== w || c.height !== h) {
+      c.width = w
+      c.height = h
+    }
+    const g = c.getContext('2d')!
+    g.clearRect(0, 0, w, h)
+
+    type Seg = [number, number, number, number]
+    const rios: Seg[] = []
+    const estradas: Seg[] = []
+    const paraPixel = (x: number, y: number): [number, number] => [x / px - ox, y / px - oy]
+    for (const v of visiveis) {
+      for (const d of v.rios) {
+        const o = vizinho(v, d)
+        if (!armazem.ler(o.q, o.r)) continue
+        const a = this.cantosRel[d]
+        const b = this.cantosRel[(d + 1) % 6]
+        rios.push([...paraPixel(v.x + a.x, v.y + a.y), ...paraPixel(v.x + b.x, v.y + b.y)])
+      }
+      for (const d of v.estradas) {
+        const o = vizinho(v, d)
+        if (!armazem.ler(o.q, o.r)) continue
+        const p = hexParaPixel(o, R)
+        estradas.push([...paraPixel(v.x, v.y), ...paraPixel(p.x, p.y)])
+      }
+    }
+
+    const carimbar = (segs: Seg[], tam: number, cor: string) => {
+      g.fillStyle = cor
+      const m = Math.floor(tam / 2)
+      for (const [x0, y0, x1, y1] of segs) {
+        for (const [x, y] of pixelsDaLinha(x0, y0, x1, y1)) g.fillRect(x - m, y - m, tam, tam)
+      }
+    }
+    const salpicar = (segs: Seg[], tam: number, cor: string, chance: number) => {
+      g.fillStyle = cor
+      const m = Math.floor(tam / 2)
+      for (const [x0, y0, x1, y1] of segs) {
+        for (const [x, y] of pixelsDaLinha(x0, y0, x1, y1)) {
+          if (ruidoDoPixel(x + ox, y + oy) < chance) g.fillRect(x - m, y - m, tam, tam)
+        }
+      }
+    }
+
+    // Larguras ímpares, para o traço ficar centrado no pixel.
+    carimbar(rios, 7, '#1f4f86') // contorno
+    carimbar(rios, 5, '#3b86c6') // água
+    carimbar(rios, 3, '#79c4ec') // meio claro
+    salpicar(rios, 1, '#e6f7ff', 0.16) // brilho
+    carimbar(estradas, 7, '#4a3520') // contorno
+    carimbar(estradas, 5, '#c9a56b') // terra
+    salpicar(estradas, 3, '#e3c98f', 0.2) // trechos claros
+    salpicar(estradas, 1, '#8a6a3b', 0.25) // pedrinhas
+
+    ctx.drawImage(c, ox * px, oy * px, w * px, h * px)
   }
 
   /** Rio pela borda do hexágono dono. Só aparece se os dois lados existem (se um foi apagado, o dado fica guardado). */
@@ -513,6 +595,13 @@ export class Renderizador {
     if (!t) return
     const { ctx, R } = this
     const { x, y } = hexParaPixel(t, R)
+    const sprite = this.tileset.imagemToken()
+    if (sprite) {
+      // Sprite do tileset: a base do desenho (a parte de baixo, ~92% da altura) fica um pouco abaixo do centro do hexágono.
+      const lado = R * 1.25
+      ctx.drawImage(sprite, x - lado / 2, y + R * 0.3 - lado * 0.92, lado, lado)
+      return
+    }
     const raio = R * 0.27
     const cy = y - R * 0.4
     const ponta = y + R * 0.12

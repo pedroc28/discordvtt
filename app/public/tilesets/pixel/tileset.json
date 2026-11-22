@@ -42,6 +42,7 @@
       "nome": "Fantasia e perigo"
     }
   ],
+  "token": "token.png",
   "terrenos": [
     {
       "id": "planicie",

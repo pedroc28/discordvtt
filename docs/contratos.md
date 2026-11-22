@@ -53,6 +53,25 @@ interface RepositorioMapa {
 - Um chunk que falhou ao carregar não pode ser gravado como vazio por cima do verdadeiro.
 - A camada privada do mestre fica em coleções separadas, protegidas no servidor.
 
+## Campanhas e papéis (servidor)
+
+Arquivos: `pocketbase/pb_migrations/1795321000_base_campanhas.js` e `pocketbase/pb_hooks/campanhas.pb.js` (área do servidor). Detalhes em `docs/servidor/README.md`.
+
+- Coleções: `users` (`name`), `campanhas` (`nome`) e `participantes` (`campanha`, `usuario`, `papel`, que é `mestre` ou `jogador`).
+- Uma participação nunca muda de campanha nem de pessoa. Para trocar, apague e crie outra.
+- Toda campanha tem pelo menos um mestre, e pode ter vários.
+- Coleções de outras áreas ligadas a uma campanha (por exemplo, um mapa com o campo `campanha`) reaproveitam estas regras:
+
+```
+// é participante da campanha
+campanha.participantes_via_campanha.usuario ?= @request.auth.id
+
+// é mestre da campanha
+@collection.participantes:mestre.campanha ?= campanha && @collection.participantes:mestre.usuario ?= @request.auth.id && @collection.participantes:mestre.papel ?= "mestre"
+```
+
+O alias `:mestre` faz as três condições valerem para a mesma participação. Sem ele, quem é mestre em uma campanha e jogador em outra passaria como mestre nas duas. Toda regra nova ganha verificação em `pocketbase/testar-regras.mjs`.
+
 ## Configuração
 
 - `VITE_POCKETBASE_URL`: endereço do PocketBase usado pelo app (modelo em `app/.env.example`).

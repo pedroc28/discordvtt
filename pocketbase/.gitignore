@@ -2,3 +2,8 @@
 pocketbase
 pocketbase.exe
 pb_data/
+
+# O que mais vem no zip do PocketBase, caso alguém extraia tudo nesta pasta
+pocketbase_*.zip
+CHANGELOG.md
+LICENSE.md

@@ -1,0 +1,2 @@
+# O cmd do Windows se confunde com arquivos .bat que só têm LF no fim das linhas
+*.bat text eol=crlf

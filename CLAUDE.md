@@ -38,7 +38,7 @@ Site de teste, atualizado sozinho a cada mudança na `main`: https://pedroc28.gi
    - traz a `main` mais recente
    - roda lint, build e testes
    - envia a branch e abre o pull request
-   - espera a verificação do GitHub e junta na `main` com squash
+   - espera a verificação do GitHub e junta na `main` com squash. A verificação roda lint, build e testes do app e também o teste das regras do servidor (`pocketbase/testar-regras.mjs`).
 
    Não existe revisão humana: se a verificação passa, entra.
 5. **Responder.** Diga à pessoa o que mudou, o link do pull request e o link do site de teste.

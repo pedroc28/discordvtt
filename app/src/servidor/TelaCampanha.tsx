@@ -120,7 +120,95 @@ function Conectado({ estado }: { estado: EstadoServidor }) {
       <Convite endereco={estado.endereco} />
       <Campanhas estado={estado} />
       {atual && <CampanhaAberta key={atual.id} estado={estado} campanha={atual} />}
+      <Conta ocupado={estado.ocupado} />
     </>
+  )
+}
+
+/** A própria conta: por enquanto, só a troca de senha, escondida até a pessoa pedir. */
+function Conta({ ocupado }: { ocupado: boolean }) {
+  const titulo = useId()
+  const [aberto, setAberto] = useState(false)
+  const [atual, setAtual] = useState('')
+  const [nova, setNova] = useState('')
+  const [confirmacao, setConfirmacao] = useState('')
+  // As mensagens ficam aqui, junto do formulário, e não no topo da página.
+  const [erro, setErro] = useState('')
+  const [aviso, setAviso] = useState('')
+
+  const fechar = () => {
+    setAberto(false)
+    setAtual('')
+    setNova('')
+    setConfirmacao('')
+    setErro('')
+  }
+
+  const enviar = async (e: FormEvent) => {
+    e.preventDefault()
+    setErro('')
+    setAviso('')
+    const resultado = await conexao.trocarSenha(atual, nova, confirmacao)
+    if (resultado.ok) {
+      fechar()
+      setAviso(resultado.aviso)
+    } else {
+      setErro(resultado.erro)
+    }
+  }
+
+  return (
+    <section className="servidor__secao servidor__secao--aberta" aria-labelledby={titulo}>
+      <div>
+        <h2 id={titulo} className="servidor__subtitulo">
+          Sua conta
+        </h2>
+        <p className="servidor__erro" role="alert">
+          {erro}
+        </p>
+        <p className="servidor__aviso" role="status">
+          {aviso}
+        </p>
+      </div>
+      {!aberto ? (
+        <div className="servidor__linha">
+          <button
+            type="button"
+            className="botao-topo"
+            onClick={() => {
+              setAviso('')
+              setAberto(true)
+            }}
+          >
+            Trocar senha
+          </button>
+        </div>
+      ) : (
+        <form className="servidor__secao" onSubmit={enviar} noValidate>
+          <label className="servidor__campo">
+            <span>Senha atual</span>
+            <input type="password" autoComplete="current-password" value={atual} onChange={(e) => setAtual(e.target.value)} />
+          </label>
+          <label className="servidor__campo">
+            <span>Nova senha</span>
+            <input type="password" autoComplete="new-password" value={nova} onChange={(e) => setNova(e.target.value)} />
+          </label>
+          <label className="servidor__campo">
+            <span>Repita a nova senha</span>
+            <input type="password" autoComplete="new-password" value={confirmacao} onChange={(e) => setConfirmacao(e.target.value)} />
+          </label>
+          <p className="servidor__dica">Pelo menos 8 caracteres. Nos outros aparelhos, você vai precisar entrar de novo com a senha nova.</p>
+          <div className="servidor__linha">
+            <button type="submit" className="botao-topo botao-topo--principal" disabled={ocupado}>
+              Salvar nova senha
+            </button>
+            <button type="button" className="botao-topo" onClick={fechar}>
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
   )
 }
 

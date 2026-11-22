@@ -39,6 +39,13 @@ describe('mensagens de erro', () => {
     expect(mensagemDeErro(erro(400, '', { nome: { code: 'validation_required' } }), 'criar', ENDERECO)).toContain('80')
   })
 
+  it('senha atual errada na troca de senha tem mensagem própria', () => {
+    const errada = erro(400, 'Failed to update record.', { oldPassword: { code: 'validation_invalid_old_password', message: 'Missing or invalid old password.' } })
+    expect(mensagemDeErro(errada, 'senha', ENDERECO)).toBe('A senha atual está errada.')
+    const curta = erro(400, 'Failed to update record.', { password: { code: 'validation_min_text_constraint' } })
+    expect(mensagemDeErro(curta, 'senha', ENDERECO)).toContain('8 a 71')
+  })
+
   it('erro desconhecido cai numa mensagem da própria ação', () => {
     expect(mensagemDeErro(new Error('???'), 'apagar', ENDERECO)).toBe('Não consegui apagar a campanha. Tente de novo.')
     expect(mensagemDeErro(erro(500), 'criar', ENDERECO)).toBe('Não consegui criar a campanha. Tente de novo.')

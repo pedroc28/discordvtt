@@ -293,6 +293,37 @@ async function testar() {
   confere('mestre apaga a campanha', apaga.ok, apaga)
   confere('apagar a campanha apaga as participações', (await contarParticipacoes(admin, `campanha = "${mesaAna.id}"`)) === 0)
 
+  console.log('\nTrocar senha')
+  const NOVA = 'nova-senha-123'
+  const semAtual = await api('PATCH', `/api/collections/users/records/${contas.Davi.id}`, {
+    token: Davi,
+    corpo: { oldPassword: 'errada-123', password: NOVA, passwordConfirm: NOVA },
+  })
+  confere('sem a senha atual certa, ninguém troca a senha', !semAtual.ok, semAtual.status)
+
+  const troca = await api('PATCH', `/api/collections/users/records/${contas.Davi.id}`, {
+    token: Davi,
+    corpo: { oldPassword: SENHA, password: NOVA, passwordConfirm: NOVA },
+  })
+  confere('cada um troca a própria senha informando a atual', troca.ok, troca)
+
+  const sessaoAntiga = await api('GET', registros('users'), { token: Davi })
+  confere('trocar a senha encerra as sessões antigas', !sessaoAntiga.ok || sessaoAntiga.dados.items.length === 0, sessaoAntiga.status)
+
+  let novaSessao = ''
+  try {
+    novaSessao = await login('users', contas.Davi.email, NOVA)
+  } catch {
+    novaSessao = ''
+  }
+  confere('a senha nova funciona no login', Boolean(novaSessao))
+
+  const trocaDeOutro = await api('PATCH', `/api/collections/users/records/${contas.Bruno.id}`, {
+    token: novaSessao,
+    corpo: { oldPassword: SENHA, password: 'invasao-1234', passwordConfirm: 'invasao-1234' },
+  })
+  confere('ninguém troca a senha de outra pessoa, mesmo sabendo a senha dela', !trocaDeOutro.ok, trocaDeOutro.status)
+
   console.log('\nLimite de tentativas')
   await esperar(3200)
   const tentativas = []

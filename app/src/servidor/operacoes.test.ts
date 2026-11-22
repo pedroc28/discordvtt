@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { campanhaValida, ehUnicoMestre, limparNomeCampanha, montarCampanhas, montarParticipantes, usuariosDisponiveis } from './operacoes'
+import {
+  campanhaValida,
+  ehUnicoMestre,
+  limparNomeCampanha,
+  montarCampanhas,
+  montarParticipantes,
+  problemaNaNovaSenha,
+  usuariosDisponiveis,
+} from './operacoes'
 import type { Participacao, Usuario } from './tipos'
 
 const usuarios: Usuario[] = [
@@ -61,6 +69,20 @@ describe('participantes', () => {
 
   it('oferece para adicionar só quem ainda não está na campanha', () => {
     expect(usuariosDisponiveis(usuarios, participacoes).map((u) => u.id)).toEqual(['u4'])
+  })
+})
+
+describe('troca de senha', () => {
+  it('aceita senha nova válida e diferente da atual', () => {
+    expect(problemaNaNovaSenha('antiga-123', 'nova-senha-1', 'nova-senha-1')).toBeNull()
+  })
+
+  it('explica cada problema antes de mandar ao servidor', () => {
+    expect(problemaNaNovaSenha('', 'nova-senha-1', 'nova-senha-1')).toBe('Digite a senha atual.')
+    expect(problemaNaNovaSenha('antiga-123', 'curta', 'curta')).toContain('pelo menos 8')
+    expect(problemaNaNovaSenha('antiga-123', 'x'.repeat(72), 'x'.repeat(72))).toContain('no máximo 71')
+    expect(problemaNaNovaSenha('antiga-123', 'nova-senha-1', 'nova-senha-2')).toContain('não bate')
+    expect(problemaNaNovaSenha('mesma-senha', 'mesma-senha', 'mesma-senha')).toContain('igual à atual')
   })
 })
 

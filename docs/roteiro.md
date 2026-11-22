@@ -10,7 +10,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Mapa hexagonal: rios, estradas, token do grupo e régua de distância (fase 3)
 - [x] Reorganização do repositório: áreas, telas automáticas, regras para os Claudes, entrega automática e site de teste
 - [x] Base do servidor no PocketBase: contas, campanhas, mestres e jogadores
-- [x] Aba Campanha: login, escolha da campanha e quem participa, atualizando em tempo real
+- [x] Aba Campanha: login, escolha da campanha, quem participa e troca de senha, atualizando em tempo real
 
 ## Mapa (GrifoCaolho)
 

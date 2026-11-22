@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizarCampanha, normalizarLista, normalizarParticipacao, normalizarUsuario } from './validacao'
+import { emailDaConta, normalizarCampanha, normalizarLista, normalizarParticipacao, normalizarUsuario } from './validacao'
 
 describe('validação dos dados do servidor', () => {
   it('converte os campos do PocketBase para os nomes do app', () => {
@@ -23,6 +23,13 @@ describe('validação dos dados do servidor', () => {
     expect(normalizarCampanha(null)).toBeNull()
     expect(normalizarParticipacao({ id: 'p1', campanha: 'c1', usuario: 'u1', papel: 'narrador' })).toBeNull()
     expect(normalizarParticipacao({ id: 'p1', campanha: '', usuario: 'u1', papel: 'jogador' })).toBeNull()
+  })
+
+  it('lê o e-mail da própria conta só se ele vier certo', () => {
+    expect(emailDaConta({ id: 'u1', email: 'ana@teste.local' })).toBe('ana@teste.local')
+    expect(emailDaConta({ id: 'u1', email: '' })).toBeNull()
+    expect(emailDaConta({ id: 'u1' })).toBeNull()
+    expect(emailDaConta(null)).toBeNull()
   })
 
   it('lista que não é lista vira vazia, e itens inválidos saem', () => {

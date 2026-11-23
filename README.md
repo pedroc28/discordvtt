@@ -35,4 +35,4 @@ scripts/              comecar.sh e entregar.sh, usados pelo Claude
 - [Roteiro](docs/roteiro.md): o que está pronto e o que vem depois
 - [Decisões](docs/decisoes.md): o que foi decidido e por quê
 - [Contratos](docs/contratos.md): o que uma área oferece para as outras
-- [Fichas](docs/fichas.md), [mapa](docs/mapa/manual.md) e [servidor](docs/servidor/README.md)
+- [Fichas](docs/fichas.md), [mapa](docs/mapa/manual.md), [dados](docs/dados.md) e [servidor](docs/servidor/README.md)

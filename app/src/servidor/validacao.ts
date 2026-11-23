@@ -1,6 +1,8 @@
 // Validação do que chega do PocketBase. O servidor pode estar numa versão diferente ou com
 // dados antigos, então nada é usado sem passar por aqui. Registro inválido é descartado.
 
+import { ehLados } from '../dados/operacoes'
+import type { Rolagem } from '../dados/tipos'
 import { normalizarHexagono, normalizarRegiao } from '../mapa/armazenamento'
 import type { Hexagono, Lote, Mudanca, MudancaNota, MudancaRegiao, NotaPrivada, Regiao, TipoLote, TokenGrupo } from '../mapa/tipos'
 import type { CamadaMestreDoServidor, Campanha, LoteDoServidor, MapaDoServidor, Papel, Participacao, TokenDoServidor, Usuario } from './tipos'
@@ -170,4 +172,23 @@ export function normalizarTokenDoServidor(bruto: unknown): TokenDoServidor | nul
     }
   }
   return { id: bruto.id, token }
+}
+
+// ---------- dados ----------
+
+/** Data do PocketBase ("2026-11-23 04:24:00.123Z") em milissegundos, ou null se não der para ler. */
+export function horaDoServidor(bruto: unknown): number | null {
+  if (typeof bruto !== 'string' || !bruto) return null
+  const ms = Date.parse(bruto.replace(' ', 'T'))
+  return Number.isFinite(ms) ? ms : null
+}
+
+/** Registro de `rolagens` ou de `rolagens_secretas` (diz qual em `secreta`). Resultado fora do dado descarta o registro. */
+export function normalizarRolagemDoServidor(bruto: unknown, secreta: boolean): Rolagem | null {
+  if (!ehObj(bruto) || !id(bruto.id) || !id(bruto.autor) || !ehLados(bruto.lados)) return null
+  const lados = bruto.lados
+  if (!inteiro(bruto.resultado) || bruto.resultado < 1 || bruto.resultado > lados) return null
+  const quando = horaDoServidor(bruto.created)
+  if (quando === null) return null
+  return { id: bruto.id, autorId: bruto.autor, lados, resultado: bruto.resultado, quando, secreta }
 }

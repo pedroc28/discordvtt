@@ -1,13 +1,14 @@
-// Conexão do app com o PocketBase: login, campanhas, participantes e o cliente do mapa.
+// Conexão do app com o PocketBase: login, campanhas, participantes e os clientes do mapa e dos dados.
 // É o único lugar do app que usa o SDK do servidor (ver o CLAUDE.md da área). A tela só lê
 // o estado com useServidor() e chama os métodos de `conexao`. O mapa recebe um RepositorioPocketBase
-// pronto, por abrirRepositorioMapa().
+// pronto, por abrirRepositorioMapa(), e a aba Dados, um RepositorioDadosPocketBase, por abrirRepositorioDados().
 
 import PocketBase, { LocalAuthStore } from 'pocketbase'
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { ENDERECO_PADRAO, enderecoDoLink, normalizarEndereco, semParametroDoServidor } from './endereco'
-import { MAPA_FECHADO, mensagemDeErro, type Acao } from './erros'
+import { DADOS_FECHADO, MAPA_FECHADO, mensagemDeErro, type Acao } from './erros'
 import { campanhaValida, limparNomeCampanha, mapaContinuaAberto, montarCampanhas, montarParticipantes, problemaNaNovaSenha } from './operacoes'
+import { RepositorioDadosPocketBase, type ClienteDados } from './repositorio-dados'
 import { RepositorioPocketBase, type ClienteMapa, type FiltroServidor } from './repositorio-mapa'
 import type { EstadoServidor, FaseConexao, Papel } from './tipos'
 import { emailDaConta, normalizarCampanha, normalizarLista, normalizarParticipacao, normalizarUsuario } from './validacao'
@@ -61,6 +62,14 @@ function estadoVazio(endereco: string, fase: FaseConexao, sessaoSalva: boolean):
   }
 }
 
+/** Repositório preso a uma campanha e a um papel, que fecha quando a sessão muda. */
+interface RepositorioDaSessao {
+  readonly campanhaId: string
+  readonly papel: Papel
+  readonly fechado: boolean
+  fechar(): Promise<void>
+}
+
 const statusDe = (erro: unknown) =>
   typeof erro === 'object' && erro !== null && 'status' in erro && typeof erro.status === 'number' ? erro.status : -1
 
@@ -76,8 +85,9 @@ export class ConexaoServidor {
   private geracao = 0
   // Sobe a cada recarga. Só a mais recente pode mudar a tela.
   private ultimaCarga = 0
-  // Mapas abertos, para fechar as assinaturas deles quando a pessoa troca de campanha, sai ou troca de servidor.
-  private mapasAbertos: Array<{ repositorio: RepositorioPocketBase; geracao: number }> = []
+  // Mapas e rolagens abertos, para fechar as assinaturas deles quando a pessoa troca de campanha, sai,
+  // troca de servidor ou muda de papel.
+  private abertos: Array<{ repositorio: RepositorioDaSessao; geracao: number }> = []
 
   constructor() {
     // O link de convite (?servidor=) vale mais que o endereço guardado. Ele é guardado na hora
@@ -109,7 +119,7 @@ export class ConexaoServidor {
 
   private mudar(patch: Partial<EstadoServidor>) {
     this.atual = { ...this.atual, ...patch }
-    this.fecharMapasForaDaSessao()
+    this.fecharForaDaSessao()
     for (const ouvinte of [...this.ouvintes]) ouvinte()
   }
 
@@ -486,41 +496,62 @@ export class ConexaoServidor {
     }
   }
 
-  // ---------- mapa ----------
+  // ---------- mapa e dados ----------
 
-  /** O mapa da campanha aberta, com a camada do mestre se a pessoa for mestre dela. Null sem login ou sem campanha aberta. */
-  abrirRepositorioMapa(): RepositorioPocketBase | null {
+  /** Campanha aberta e papel da pessoa nela, ou null sem login ou sem campanha aberta. */
+  private campanhaAberta(): { campanhaId: string; papel: Papel } | null {
     const { fase, campanhaAtualId, campanhas } = this.atual
     const papel = campanhas.find((c) => c.id === campanhaAtualId)?.papel
     if (fase !== 'conectado' || !campanhaAtualId || !papel) return null
-    const repositorio = new RepositorioPocketBase(this.clienteMapa(this.geracao), campanhaAtualId, { papel })
-    this.mapasAbertos.push({ repositorio, geracao: this.geracao })
+    return { campanhaId: campanhaAtualId, papel }
+  }
+
+  /** O mapa da campanha aberta, com a camada do mestre se a pessoa for mestre dela. Null sem login ou sem campanha aberta. */
+  abrirRepositorioMapa(): RepositorioPocketBase | null {
+    const aberta = this.campanhaAberta()
+    if (!aberta) return null
+    const repositorio = new RepositorioPocketBase(this.clienteMapa(this.geracao), aberta.campanhaId, { papel: aberta.papel })
+    this.abertos.push({ repositorio, geracao: this.geracao })
     return repositorio
   }
 
-  private fecharMapasForaDaSessao() {
-    if (!this.mapasAbertos.length) return
+  /** As rolagens da campanha aberta, com as secretas se a pessoa for mestre dela. Null sem login ou sem campanha aberta. */
+  abrirRepositorioDados(): RepositorioDadosPocketBase | null {
+    const aberta = this.campanhaAberta()
+    if (!aberta) return null
+    const repositorio = new RepositorioDadosPocketBase(this.clienteDados(this.geracao), aberta.campanhaId, { papel: aberta.papel })
+    this.abertos.push({ repositorio, geracao: this.geracao })
+    return repositorio
+  }
+
+  private fecharForaDaSessao() {
+    if (!this.abertos.length) return
     const sessao = { fase: this.atual.fase, campanhaAtualId: this.atual.campanhaAtualId, geracao: this.geracao, campanhas: this.atual.campanhas }
-    this.mapasAbertos = this.mapasAbertos.filter(({ repositorio, geracao }) => {
-      const mapa = { campanhaId: repositorio.campanhaId, geracao, papel: repositorio.papel }
-      if (!repositorio.fechado && mapaContinuaAberto(mapa, sessao)) return true
+    this.abertos = this.abertos.filter(({ repositorio, geracao }) => {
+      const aberto = { campanhaId: repositorio.campanhaId, geracao, papel: repositorio.papel }
+      if (!repositorio.fechado && mapaContinuaAberto(aberto, sessao)) return true
       void repositorio.fechar()
       return false
     })
   }
 
   /**
-   * O que o RepositorioPocketBase precisa do SDK, preso à sessão atual. Resposta que chega depois de a
-   * sessão acabar (saída, troca de servidor) vira erro, para não trazer dados para a sessão nova.
+   * Prende um pedido à sessão atual. Resposta que chega depois de a sessão acabar (saída, troca de
+   * servidor) vira erro com a mensagem `fechado`, para não trazer dados para a sessão nova.
    */
+  private daSessao(geracao: number, fechado: string) {
+    return async <T>(pedido: Promise<T>): Promise<T> => {
+      const resposta = await pedido
+      if (geracao !== this.geracao) throw new Error(fechado)
+      return resposta
+    }
+  }
+
+  /** O que o RepositorioPocketBase precisa do SDK, preso à sessão atual. */
   private clienteMapa(geracao: number): ClienteMapa {
     const pb = this.pb
     const filtro = (f: FiltroServidor) => pb.filter(f.expressao, f.valores)
-    const daSessao = async <T>(pedido: Promise<T>): Promise<T> => {
-      const resposta = await pedido
-      if (geracao !== this.geracao) throw new Error(MAPA_FECHADO)
-      return resposta
-    }
+    const daSessao = this.daSessao(geracao, MAPA_FECHADO)
     return {
       endereco: this.atual.endereco,
       // Lotes de importação e mapas grandes: páginas do maior tamanho que o PocketBase aceita.
@@ -530,19 +561,44 @@ export class ConexaoServidor {
         daSessao(pb.collection(colecao).getList(1, 1, { filter: filtro(f), skipTotal: true }).then((pagina) => pagina.items[0] ?? null)),
       criar: (colecao, dados) => daSessao(pb.collection(colecao).create(dados)),
       atualizar: (colecao, id, dados) => daSessao(pb.collection(colecao).update(id, dados)),
-      assinar: (colecao, f, ouvinte) =>
-        pb.collection(colecao).subscribe(
-          '*',
-          (evento) => {
-            if (geracao === this.geracao) ouvinte({ acao: evento.action, registro: evento.record })
-          },
-          { filter: filtro(f) },
-        ),
-      aoReconectar: (ouvinte) =>
-        pb.realtime.subscribe('PB_CONNECT', () => {
-          if (geracao === this.geracao) ouvinte()
-        }),
+      assinar: (colecao, f, ouvinte) => this.assinarColecao(geracao, colecao, f, ouvinte),
+      aoReconectar: (ouvinte) => this.aoReconectar(geracao, ouvinte),
     }
+  }
+
+  /** O que o RepositorioDadosPocketBase precisa do SDK, preso à sessão atual. */
+  private clienteDados(geracao: number): ClienteDados {
+    const pb = this.pb
+    const daSessao = this.daSessao(geracao, DADOS_FECHADO)
+    return {
+      endereco: this.atual.endereco,
+      recentes: (colecao, f, quantos) =>
+        daSessao(
+          pb
+            .collection(colecao)
+            .getList(1, quantos, { filter: pb.filter(f.expressao, f.valores), sort: '-created,-id', skipTotal: true })
+            .then((pagina) => pagina.items),
+        ),
+      criar: (colecao, dados) => daSessao(pb.collection(colecao).create(dados)),
+      assinar: (colecao, f, ouvinte) => this.assinarColecao(geracao, colecao, f, ouvinte),
+      aoReconectar: (ouvinte) => this.aoReconectar(geracao, ouvinte),
+    }
+  }
+
+  private assinarColecao(geracao: number, colecao: string, f: FiltroServidor, ouvinte: (evento: { acao: string; registro: unknown }) => void) {
+    return this.pb.collection(colecao).subscribe(
+      '*',
+      (evento) => {
+        if (geracao === this.geracao) ouvinte({ acao: evento.action, registro: evento.record })
+      },
+      { filter: this.pb.filter(f.expressao, f.valores) },
+    )
+  }
+
+  private aoReconectar(geracao: number, ouvinte: () => void) {
+    return this.pb.realtime.subscribe('PB_CONNECT', () => {
+      if (geracao === this.geracao) ouvinte()
+    })
   }
 
   /** Esconde a mensagem de erro ou de aviso. */
@@ -565,7 +621,21 @@ export function abrirRepositorioMapa(): RepositorioPocketBase | null {
   return conexao.abrirRepositorioMapa()
 }
 
-/** Estado da conexão com o servidor. Atualiza sozinho a cada mudança. */
+/**
+ * As rolagens da campanha aberta, guardadas no servidor, para a aba Dados usar no lugar da rolagem local.
+ * Null sem login ou sem campanha aberta. Fecha sozinho como o mapa. Detalhes em docs/contratos.md.
+ */
+export function abrirRepositorioDados(): RepositorioDadosPocketBase | null {
+  return conexao.abrirRepositorioDados()
+}
+
+/**
+ * Estado da conexão com o servidor. Atualiza sozinho a cada mudança. Na primeira vez, retoma a sessão
+ * guardada neste navegador, em qualquer aba que use o servidor (chamar de novo não faz nada).
+ */
 export function useServidor(): EstadoServidor {
+  useEffect(() => {
+    void conexao.iniciar()
+  }, [])
   return useSyncExternalStore(conexao.assinar, () => conexao.estado)
 }

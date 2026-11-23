@@ -45,14 +45,20 @@ let ultimoLogin = 0
 /** Entra no servidor de teste com uma das contas de contas-de-teste.json. */
 export async function entrarComoTeste(conta: ContaDeTeste): Promise<ConexaoServidor> {
   if (!ENDERECO_DE_TESTE) throw new Error('Falta o endereço do servidor de teste em DISCORDVTT_SERVIDOR_TESTE.')
-  const espera = ultimoLogin + 1600 - Date.now()
-  if (espera > 0) await esperar(espera)
-  ultimoLogin = Date.now()
-  const conexao = new ConexaoServidor()
   const { email, senha } = dadosDaConta(conta)
-  await conexao.entrar(ENDERECO_DE_TESTE, email, senha)
-  if (conexao.estado.fase !== 'conectado') throw new Error(`Não consegui entrar como ${conta}: ${conexao.estado.erro ?? 'sem resposta'}`)
-  return conexao
+  // Cada arquivo de teste roda à parte, ao mesmo tempo que os outros, e o espaço entre logins só vale
+  // dentro de um arquivo. Se outro arquivo usou a vez, o servidor recusa por excesso: espera e tenta de novo.
+  for (let tentativa = 1; ; tentativa++) {
+    const espera = ultimoLogin + 1600 - Date.now()
+    if (espera > 0) await esperar(espera)
+    ultimoLogin = Date.now()
+    const conexao = new ConexaoServidor()
+    await conexao.entrar(ENDERECO_DE_TESTE, email, senha)
+    if (conexao.estado.fase === 'conectado') return conexao
+    const excesso = conexao.estado.erro?.startsWith('Muitas tentativas') ?? false
+    if (!excesso || tentativa >= 4) throw new Error(`Não consegui entrar como ${conta}: ${conexao.estado.erro ?? 'sem resposta'}`)
+    await esperar(3100)
+  }
 }
 
 /**

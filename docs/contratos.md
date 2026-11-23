@@ -126,7 +126,7 @@ O alias `:mestre` faz as três condições valerem para a mesma participação. 
 Arquivos: `app/src/servidor/conexao.ts` e `app/src/servidor/tipos.ts` (área do servidor).
 
 ```ts
-useServidor(): EstadoServidor  // hook React, atualiza sozinho
+useServidor(): EstadoServidor  // hook React, atualiza sozinho e, na primeira vez, retoma a sessão guardada
 // campos que as outras áreas podem usar:
 //   fase: 'iniciando' | 'desconectado' | 'entrando' | 'conectado'
 //   usuario: { id, nome } | null
@@ -135,8 +135,43 @@ useServidor(): EstadoServidor  // hook React, atualiza sozinho
 ```
 
 - A campanha aberta é a que a pessoa escolheu na aba Campanha. O mapa e as fichas no servidor devem trabalhar nela.
-- Fora da área do servidor, ninguém importa o SDK do PocketBase nem chama métodos de `conexao`: a leitura é só pelo `useServidor()`. O que mais for preciso (como o `RepositorioPocketBase`) a área do servidor oferece.
+- Fora da área do servidor, ninguém importa o SDK do PocketBase nem chama métodos de `conexao`: a leitura é só pelo `useServidor()`. O que mais for preciso (como o `RepositorioPocketBase` e o `RepositorioDadosPocketBase`) a área do servidor oferece.
 - Sem login (`fase` diferente de `conectado`), as fichas e o mapa continuam funcionando só no navegador.
+
+## Dados e servidor
+
+Arquivos: `app/src/dados/tipos.ts` e `app/src/dados/repositorio.ts` (área dos dados), `app/src/servidor/repositorio-dados.ts` e `abrirRepositorioDados()` em `app/src/servidor/conexao.ts` (área do servidor). Os dois lados são do Pedro.
+
+```ts
+const LADOS = [2, 4, 6, 8, 10, 12, 20]   // os dados que existem, um botão para cada
+
+interface Rolagem {
+  id: string
+  autorId: string     // conta de quem rolou. Vazio na rolagem só deste aparelho
+  lados: 2 | 4 | 6 | 8 | 10 | 12 | 20
+  resultado: number   // de 1 a lados
+  quando: number      // milissegundos desde 1970
+  secreta: boolean    // só os mestres veem
+}
+
+interface RepositorioDados {
+  readonly compartilhado: boolean        // da campanha (servidor) ou só deste aparelho
+  readonly podeRolarEmSegredo: boolean   // é mestre da campanha
+  rolar(lados, opcoes?: { secreta?: boolean }): Promise<Rolagem>
+  recentes(quantas: number): Promise<Rolagem[]>   // da mais nova para a mais velha
+  assinar(ouvinte: (rolagem: Rolagem) => void): () => void
+  fechar(): Promise<void>
+}
+
+abrirRepositorioDados(): RepositorioDadosPocketBase | null   // da campanha aberta, ou null
+```
+
+- Quem sorteia é o repositório: o servidor, na campanha, ou o gerador criptográfico do navegador, na rolagem local (`RepositorioDadosLocal`, em `app/src/dados/local.ts`). Ninguém fora dele escolhe um resultado.
+- `assinar` avisa toda rolagem nova, inclusive as próprias, e pode avisar a mesma mais de uma vez (a resposta, o eco do tempo real e a busca depois de reconectar). Quem ouve junta pelo id.
+- Os erros de `rolar` e `recentes` dizem a causa e o que fazer, começando em minúscula. Quem mostra põe antes o que tentava: "Não consegui rolar: ...".
+- Rolagem secreta de quem não é mestre falha sem perguntar ao servidor, e o servidor recusa do mesmo jeito.
+- Trocar de campanha, sair, trocar de servidor ou mudar de papel fecha o repositório do servidor. Quem usa abre outro.
+- A ficha, quando ganhar botões de rolagem (`roll@forca`, no roteiro), pode usar este mesmo contrato.
 
 ## Configuração
 

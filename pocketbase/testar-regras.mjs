@@ -8,7 +8,7 @@
 // só do Node.js 18 ou mais novo.
 //
 // São duas rodadas: a principal, com todas as regras, e outra que simula um servidor antigo
-// recebendo a migração do mapa e testa a limpeza dos lotes.
+// recebendo a migração do mapa e testa a limpeza dos lotes e das rolagens.
 
 import { execFileSync, spawn } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
@@ -301,6 +301,7 @@ async function testar() {
   confere('apagar a campanha apaga as participações', (await contarParticipacoes(admin, `campanha = "${mesaAna.id}"`)) === 0)
 
   await testarMapa({ admin, contas, Ana, Bruno, Carla, mesaBruno })
+  await testarDados({ admin, contas, Ana, Bruno, Carla, Davi })
 
   console.log('\nTrocar senha')
   const NOVA = 'nova-senha-123'
@@ -844,6 +845,126 @@ async function testarMapa({ admin, contas, Ana, Bruno, Carla, mesaBruno }) {
   confere('apagar a campanha apaga o mapa e tudo o que é dele', apagou.ok && restos.every((n) => n === 0), restos)
 }
 
+// ---------- dados ----------
+
+const LADOS = [2, 4, 6, 8, 10, 12, 20]
+
+/**
+ * Faz uma rolagem como o app faz: só a campanha e o dado. `extra` acrescenta campos ao pedido,
+ * para testar o que o servidor recusa. Cada pessoa usa um IP próprio (como atrás do Funnel), para o
+ * limite de pedidos de uma não atrapalhar os testes das outras.
+ */
+function rolar(token, campanha, lados, { secreta = false, extra = {}, ip } = {}) {
+  const colecao = secreta ? 'rolagens_secretas' : 'rolagens'
+  return api('POST', `/api/collections/${colecao}/records`, { token, ip, corpo: { campanha, lados, ...extra } })
+}
+
+const resultadoValido = (r, lados) => Number.isInteger(r?.resultado) && r.resultado >= 1 && r.resultado <= lados && r.lados === lados
+
+async function esperarEvento(tempoReal, topico, trecho) {
+  for (let i = 0; i < 40; i++) {
+    if (tempoReal.eventos.some((e) => e.event === topico && e.data.includes(trecho))) return true
+    await esperar(50)
+  }
+  return false
+}
+
+async function testarDados({ admin, contas, Ana, Bruno, Carla, Davi }) {
+  console.log('\nDados: rolar')
+  const mesa = (await api('POST', '/api/collections/campanhas/records', { token: Ana, corpo: { nome: 'Mesa dos dados' } })).dados
+  for (const [nome, papel] of [['Bruno', 'jogador'], ['Davi', 'mestre']]) {
+    await api('POST', '/api/collections/participantes/records', { token: Ana, corpo: { campanha: mesa.id, usuario: contas[nome].id, papel } })
+  }
+  const ip = { Ana: '198.51.100.21', Bruno: '198.51.100.22', Carla: '198.51.100.23', Davi: '198.51.100.24' }
+  const tempoRealBruno = await abrirTempoReal(Bruno, ['rolagens/*', 'rolagens_secretas/*'])
+  const tempoRealCarla = await abrirTempoReal(Carla, ['rolagens/*'])
+  const tempoRealDavi = await abrirTempoReal(Davi, ['rolagens_secretas/*'])
+
+  const d20 = await rolar(Bruno, mesa.id, 20, { ip: ip.Bruno })
+  confere('quem participa rola um d20, e o servidor sorteia de 1 a 20', d20.ok && resultadoValido(d20.dados, 20), d20)
+  confere('quem rolou é quem está logado', d20.dados?.autor === contas.Bruno.id, d20.dados?.autor)
+
+  const escolheResultado = await rolar(Bruno, mesa.id, 20, { ip: ip.Bruno, extra: { resultado: 20 } })
+  confere('ninguém escolhe o próprio resultado', !escolheResultado.ok, escolheResultado.status)
+  const finge = await rolar(Bruno, mesa.id, 20, { ip: ip.Bruno, extra: { autor: contas.Ana.id } })
+  confere('ninguém rola em nome de outra pessoa', !finge.ok, finge.status)
+  const d7 = await rolar(Bruno, mesa.id, 7, { ip: ip.Bruno })
+  confere('dado fora dos clássicos é recusado, com o motivo', !d7.ok && String(d7.dados?.message).startsWith('Rolagem recusada:'), d7.dados)
+  const d100 = await rolar(Bruno, mesa.id, 100, { ip: ip.Bruno })
+  confere('dado de 100 lados é recusado', !d100.ok, d100.status)
+  const semDado = await api('POST', '/api/collections/rolagens/records', { token: Bruno, ip: ip.Bruno, corpo: { campanha: mesa.id } })
+  confere('rolagem sem dado é recusada', !semDado.ok, semDado.status)
+
+  const deFora = await rolar(Carla, mesa.id, 20, { ip: ip.Carla })
+  confere('quem está fora não rola na campanha', !deFora.ok, deFora.status)
+  const visitante = await rolar('', mesa.id, 20, { ip: '198.51.100.25' })
+  confere('visitante não rola', !visitante.ok, visitante.status)
+  const doPainel = await rolar(admin, mesa.id, 20)
+  confere('o administrador do painel não rola: ele não participa de campanhas', !doPainel.ok, doPainel.dados)
+
+  const todos = []
+  for (const lados of LADOS) todos.push([lados, await rolar(Ana, mesa.id, lados, { ip: ip.Ana })])
+  confere('cada dado clássico, do d2 ao d20, sorteia dentro dos próprios lados', todos.every(([lados, r]) => r.ok && resultadoValido(r.dados, lados)), todos.map(([l, r]) => [l, r.dados?.resultado ?? r.status]))
+
+  // 16 rolagens de d2 saírem iguais tem chance de 1 em 32 mil: se só aparece uma face, o sorteio está preso.
+  const faces = new Set()
+  for (let i = 0; i < 16; i++) faces.add((await rolar(Davi, mesa.id, 2, { ip: ip.Davi })).dados?.resultado)
+  confere('as duas faces do d2 aparecem', faces.has(1) && faces.has(2) && faces.size === 2, [...faces])
+
+  const vistasBruno = await api('GET', registros('rolagens', `campanha = "${mesa.id}"`), { token: Bruno })
+  confere('quem participa vê as rolagens de todos da campanha', vistasBruno.dados?.items?.length === 1 + LADOS.length + 16, vistasBruno.dados?.items?.length)
+  const vistasCarla = await api('GET', registros('rolagens', `campanha = "${mesa.id}"`), { token: Carla })
+  confere('quem está fora não vê as rolagens', vistasCarla.ok && vistasCarla.dados.items.length === 0, vistasCarla.dados)
+  const vistaDireta = await api('GET', `/api/collections/rolagens/records/${d20.dados.id}`, { token: Carla })
+  confere('nem pelo id', !vistaDireta.ok, vistaDireta.status)
+
+  confere('quem participa recebe as rolagens pelo tempo real', await esperarEvento(tempoRealBruno, 'rolagens/*', todos[0][1].dados.id))
+  await esperar(300)
+  confere('quem está fora não recebe nada pelo tempo real', !tempoRealCarla.eventos.some((e) => e.event === 'rolagens/*'), tempoRealCarla.eventos)
+
+  const muda = await api('PATCH', `/api/collections/rolagens/records/${d20.dados.id}`, { token: Bruno, ip: ip.Bruno, corpo: { resultado: 20 } })
+  confere('ninguém muda uma rolagem feita', !muda.ok, muda.status)
+  const mudaMestre = await api('PATCH', `/api/collections/rolagens/records/${d20.dados.id}`, { token: Ana, ip: ip.Ana, corpo: { resultado: 20 } })
+  confere('nem o mestre', !mudaMestre.ok, mudaMestre.status)
+  const apaga = await api('DELETE', `/api/collections/rolagens/records/${d20.dados.id}`, { token: Ana, ip: ip.Ana })
+  confere('ninguém apaga uma rolagem pelo app', !apaga.ok, apaga.status)
+
+  console.log('\nDados: rolagem secreta do mestre')
+  const secreta = await rolar(Ana, mesa.id, 20, { secreta: true, ip: ip.Ana })
+  confere('mestre rola em segredo', secreta.ok && resultadoValido(secreta.dados, 20) && secreta.dados.autor === contas.Ana.id, secreta)
+  // Bruno é mestre da própria mesa e jogador nesta: a regra precisa olhar o papel nesta campanha.
+  const jogadorSecreta = await rolar(Bruno, mesa.id, 20, { secreta: true, ip: ip.Bruno })
+  confere('jogador não rola em segredo, mesmo sendo mestre em outra campanha', !jogadorSecreta.ok, jogadorSecreta.status)
+  const secretaEscolhida = await rolar(Ana, mesa.id, 20, { secreta: true, ip: ip.Ana, extra: { resultado: 20 } })
+  confere('nem o mestre escolhe o resultado em segredo', !secretaEscolhida.ok, secretaEscolhida.status)
+
+  const secretasBruno = await api('GET', registros('rolagens_secretas', `campanha = "${mesa.id}"`), { token: Bruno })
+  confere('jogador não vê as rolagens secretas', secretasBruno.ok && secretasBruno.dados.items.length === 0, secretasBruno.dados)
+  const secretaDireta = await api('GET', `/api/collections/rolagens_secretas/records/${secreta.dados.id}`, { token: Bruno })
+  confere('nem pelo id', !secretaDireta.ok, secretaDireta.status)
+  const secretasDavi = await api('GET', registros('rolagens_secretas', `campanha = "${mesa.id}"`), { token: Davi })
+  confere('os outros mestres da campanha veem as rolagens secretas', secretasDavi.dados?.items?.length === 1, secretasDavi.dados)
+  const abertasSemSecreta = await api('GET', registros('rolagens', `id = "${secreta.dados.id}"`), { token: Bruno })
+  confere('a rolagem secreta não aparece entre as abertas', abertasSemSecreta.dados?.items?.length === 0, abertasSemSecreta.dados)
+
+  confere('os outros mestres recebem a rolagem secreta pelo tempo real', await esperarEvento(tempoRealDavi, 'rolagens_secretas/*', secreta.dados.id))
+  await esperar(300)
+  confere('jogador não recebe a rolagem secreta pelo tempo real', !tempoRealBruno.eventos.some((e) => e.event === 'rolagens_secretas/*'), tempoRealBruno.eventos.map((e) => e.event))
+  await Promise.all([tempoRealBruno.fechar(), tempoRealCarla.fechar(), tempoRealDavi.fechar()])
+
+  const mudaSecreta = await api('PATCH', `/api/collections/rolagens_secretas/records/${secreta.dados.id}`, { token: Ana, ip: ip.Ana, corpo: { resultado: 20 } })
+  confere('ninguém muda uma rolagem secreta feita', !mudaSecreta.ok, mudaSecreta.status)
+
+  console.log('\nDados: limite de pedidos')
+  const seguidas = []
+  for (let i = 0; i < 25; i++) seguidas.push((await rolar(Bruno, mesa.id, 6, { ip: '198.51.100.26' })).status)
+  confere('rolagens seguidas demais são barradas (limite padrão de 20 a cada 5 segundos por pessoa)', seguidas.includes(429) && seguidas.slice(0, 20).every((s) => s === 200), seguidas)
+
+  const apagou = await api('DELETE', `/api/collections/campanhas/records/${mesa.id}`, { token: Ana })
+  const restos = [await contar(admin, 'rolagens', `campanha = "${mesa.id}"`), await contar(admin, 'rolagens_secretas', `campanha = "${mesa.id}"`)]
+  confere('apagar a campanha apaga as rolagens dela, abertas e secretas', apagou.ok && restos.every((n) => n === 0), restos)
+}
+
 /**
  * Rodada da migração e da limpeza: sobe um servidor como os de antes do mapa, com campanhas,
  * aplica a migração do mapa e confere que as campanhas antigas ganharam mapa. Depois testa a
@@ -869,7 +990,7 @@ async function testarMigracaoELimpeza(dados) {
   }
   await servidor.parar()
 
-  servidor = await subirServidor(dados, { env: { DISCORDVTT_DIAS_LOTES: '0' } })
+  servidor = await subirServidor(dados, { env: { DISCORDVTT_DIAS_LOTES: '0', DISCORDVTT_DIAS_ROLAGENS: '0' } })
   try {
     admin = await login('_superusers', ADMIN.email, ADMIN.senha)
     const mapas = []
@@ -896,6 +1017,24 @@ async function testarMigracaoELimpeza(dados) {
     confere('e o mapa continua igual, porque o estado fica nos hexágonos', (await contar(admin, 'hexagonos', `mapa = "${mapa}"`)) === 2)
     const depois = await gravarLote(admin, novoLote(mapa, [pintar(1, 0, 'colina')]))
     confere('a numeração continua de onde parou, sem recomeçar', depois.dados?.ordem === 3, depois.dados?.ordem)
+
+    console.log('\nDados: limpeza das rolagens antigas')
+    const conta = await api('POST', '/api/collections/users/records', {
+      token: admin,
+      corpo: { email: 'mestra@teste.local', password: SENHA, passwordConfirm: SENHA, name: 'Mestra' },
+    })
+    if (!conta.ok) throw new Error(`Não consegui criar a conta da limpeza: ${JSON.stringify(conta.dados)}`)
+    const mestra = await login('users', 'mestra@teste.local', SENHA)
+    const mesa = (await api('POST', '/api/collections/campanhas/records', { token: mestra, corpo: { nome: 'Mesa da limpeza' } })).dados
+    const rolagens = [await rolar(mestra, mesa.id, 20), await rolar(mestra, mesa.id, 6, { secreta: true })]
+    confere('rolagens feitas antes da limpeza', rolagens.every((r) => r.ok), rolagens.map((r) => r.status))
+    const limpezaRolagens = await api('POST', '/api/crons/limpar_rolagens', { token: admin })
+    let sobraram = -1
+    for (let i = 0; i < 40 && sobraram !== 0; i++) {
+      await esperar(100)
+      sobraram = (await contar(admin, 'rolagens', `campanha = "${mesa.id}"`)) + (await contar(admin, 'rolagens_secretas', `campanha = "${mesa.id}"`))
+    }
+    confere('a limpeza apaga as rolagens mais velhas que o prazo, inclusive as secretas', limpezaRolagens.ok && sobraram === 0, { status: limpezaRolagens.status, sobraram })
   } finally {
     await servidor.parar()
   }
@@ -910,8 +1049,8 @@ async function subirServidor(dados, { migracoes = join(pasta, 'pb_migrations'), 
   base = `http://127.0.0.1:${porta}`
   let log = ''
   const servidor = spawn(executavel, ['serve', `--http=127.0.0.1:${porta}`, '--hooksWatch=false', ...argumentos], {
-    // O prazo da limpeza fica vazio (o padrão, 7 dias) a não ser que a rodada peça outro.
-    env: { ...process.env, DISCORDVTT_DIAS_LOTES: '', ...env },
+    // Os prazos da limpeza ficam vazios (o padrão, 7 dias) a não ser que a rodada peça outro.
+    env: { ...process.env, DISCORDVTT_DIAS_LOTES: '', DISCORDVTT_DIAS_ROLAGENS: '', ...env },
   })
   servidor.stdout.on('data', (parte) => (log += parte))
   servidor.stderr.on('data', (parte) => (log += parte))

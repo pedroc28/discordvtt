@@ -1,6 +1,6 @@
 # Servidor
 
-Dono: Pedro. Passos 1, 2 e 3 prontos: o PocketBase tem contas, campanhas e participantes (mestre ou jogador), com regras de acesso testadas, o app tem a aba Campanha, e o servidor está no ar pelo Tailscale Funnel no PC do Pedro, com backup a cada hora copiado para o Google Drive. O passo 4 está pela metade: o servidor já guarda o mapa de cada campanha e o app já tem o `RepositorioPocketBase`, mas o mapa do app ainda não está ligado nele. As fichas ainda não usam o servidor.
+Dono: Pedro. Passos 1, 2 e 3 prontos: o PocketBase tem contas, campanhas e participantes (mestre ou jogador), com regras de acesso testadas, o app tem a aba Campanha, e o servidor está no ar pelo Tailscale Funnel no PC do Pedro, com backup a cada hora copiado para o Google Drive. O passo 4 está pela metade: o servidor já guarda o mapa de cada campanha e o app já tem o `RepositorioPocketBase`, mas o mapa do app ainda não está ligado nele. A aba Dados já usa o servidor: ele sorteia e guarda as rolagens de cada campanha. As fichas ainda não usam o servidor.
 
 Para jogar, o PC do Pedro precisa estar ligado, acordado e com o `iniciar.bat` aberto. Os amigos entram pelo link de convite da aba Campanha.
 
@@ -45,8 +45,10 @@ Cuidados:
 | `hexagonos_ocultos` | `mapa`, `q`, `r`, `chunk`, `dados` | Hexágonos que só o mestre vê, com os marcadores deles. Pode haver um público e um oculto na mesma posição. |
 | `notas_mestre` | `mapa`, `q`, `r`, `chunk`, `dados` | Notas privadas do mestre, uma por posição. `dados` é `{ q, r, texto, rev }`. |
 | `lotes_mestre` | `mapa`, `ordem`, `loteId`, `autor`, `ts`, `tipo`, `alvoId`, `ocultos`, `notas` | A parte privada dos lotes, com numeração própria. O `loteId` é o mesmo do lote que o app mandou. Apagados depois de 7 dias. |
+| `rolagens` | `campanha`, `autor`, `lados`, `resultado` | As rolagens de dados abertas da campanha. `autor` e `resultado` são dados pelo servidor. Apagadas depois de 7 dias. |
+| `rolagens_secretas` | `campanha`, `autor`, `lados`, `resultado` | As rolagens secretas dos mestres, iguais às abertas. Apagadas depois de 7 dias. |
 
-Todas têm `created` e `updated`. Apagar a campanha apaga o mapa e, em cascata, tudo o que é dele.
+Todas têm `created`, e todas menos as rolagens têm `updated`. Apagar a campanha apaga o mapa e, em cascata, tudo o que é dele.
 
 ## Regras de acesso
 
@@ -60,6 +62,8 @@ Todas têm `created` e `updated`. Apagar a campanha apaga o mapa e, em cascata, 
 | `tokens_grupo` | quem participa da campanha do mapa | ninguém (nasce com o mapa) | quem participa, sem mudar de mapa | ninguém |
 | `lotes` | quem participa da campanha do mapa | quem participa da campanha do mapa (o hook confere o resto) | ninguém | ninguém (só a limpeza) |
 | `mapas_mestre`, `hexagonos_ocultos`, `notas_mestre` e `lotes_mestre` | mestre da campanha do mapa | ninguém: só os hooks | ninguém | ninguém (só a limpeza, nos lotes) |
+| `rolagens` | quem participa da campanha | quem participa da campanha, sem mandar `autor` nem `resultado` | ninguém | ninguém (só a limpeza) |
+| `rolagens_secretas` | mestre da campanha | mestre da campanha, sem mandar `autor` nem `resultado` | ninguém | ninguém (só a limpeza) |
 
 Visitante sem login não vê nada. O administrador, pelo painel, passa por cima de todas as regras.
 
@@ -142,6 +146,26 @@ Fechado em 22/11/2026. O lado do mapa fica com o Grifo, e o do servidor, com o P
 13. **Presença** (fora por enquanto). O PocketBase não tem mensagem efêmera.
 14. **Teste ao vivo com o grupo** (os dois), quando o mapa estiver ligado ao servidor.
 
+## Dados
+
+A aba Dados é da área `dados` (ver `docs/dados.md`). O servidor sorteia e guarda as rolagens, em `pocketbase/pb_migrations/1795321005_dados.js` e `pocketbase/pb_hooks/dados.pb.js`.
+
+- **O servidor sorteia.** O app manda só a campanha e o dado (`lados`: 2, 4, 6, 8, 10, 12 ou 20). O hook confere o dado, grava quem rolou e sorteia o resultado com o gerador criptográfico do servidor (`$security.randomStringWithAlphabet`), que dá a mesma chance a cada face. A regra de criar recusa um pedido que traga `autor` ou `resultado`: ninguém escolhe o próprio resultado, nem mandando o pedido à mão.
+- **Rolagem secreta do mestre** fica em `rolagens_secretas`, uma coleção que só os mestres da campanha leem, e não numa marcação dentro de `rolagens`: dado secreto do mestre fica em coleção própria. O tempo real respeita as regras, então jogador não recebe nem fica sabendo que houve uma rolagem secreta.
+- **Rolagem feita não muda nem some** pelo app, nem pelo mestre. O administrador do painel não rola: ele não participa de campanhas.
+- **Limite de pedidos:** vale o padrão do PocketBase para criar registros, 20 a cada 5 segundos por pessoa (o IP de cada um, atrás do Funnel). Para quem clica nos botões, sobra. O teste das regras confere que ele barra.
+- **Limpeza:** a cada hora, o hook apaga as rolagens com mais de 7 dias, abertas e secretas, direto no banco, sem aviso pelo tempo real. O prazo muda pela variável `DISCORDVTT_DIAS_ROLAGENS`, que o teste usa para zerá-lo.
+- **Apagar a campanha** apaga as rolagens dela.
+
+### Lado do app
+
+O `RepositorioDadosPocketBase` (`app/src/servidor/repositorio-dados.ts`) implementa a `RepositorioDados`, o contrato da área de dados (ver `docs/contratos.md`). `abrirRepositorioDados()`, em `conexao.ts`, devolve o da campanha aberta, ou null sem login ou sem campanha.
+
+- **Rolar** cria o registro e devolve a rolagem que o servidor sorteou. Ela também é avisada a quem ouve na hora, sem esperar o tempo real, e chega de novo pelo eco com o mesmo id.
+- **Ouvir:** assina `rolagens` da campanha e, para o mestre, `rolagens_secretas`. Quando o tempo real reconecta, busca as 30 mais recentes e avisa de novo, da mais velha para a mais nova: quem ouve ignora as repetidas pelo id.
+- **Fechar:** trocar de campanha, sair, trocar de servidor ou mudar de papel fecha o repositório, como o do mapa. Depois disso, rolar falha com uma mensagem que explica.
+- **Erros** dizem a causa e o que fazer, começando em minúscula, porque a aba mostra "Não consegui rolar: ...". Uma recusa sem motivo do servidor quase sempre é falta de permissão: na rolagem secreta, a mensagem pede para conferir se a pessoa ainda é mestre.
+
 ## Aba Campanha
 
 - **Entrar:** servidor, e-mail e senha. O endereço vem preenchido com o `VITE_POCKETBASE_URL` (no site de teste, `http://127.0.0.1:8090`) e pode ser trocado, por exemplo pelo endereço `.ts.net` do Funnel. Sem esquema, endereço local vira `http://` e o resto vira `https://`. O app guarda o endereço e a sessão no navegador, separados por servidor.
@@ -209,7 +233,7 @@ Proteções que valem atrás do Funnel (migração `1795321002_hospedagem.js`):
 node pocketbase/testar-regras.mjs caminho/do/pocketbase
 ```
 
-O script sobe um PocketBase com dados temporários, cria contas de teste e confere 157 situações: quem vê, cria, altera e apaga o quê, a troca de senha, o limite de tentativas por pessoa, o administrador barrado vindo de fora, a cópia do backup, o mapa (lotes, gravações ao mesmo tempo, lote recusado, lote repetido, chunk com negativos, tempo real, token, uma importação de 5 mil hexágonos com a medição do tempo) e a camada do mestre (quem vê, tempo real, revelar, lote misto recusado inteiro, importação, reversão e trava). Numa segunda rodada, ele sobe um servidor como os de antes do mapa, com campanhas, aplica as migrações do mapa, confere que as campanhas antigas ganharam mapa, camada do mestre e trava aberta, e testa a limpeza dos lotes, inclusive os do mestre. No fim, apaga tudo. Ele nunca toca no `pb_data` de verdade. Sem caminho, usa o executável da pasta `pocketbase`. A verificação do GitHub roda o script em todo pull request, baixando o PocketBase da versão de `pocketbase/VERSAO` e conferindo o checksum publicado, então uma regra quebrada impede a entrada na `main`.
+O script sobe um PocketBase com dados temporários, cria contas de teste e confere 191 situações: quem vê, cria, altera e apaga o quê, a troca de senha, o limite de tentativas por pessoa, o administrador barrado vindo de fora, a cópia do backup, o mapa (lotes, gravações ao mesmo tempo, lote recusado, lote repetido, chunk com negativos, tempo real, token, uma importação de 5 mil hexágonos com a medição do tempo) e a camada do mestre (quem vê, tempo real, revelar, lote misto recusado inteiro, importação, reversão e trava) e os dados (o servidor sorteia, ninguém escolhe o resultado nem rola em nome de outra pessoa, dado fora dos clássicos recusado, rolagem secreta só para os mestres, inclusive no tempo real, e o limite de pedidos). Numa segunda rodada, ele sobe um servidor como os de antes do mapa, com campanhas, aplica as migrações do mapa, confere que as campanhas antigas ganharam mapa, camada do mestre e trava aberta, e testa a limpeza dos lotes, inclusive os do mestre, e a das rolagens, inclusive as secretas. No fim, apaga tudo. Ele nunca toca no `pb_data` de verdade. Sem caminho, usa o executável da pasta `pocketbase`. A verificação do GitHub roda o script em todo pull request, baixando o PocketBase da versão de `pocketbase/VERSAO` e conferindo o checksum publicado, então uma regra quebrada impede a entrada na `main`.
 
 ## Servidor de teste
 
@@ -223,8 +247,8 @@ O script sobe um PocketBase com dados temporários, com as migrações e os hook
 
 - **À mão:** com o app rodando (`npm run dev`, em `app/`), entre na aba Campanha com uma das contas e o endereço `http://127.0.0.1:8092`. Duas janelas, com contas diferentes, fazem dois jogadores.
 - **Nos testes:** os testes do app que precisam de um servidor de verdade terminam em `.servidor.test.ts` e rodam quando a variável `DISCORDVTT_SERVIDOR_TESTE` tem o endereço do servidor de teste. Sem ela, como no `npm test` comum, são pulados. Em `app/`: `DISCORDVTT_SERVIDOR_TESTE=http://127.0.0.1:8092 npx vitest run .servidor.test.ts`.
-- **Ajudantes** em `app/src/servidor/teste-servidor.ts`: `entrarComoTeste('mestre')` entra com uma das contas e devolve a conexão, `campanhaDeTeste(mestre, [jogadores])` cria uma campanha só para o teste e abre nela para todos, e `instalarEventSource()` dá ao Node o EventSource que o SDK usa no tempo real. Depois disso, `conexao.abrirRepositorioMapa()` devolve o `RepositorioPocketBase` daquela pessoa.
-- **Na verificação do GitHub:** depois do teste das regras, ela sobe o servidor de teste e roda todos os `.servidor.test.ts`. Hoje são os testes do `RepositorioPocketBase` em `repositorio-mapa.servidor.test.ts`: dois jogadores sincronizando, chunk com coordenadas negativas, lote reenviado, lote recusado, camada do mestre com revelar, trava do mapa, troca de campanha e saída do servidor.
+- **Ajudantes** em `app/src/servidor/teste-servidor.ts`: `entrarComoTeste('mestre')` entra com uma das contas e devolve a conexão, `campanhaDeTeste(mestre, [jogadores])` cria uma campanha só para o teste e abre nela para todos, e `instalarEventSource()` dá ao Node o EventSource que o SDK usa no tempo real. Depois disso, `conexao.abrirRepositorioMapa()` devolve o `RepositorioPocketBase` daquela pessoa, e `conexao.abrirRepositorioDados()`, o `RepositorioDadosPocketBase`. Os arquivos de teste rodam ao mesmo tempo, então dois logins podem cair juntos no limite de tentativas: `entrarComoTeste` espera e tenta de novo.
+- **Na verificação do GitHub:** depois do teste das regras, ela sobe o servidor de teste e roda todos os `.servidor.test.ts`. Hoje são os testes do `RepositorioPocketBase` em `repositorio-mapa.servidor.test.ts` (dois jogadores sincronizando, chunk com coordenadas negativas, lote reenviado, lote recusado, camada do mestre com revelar, trava do mapa, troca de campanha e saída do servidor) e os do `RepositorioDadosPocketBase` em `repositorio-dados.servidor.test.ts` (rolagem vista na hora pela jogadora, rolagem secreta só para os mestres e saída do servidor).
 
 ## Próximos passos
 

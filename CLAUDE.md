@@ -18,6 +18,7 @@ Site de teste, atualizado sozinho a cada mudança na `main`: https://pedroc28.gi
 | --- | --- | --- |
 | `mapa` | `app/src/mapa/`, `app/public/tilesets/`, `app/tools/gerar-tileset.mjs`, `docs/mapa/` | GrifoCaolho |
 | `servidor` | `pocketbase/`, `app/src/servidor/`, `docs/servidor/`, hospedagem | Pedro (pedroc28) |
+| `dados` | `app/src/dados/`, `docs/dados.md` | Pedro (pedroc28) |
 | `ficha` | `app/src/ficha/`, `docs/fichas.md` | os dois, **congelada** |
 | `geral` | `app/src/nucleo/`, configurações do app, `.github/`, `scripts/`, `CLAUDE.md`, `README.md`, o resto de `docs/` | os dois |
 
@@ -31,7 +32,7 @@ Site de teste, atualizado sozinho a cada mudança na `main`: https://pedroc28.gi
 2. **Trabalhar.** Faça a mudança seguindo as regras deste arquivo e do `CLAUDE.md` da área. Commits em português, no imperativo, com título curto ("Adiciona régua de distância").
 3. **Documentar.** No mesmo trabalho, atualize:
    - `docs/roteiro.md`, marcando o que ficou pronto
-   - a documentação da área (`docs/mapa/`, `docs/servidor/` ou `docs/fichas.md`)
+   - a documentação da área (`docs/mapa/`, `docs/servidor/`, `docs/dados.md` ou `docs/fichas.md`)
    - `docs/decisoes.md`, se houve uma decisão que muda o rumo do projeto
    - `docs/contratos.md`, se mudou algo que outra área usa
 4. **Entregar.** Escreva a descrição do pull request seguindo `.github/pull_request_template.md` num arquivo temporário e rode `scripts/entregar.sh "Título" /tmp/descricao.md`. O script:

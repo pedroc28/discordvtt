@@ -2,6 +2,10 @@
 
 Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em cima. Cada entrada diz o que foi decidido e por quê.
 
+## 2026-11-23
+
+- **Área própria para os dados, do Pedro.** A rolagem de dados não é de nenhuma área: o sorteio e o histórico ficam no servidor, e um dia os dados 3D vão cair por cima do mapa. Com área própria (`app/src/dados/`), a aba Dados entra sem mexer nos arquivos do mapa, e o GrifoCaolho continua decidindo o visual do mapa: os dados 3D por cima dele só entram depois de ele aprovar. O sorteio, as coleções e o repositório no servidor seguem na área `servidor`.
+
 ## 2026-11-22
 
 - **Camada do mestre no servidor, combinada com o GrifoCaolho.** Privado é só a nota privada e o hexágono oculto, com os marcadores dele. Regiões são sempre públicas. A parte privada vai no mesmo lote, para revelar ser uma gravação só, e o servidor a separa em coleções que só o mestre lê, com numeração própria: assim jogador nenhum recebe essa parte nem percebe, pelos números, que ela existe. Um hexágono público e um oculto podem ocupar a mesma posição: se o servidor recusasse o jogador que pinta ali, ele descobriria o segredo pela recusa.

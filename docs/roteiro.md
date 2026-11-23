@@ -40,6 +40,11 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [ ] Fichas sincronizadas: todos editando e vendo a mesma ficha em tempo real
 - [ ] Rodízio de anfitrião, se o grupo decidir: qualquer membro hospeda o servidor, um por vez, com troca de dados automática pelo Google Drive
 
+## Dados (Pedro)
+
+- [ ] Aba Dados: um botão para cada dado (d2 a d20), sorteio no servidor, histórico da campanha e rolagem secreta do mestre
+- [ ] Dados 3D caindo sobre o mapa (depende do GrifoCaolho aprovar o visual)
+
 ## Fichas (os dois, congelada)
 
 - [ ] Fórmulas e rolagens: campos calculados e botões como `roll@forca`

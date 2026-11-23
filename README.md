@@ -12,6 +12,7 @@ Cada um conversa com o próprio Claude, que cuida de Git, testes e entrega. O pa
 | --- | --- |
 | Mapa e mesa | GrifoCaolho |
 | Servidor, conexão e hospedagem | Pedro |
+| Dados | Pedro |
 | Fichas | os dois (congelada por enquanto) |
 
 ## Estrutura
@@ -22,6 +23,7 @@ app/                  app web (Vite, React e TypeScript)
   src/ficha/          editor de fichas (congelada)
   src/mapa/           mapa hexagonal (GrifoCaolho)
   src/servidor/       conexão com o PocketBase (Pedro)
+  src/dados/          rolagem de dados (Pedro)
 pocketbase/           migrações e hooks do PocketBase (Pedro)
 docs/                 toda a documentação
 scripts/              comecar.sh e entregar.sh, usados pelo Claude

@@ -99,3 +99,33 @@ export function mensagemDeErroMapa(erro: unknown, endereco: string): string {
   if (status === 400) return 'o servidor recusou a mudança. Atualize a página e tente de novo.'
   return 'o servidor não conseguiu atender. Tente de novo daqui a pouco.'
 }
+
+// ---------- dados ----------
+// A aba Dados mostra estas mensagens depois do que tentava fazer ("Não consegui rolar: ..."),
+// então elas dizem só a causa e o que fazer, começando com letra minúscula.
+
+export const DADOS_FECHADO = 'as rolagens foram fechadas porque você trocou de campanha ou saiu do servidor. Abra a aba Dados de novo.'
+export const DADOS_SO_MESTRE = 'só o mestre da campanha rola em segredo.'
+export const DADOS_INVALIDO = 'o servidor respondeu com uma rolagem que o app não entendeu. Atualize a página e role de novo.'
+
+export function mensagemDeErroDados(erro: unknown, endereco: string, secreta = false): string {
+  // Erros do próprio repositório já vêm prontos.
+  if (erro instanceof Error && [DADOS_FECHADO, DADOS_SO_MESTRE, DADOS_INVALIDO].includes(erro.message)) return erro.message
+  if (!ehObj(erro)) return 'aconteceu um erro inesperado. Tente de novo.'
+  const status = typeof erro.status === 'number' ? erro.status : -1
+  const resposta = ehObj(erro.response) ? erro.response : {}
+  const mensagem = typeof resposta.message === 'string' ? resposta.message : ''
+
+  if (status === 0) return `o servidor em ${endereco} não respondeu. Confira se ele está ligado e tente de novo.`
+  if (status === 401) return 'sua sessão expirou. Entre de novo na aba Campanha.'
+  if (status === 429) return 'muitas rolagens seguidas. Espere alguns segundos e role de novo.'
+  // O hook do servidor já explica em português o que estava errado.
+  if (mensagem.startsWith('Rolagem recusada:')) return `o servidor recusou: ${mensagem.slice('Rolagem recusada:'.length).trim()}`
+  // O PocketBase esconde o motivo de propósito: quase sempre é falta de permissão.
+  if (status === 400 || status === 403 || status === 404) {
+    return secreta
+      ? 'só o mestre da campanha rola em segredo. Confira na aba Campanha se você ainda é mestre dela.'
+      : 'você não participa mais desta campanha, ou ela foi apagada. Confira na aba Campanha.'
+  }
+  return 'o servidor não conseguiu atender. Tente de novo daqui a pouco.'
+}

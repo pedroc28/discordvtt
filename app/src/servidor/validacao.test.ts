@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   emailDaConta,
+  horaDoServidor,
   normalizarCampanha,
   normalizarHexagonoDoServidor,
   normalizarLista,
@@ -10,6 +11,7 @@ import {
   normalizarNotaPrivada,
   normalizarParticipacao,
   normalizarRegiaoDoServidor,
+  normalizarRolagemDoServidor,
   normalizarTokenDoServidor,
   normalizarUsuario,
 } from './validacao'
@@ -130,5 +132,37 @@ describe('validação da camada do mestre', () => {
   it('nota privada precisa de posição e texto', () => {
     expect(normalizarNotaPrivada({ q: 0, r: -1, texto: 'x' })).toEqual({ q: 0, r: -1, texto: 'x', rev: 1 })
     expect(normalizarNotaPrivada({ q: 0, r: -1 })).toBeNull()
+  })
+})
+
+describe('validação das rolagens', () => {
+  const bruto = { id: 'r1', campanha: 'c1', autor: 'u1', lados: 20, resultado: 17, created: '2026-11-23 04:24:00.123Z' }
+
+  it('registro do servidor vira a Rolagem, com a hora em milissegundos', () => {
+    expect(normalizarRolagemDoServidor(bruto, false)).toEqual({
+      id: 'r1',
+      autorId: 'u1',
+      lados: 20,
+      resultado: 17,
+      quando: Date.parse('2026-11-23T04:24:00.123Z'),
+      secreta: false,
+    })
+    expect(normalizarRolagemDoServidor(bruto, true)?.secreta).toBe(true)
+  })
+
+  it('dado fora dos clássicos ou resultado fora do dado descarta o registro', () => {
+    expect(normalizarRolagemDoServidor({ ...bruto, lados: 7 }, false)).toBeNull()
+    expect(normalizarRolagemDoServidor({ ...bruto, resultado: 21 }, false)).toBeNull()
+    expect(normalizarRolagemDoServidor({ ...bruto, resultado: 0 }, false)).toBeNull()
+    expect(normalizarRolagemDoServidor({ ...bruto, resultado: 2.5 }, false)).toBeNull()
+    expect(normalizarRolagemDoServidor({ ...bruto, autor: '' }, false)).toBeNull()
+    expect(normalizarRolagemDoServidor({ ...bruto, created: 'ontem' }, false)).toBeNull()
+    expect(normalizarRolagemDoServidor(null, false)).toBeNull()
+  })
+
+  it('hora do PocketBase, com espaço no lugar do T', () => {
+    expect(horaDoServidor('2026-11-23 04:24:00.123Z')).toBe(Date.UTC(2026, 10, 23, 4, 24, 0, 123))
+    expect(horaDoServidor('')).toBeNull()
+    expect(horaDoServidor(123)).toBeNull()
   })
 })

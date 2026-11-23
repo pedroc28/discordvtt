@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAPA_FECHADO, mensagemDeErro, mensagemDeErroMapa } from './erros'
+import { DADOS_FECHADO, MAPA_FECHADO, mensagemDeErro, mensagemDeErroDados, mensagemDeErroMapa } from './erros'
 
 // Mesmo formato do ClientResponseError do SDK do PocketBase.
 const erro = (status: number, message = '', data: Record<string, unknown> = {}) => ({ status, response: { status, message, data } })
@@ -68,5 +68,29 @@ describe('mensagens de erro do mapa', () => {
   it('mensagens do próprio repositório passam como estão', () => {
     expect(mensagemDeErroMapa(new Error(MAPA_FECHADO), ENDERECO)).toBe(MAPA_FECHADO)
     expect(mensagemDeErroMapa(new Error('outra coisa'), ENDERECO)).toContain('Tente de novo')
+  })
+})
+
+describe('mensagens de erro dos dados', () => {
+  it('dizem a causa e o que fazer, começando com letra minúscula', () => {
+    expect(mensagemDeErroDados(erro(0), ENDERECO)).toBe(`o servidor em ${ENDERECO} não respondeu. Confira se ele está ligado e tente de novo.`)
+    expect(mensagemDeErroDados(erro(401), ENDERECO)).toContain('Entre de novo na aba Campanha')
+    expect(mensagemDeErroDados(erro(429), ENDERECO)).toContain('Espere alguns segundos')
+    expect(mensagemDeErroDados(erro(500), ENDERECO)).toContain('Tente de novo daqui a pouco')
+  })
+
+  it('o motivo escrito pelo servidor passa adiante', () => {
+    const recusada = erro(400, 'Rolagem recusada: o dado precisa ter 2, 4, 6, 8, 10, 12, 20 lados.')
+    expect(mensagemDeErroDados(recusada, ENDERECO)).toBe('o servidor recusou: o dado precisa ter 2, 4, 6, 8, 10, 12, 20 lados.')
+  })
+
+  it('recusa sem motivo é falta de permissão, diferente para a rolagem secreta', () => {
+    expect(mensagemDeErroDados(erro(400, 'Failed to create record.'), ENDERECO)).toContain('não participa mais desta campanha')
+    expect(mensagemDeErroDados(erro(400, 'Failed to create record.'), ENDERECO, true)).toContain('ainda é mestre')
+  })
+
+  it('mensagens do próprio repositório passam como estão', () => {
+    expect(mensagemDeErroDados(new Error(DADOS_FECHADO), ENDERECO)).toBe(DADOS_FECHADO)
+    expect(mensagemDeErroDados(new Error('outra coisa'), ENDERECO)).toContain('Tente de novo')
   })
 })

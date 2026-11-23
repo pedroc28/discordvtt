@@ -36,13 +36,14 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Base do mapa no servidor: um mapa por campanha, hexágonos, regiões, token e lotes, com regras testadas, limpeza de lotes antigos e o `RepositorioPocketBase`
 - [x] Servidor de teste local, com mestre e jogadores, e testes do `RepositorioPocketBase` contra um PocketBase de verdade na verificação do GitHub
 - [x] Camada do mestre no servidor: notas privadas e hexágonos ocultos que só o mestre lê, revelar num lote só, importação e reversão conferidas pelo servidor e trava do mapa
+- [x] Rolagens de dados no servidor: sorteio pelo servidor, rolagens abertas e secretas com regras testadas, limpeza depois de 7 dias e o `RepositorioDadosPocketBase`
 - [ ] Ligar o mapa ao servidor, com o GrifoCaolho (lista do que combinar em `docs/servidor/README.md`)
 - [ ] Fichas sincronizadas: todos editando e vendo a mesma ficha em tempo real
 - [ ] Rodízio de anfitrião, se o grupo decidir: qualquer membro hospeda o servidor, um por vez, com troca de dados automática pelo Google Drive
 
 ## Dados (Pedro)
 
-- [ ] Aba Dados: um botão para cada dado (d2 a d20), sorteio no servidor, histórico da campanha e rolagem secreta do mestre
+- [x] Aba Dados: um botão para cada dado (d2 a d20), sorteio no servidor, histórico da campanha e rolagem secreta do mestre
 - [ ] Dados 3D caindo sobre o mapa (depende do GrifoCaolho aprovar o visual)
 
 ## Fichas (os dois, congelada)

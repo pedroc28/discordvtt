@@ -4,6 +4,12 @@ Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em ci
 
 ## 2026-11-23
 
+- **O servidor sorteia os dados.** O app manda só qual dado, e o hook sorteia com o gerador criptográfico do servidor. Se o navegador sorteasse, bastaria mandar o pedido à mão para escolher o resultado. A regra recusa um pedido que traga o resultado ou quem rolou.
+- **Rolagem secreta em coleção própria.** `rolagens_secretas` só os mestres leem, como as outras coisas secretas do mestre. Uma marcação dentro de `rolagens` dependeria de a regra nunca errar o filtro, e o tempo real mandaria a coleção inteira para as mesmas regras. Os jogadores não ficam sabendo nem que houve uma rolagem secreta.
+- **Rolagens guardadas por 7 dias**, como os lotes do mapa: dá para rever a sessão, e o backup não cresce para sempre.
+- **Sem limite de pedidos próprio para rolagens.** O padrão do PocketBase, 20 criações a cada 5 segundos por pessoa, sobra para quem clica nos botões.
+- **Rolagem só no aparelho, sem campanha.** Sem servidor, a aba continua útil, com o gerador do navegador, e diz que as rolagens não são compartilhadas.
+- **Dados 3D depois, com animação roteirizada.** Quando vierem, o dado gira e para na face que o servidor sorteou, sem física de verdade: com física, cada tela simularia um quique diferente, e o resultado sairia do navegador. As bibliotecas prontas de dados 3D estão paradas desde 2022 a 2024, então a base seria o Three.js, que é mantido.
 - **Área própria para os dados, do Pedro.** A rolagem de dados não é de nenhuma área: o sorteio e o histórico ficam no servidor, e um dia os dados 3D vão cair por cima do mapa. Com área própria (`app/src/dados/`), a aba Dados entra sem mexer nos arquivos do mapa, e o GrifoCaolho continua decidindo o visual do mapa: os dados 3D por cima dele só entram depois de ele aprovar. O sorteio, as coleções e o repositório no servidor seguem na área `servidor`.
 
 ## 2026-11-22

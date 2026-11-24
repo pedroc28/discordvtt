@@ -1060,3 +1060,25 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+.mapa__trava {
+  padding: 4px 10px;
+  border: 1px solid #8e5bd9;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #8e5bd9;
+  white-space: nowrap;
+}
+
+.mapa__aviso--oferta {
+  flex-direction: column;
+  align-items: stretch;
+  max-width: min(520px, 94%);
+}
+
+.mapa__oferta-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

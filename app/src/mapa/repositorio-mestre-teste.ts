@@ -1,15 +1,31 @@
 // Só para desenvolvimento: um mapa em memória que se comporta como o de um mestre, com camada oculta e
-// notas privadas, para ver e testar a interface sem o servidor. Entra com `?mestre=teste` no endereço e
+// notas privadas e trava do mapa, para ver e testar a interface sem o servidor. Entra com `?mestre=teste` no endereço e
 // só no `npm run dev` (no site publicado, o código nem é incluído). Nada é guardado: ao recarregar, some.
 
-import { aplicarNosChunks, RepositorioMemoria, type RepositorioComCamadaMestre } from './repositorio'
-import type { Hexagono, Lote, NotaPrivada } from './tipos'
+import { aplicarNosChunks, RepositorioMemoria, type RepositorioComCamadaMestre, type RepositorioComPermissao } from './repositorio'
+import type { Hexagono, Lote, NotaPrivada, PermissaoMapa } from './tipos'
 import { chave, chaveChunk } from './hex'
 
-export class RepositorioMestreDeTeste extends RepositorioMemoria implements RepositorioComCamadaMestre {
+export class RepositorioMestreDeTeste extends RepositorioMemoria implements RepositorioComCamadaMestre, RepositorioComPermissao {
   readonly ehMestre = true
   private ocultos = new Map<string, Map<string, Hexagono>>()
   private notas = new Map<string, NotaPrivada>()
+  private permissao: PermissaoMapa = 'todos'
+  private ouvintesPermissao = new Set<(p: PermissaoMapa) => void>()
+
+  async carregarPermissao(): Promise<PermissaoMapa> {
+    return this.permissao
+  }
+
+  async gravarPermissao(p: PermissaoMapa): Promise<void> {
+    this.permissao = p
+    for (const o of this.ouvintesPermissao) o(p)
+  }
+
+  assinarPermissao(ouvinte: (p: PermissaoMapa) => void): () => void {
+    this.ouvintesPermissao.add(ouvinte)
+    return () => this.ouvintesPermissao.delete(ouvinte)
+  }
 
   override async aplicar(lote: Lote): Promise<void> {
     if (lote.privado) {

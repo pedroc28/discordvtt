@@ -4,13 +4,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useAparencia } from '../nucleo/aparencia'
 import { abrirRepositorioMapa, useServidor } from '../servidor/conexao'
-import { carregarCamera, autorLocal, salvarCamera, metaPadrao, carregarViagem, salvarViagem, carregarPainelAberto, salvarPainelAberto, CAMERA_INICIAL } from './armazenamento'
+import { carregarRespostaLevar, salvarRespostaLevar, carregarCamera, autorLocal, salvarCamera, metaPadrao, carregarViagem, salvarViagem, carregarPainelAberto, salvarPainelAberto, CAMERA_INICIAL } from './armazenamento'
 import { lerArquivo, nomeDoArquivo, terrenosDesconhecidos, type ArquivoMapa, type ModoImportacao, type ResumoLeitura } from './arquivo'
 import { zoomEm } from './camera'
 import { ControladorMapa, novoId, type CamadaDeEdicao } from './controlador'
 import { EntradaMapa, type Ferramenta } from './entrada'
 import type { Hex } from './hex'
 import { Icone, type NomeIcone } from './Icones'
+import { prepararOferta, type OfertaDeLevar } from './levar-mapa'
 import { InspetorHexagono } from './InspetorHexagono'
 import { PaletaTerrenos } from './PaletaTerrenos'
 import { PainelViagem, type ResultadoDaRota } from './PainelViagem'
@@ -38,6 +39,25 @@ function urlDoTileset(): string {
   }
   return `${import.meta.env.BASE_URL}tilesets/${id}/tileset.json`
 }
+
+/** Baixa um mapa como arquivo, pelo navegador. */
+function baixarArquivo(arquivo: ArquivoMapa) {
+  const blob = new Blob([JSON.stringify(arquivo)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = nomeDoArquivo(arquivo.meta.nome)
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+/** Ferramentas que mudam o mapa: ficam de fora quando o mestre trava. */
+const EDITA_O_MAPA = new Set<Ferramenta>(['pintar', 'apagar', 'regiao', 'marcador', 'rio', 'estrada'])
+
+/** Quantas mudanças cabem num lote de importação no servidor (combinado com o Pedro). */
+const LIMITE_IMPORTACAO_SERVIDOR = 20000
 
 /** Ferramentas que só existem na camada pública: na oculta, não fazem nada. */
 const AVISA_CAMADA = new Set<Ferramenta>(['regiao', 'rio', 'estrada'])
@@ -101,6 +121,8 @@ export function MapaHex() {
   const [aviso, setAviso] = useState<string | null>(null)
   /** O servidor avisou que o mapa ficou desatualizado e há edição que ainda não foi enviada: a pessoa decide. */
   const [pedirRecarga, setPedirRecarga] = useState(false)
+  /** Só o mestre: o mapa deste navegador pode ser levado para a campanha, que está vazia. */
+  const [oferta, setOferta] = useState<OfertaDeLevar | null>(null)
   /** Sobe para montar o mapa de novo (recarga depois de ficar desatualizado). */
   const [geracao, setGeracao] = useState(0)
 
@@ -212,6 +234,7 @@ export function MapaHex() {
     let cancelado = false
     let desmontar: (() => void) | null = null
     setPedirRecarga(false)
+    setOferta(null)
     // Ao montar outro mapa (campanha, papel), a escolha de camada volta ao padrão.
     setCamada('publica')
     setVerComoJogador(false)
@@ -228,7 +251,10 @@ export function MapaHex() {
         const autor = doServidor && usuarioId ? usuarioId : autorLocal()
         // Câmera e visão de cada mapa ficam separadas: o da campanha não herda a posição do mapa local.
         const mapaChave = doServidor ? `campanha-${campanhaId}` : MAPA_ID
-        const ctrl = new ControladorMapa(repo, autor, { reaplicarPendentes: !!doServidor })
+        const ctrl = new ControladorMapa(repo, autor, {
+          reaplicarPendentes: !!doServidor,
+          limiteImportacao: doServidor ? LIMITE_IMPORTACAO_SERVIDOR : undefined,
+        })
         ctrl.aoErro = setAviso
         ctrl.aoRecuperar = () => setAviso((a) => (a?.startsWith('Não consegui carregar') ? null : a))
         const cancelarDesatualizado = doServidor?.aoDesatualizar(() => {
@@ -242,6 +268,16 @@ export function MapaHex() {
         })
         void ctrl.carregarRegioes()
         void ctrl.carregarToken()
+        void ctrl.carregarPermissao()
+        // Mestre com a campanha vazia e um mapa neste navegador: oferece levar, uma vez.
+        if (doServidor && ctrl.mestre && campanhaId && !carregarRespostaLevar(campanhaId)) {
+          const local = new RepositorioLocal(MAPA_ID)
+          const meta = { ...metaPadrao(MAPA_ID), tileset: tileset.def.id }
+          prepararOferta(doServidor, local, meta)
+            .then((o) => !cancelado && setOferta(o))
+            .catch(() => undefined)
+            .finally(() => local.fechar())
+        }
         const camera = carregarCamera(mapaChave)
         const render = new Renderizador(canvas, ctrl, tileset, camera, lerCores(raiz))
         const entrada = new EntradaMapa(canvas, render, ctrl, { ferramenta: 'pintar', terreno: 'planicie', regiaoId: null, raio: 0, tirarTraco: false })
@@ -357,8 +393,17 @@ export function MapaHex() {
   const regiaoAtivaValida =
     regiaoAtiva && motor && versaoRegioes >= 0 && !motor.ctrl.armazem.lerRegiao(regiaoAtiva) ? undefined : regiaoAtiva
 
+  // ----- trava do mapa -----
+  const permissao = useSyncExternalStore(
+    useCallback((cb: () => void) => (motor ? motor.ctrl.ouvirPermissao(cb) : () => {}), [motor]),
+    () => motor?.ctrl.permissao ?? 'todos',
+  )
+  /** Travado para quem usa: não é mestre e o mestre travou. O mestre nunca é travado. */
+  const travado = permissao === 'mestre' && !motor?.ctrl.mestre
+
   // ----- sincronizar opções com o motor -----
-  const ferramentaEfetiva: Ferramenta = ferramenta === 'regiao' && regiaoAtivaValida === undefined ? 'navegar' : ferramenta
+  const ferramentaSemTrava: Ferramenta = ferramenta === 'regiao' && regiaoAtivaValida === undefined ? 'navegar' : ferramenta
+  const ferramentaEfetiva: Ferramenta = travado && EDITA_O_MAPA.has(ferramentaSemTrava) ? 'navegar' : ferramentaSemTrava
   useEffect(() => {
     if (!motor) return
     motor.entrada.definirOpcoes({
@@ -417,15 +462,7 @@ export function MapaHex() {
     try {
       const meta = { ...metaPadrao(campanhaId ? `campanha-${campanhaId}` : MAPA_ID), tileset: motor.tileset.def.id }
       const arquivo = await motor.ctrl.exportar(meta)
-      const blob = new Blob([JSON.stringify(arquivo)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = nomeDoArquivo(meta.nome)
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      baixarArquivo(arquivo)
       setAviso(`Mapa exportado: ${arquivo.hexagonos.length} hexágonos e ${arquivo.regioes.length} regiões.`)
     } catch (e) {
       setAviso(`Não consegui exportar o mapa: ${e instanceof Error ? e.message : String(e)}`)
@@ -433,6 +470,24 @@ export function MapaHex() {
       setOcupado(false)
     }
   }, [motor, ocupado, campanhaId])
+
+  const levarMapa = useCallback(async () => {
+    if (!motor || !oferta || !campanhaId || ocupado) return
+    setOcupado(true)
+    try {
+      // Uma cópia antes de tudo: o mapa do navegador não é apagado, mas a cópia é a rede de segurança.
+      baixarArquivo(oferta.arquivo)
+      const r = await motor.ctrl.importar(oferta.arquivo, 'mesclar')
+      if (oferta.arquivo.token && !motor.ctrl.token) motor.ctrl.moverToken(oferta.arquivo.token)
+      salvarRespostaLevar(campanhaId, 'feito')
+      setOferta(null)
+      setAviso(`Mapa levado para a campanha: ${r.aplicados} hexágonos. Uma cópia foi baixada, e o mapa deste navegador continua aqui.`)
+    } catch (e) {
+      setAviso(`Não consegui levar o mapa: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setOcupado(false)
+    }
+  }, [motor, oferta, campanhaId, ocupado])
 
   const escolherArquivo = useCallback(
     async (arquivo: File | undefined) => {
@@ -572,7 +627,8 @@ export function MapaHex() {
               type="button"
               role="radio"
               aria-checked={ferramenta === f.id}
-              title={`${f.rotulo} (${f.tecla})`}
+              disabled={travado && EDITA_O_MAPA.has(f.id)}
+              title={travado && EDITA_O_MAPA.has(f.id) ? `${f.rotulo}: o mestre travou o mapa` : `${f.rotulo} (${f.tecla})`}
               onClick={() => escolherFerramenta(f.id)}
             >
               <Icone nome={f.icone} />
@@ -631,6 +687,22 @@ export function MapaHex() {
               Ver como jogador
             </button>
           </>
+        )}
+        {motor?.ctrl.podeTravar && (
+          <button
+            type="button"
+            className="botao-topo"
+            aria-pressed={permissao === 'mestre'}
+            title={permissao === 'mestre' ? 'Os jogadores só veem o mapa. Toque para deixar todos editarem' : 'Impede os jogadores de editar o mapa. O token continua livre'}
+            onClick={() => motor.ctrl.travar(permissao !== 'mestre')}
+          >
+            {permissao === 'mestre' ? 'Mapa travado' : 'Travar o mapa'}
+          </button>
+        )}
+        {travado && (
+          <span className="mapa__trava" role="status">
+            Mapa travado pelo mestre
+          </span>
         )}
 
         <span className="espaco" />
@@ -823,6 +895,32 @@ export function MapaHex() {
             </div>
           )}
 
+          {oferta && !pedirRecarga && (
+            <div className="mapa__aviso mapa__aviso--acao mapa__aviso--oferta" role="alert">
+              <span>
+                A campanha{nomeDaCampanha ? ` ${nomeDaCampanha}` : ''} ainda não tem mapa, e você tem um neste navegador, com {oferta.hexagonos} hexágonos. Levar para a campanha? Uma cópia é baixada antes e o mapa daqui continua aqui.
+              </span>
+              <span className="mapa__oferta-acoes">
+                <button type="button" className="botao-topo" disabled={ocupado} onClick={() => void levarMapa()}>
+                  Levar
+                </button>
+                <button type="button" className="botao-topo" disabled={ocupado} onClick={() => setOferta(null)}>
+                  Agora não
+                </button>
+                <button
+                  type="button"
+                  className="botao-topo"
+                  disabled={ocupado}
+                  onClick={() => {
+                    if (campanhaId) salvarRespostaLevar(campanhaId, 'nao')
+                    setOferta(null)
+                  }}
+                >
+                  Não perguntar mais
+                </button>
+              </span>
+            </div>
+          )}
           {pedirRecarga && (
             <div className="mapa__aviso mapa__aviso--acao" role="alert">
               <span>O mapa da campanha mudou muito enquanto você estava fora. O que você fez e não foi enviado se perde se recarregar.</span>

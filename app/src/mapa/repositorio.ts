@@ -5,7 +5,7 @@
 //   RepositorioLocal    IndexedDB do navegador, com aviso entre abas (ver repositorio-local.ts)
 // Na etapa do servidor entra uma terceira, que fala com o PocketBase, e nada acima muda.
 
-import type { Hexagono, Lote, Mudanca, MudancaRegiao, NotaPrivada, Regiao, TokenGrupo } from './tipos'
+import type { Hexagono, Lote, Mudanca, MudancaRegiao, NotaPrivada, PermissaoMapa, Regiao, TokenGrupo } from './tipos'
 import { chave, chaveChunk } from './hex'
 
 export type OuvinteLote = (lote: Lote) => void
@@ -47,6 +47,20 @@ export interface RepositorioComCamadaMestre extends RepositorioMapa {
 export function temCamadaMestre(repo: RepositorioMapa): repo is RepositorioComCamadaMestre {
   const r = repo as Partial<RepositorioComCamadaMestre>
   return r.ehMestre === true && typeof r.carregarChunkOculto === 'function' && typeof r.carregarNotasPrivadas === 'function'
+}
+
+/** Repositório com a trava do mapa: o mestre decide se só ele edita. O RepositorioPocketBase é um. */
+export interface RepositorioComPermissao extends RepositorioMapa {
+  carregarPermissao(): Promise<PermissaoMapa>
+  /** Só o mestre consegue: para os outros, o servidor recusa. */
+  gravarPermissao(permissao: PermissaoMapa): Promise<void>
+  /** Avisa quando o mestre trava ou destrava. Devolve a função que cancela. */
+  assinarPermissao(ouvinte: (permissao: PermissaoMapa) => void): () => void
+}
+
+export function temPermissao(repo: RepositorioMapa): repo is RepositorioComPermissao {
+  const r = repo as Partial<RepositorioComPermissao>
+  return typeof r.carregarPermissao === 'function' && typeof r.gravarPermissao === 'function' && typeof r.assinarPermissao === 'function'
 }
 
 /** Aplica as mudanças de hexágonos de um lote a um mapa de chunks. Compartilhado pelas implementações. */

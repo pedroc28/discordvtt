@@ -128,6 +128,9 @@ export interface Lote {
   privado?: PartePrivada
 }
 
+/** Quem edita o mapa: todos que participam da campanha, ou só o mestre (mapa travado). */
+export type PermissaoMapa = 'todos' | 'mestre'
+
 /** Campos de um hexágono que a interface edita. Ficam de fora as coordenadas e a revisão. */
 export type PatchHexagono = Partial<Pick<Hexagono, 'terreno' | 'nome' | 'nota' | 'regiaoId' | 'marcadores'>>
 

@@ -5,7 +5,7 @@
 //   RepositorioLocal    IndexedDB do navegador, com aviso entre abas (ver repositorio-local.ts)
 // Na etapa do servidor entra uma terceira, que fala com o PocketBase, e nada acima muda.
 
-import type { Hexagono, Lote, Mudanca, MudancaRegiao, Regiao, TokenGrupo } from './tipos'
+import type { Hexagono, Lote, Mudanca, MudancaRegiao, NotaPrivada, Regiao, TokenGrupo } from './tipos'
 import { chave, chaveChunk } from './hex'
 
 export type OuvinteLote = (lote: Lote) => void
@@ -32,6 +32,21 @@ export interface RepositorioMapa {
   gravarToken?(token: TokenGrupo | null): Promise<void>
   /** Recebe o token gravado por outros clientes. Retorna a função que cancela. */
   assinarToken?(ouvinte: OuvinteToken): () => void
+}
+
+/** Repositório de quem é mestre: além do mapa, lê a camada que só o mestre vê. O RepositorioPocketBase é um. */
+export interface RepositorioComCamadaMestre extends RepositorioMapa {
+  readonly ehMestre: boolean
+  /** Hexágonos ocultos de um chunk. */
+  carregarChunkOculto(chaveDoChunk: string): Promise<Hexagono[]>
+  /** Notas privadas de um chunk. */
+  carregarNotasPrivadas(chaveDoChunk: string): Promise<NotaPrivada[]>
+}
+
+/** O repositório entrega a camada do mestre a quem usa: só quando a pessoa é mestre da campanha. */
+export function temCamadaMestre(repo: RepositorioMapa): repo is RepositorioComCamadaMestre {
+  const r = repo as Partial<RepositorioComCamadaMestre>
+  return r.ehMestre === true && typeof r.carregarChunkOculto === 'function' && typeof r.carregarNotasPrivadas === 'function'
 }
 
 /** Aplica as mudanças de hexágonos de um lote a um mapa de chunks. Compartilhado pelas implementações. */

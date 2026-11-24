@@ -1,10 +1,10 @@
 // Painel do hexágono selecionado: nome, terreno, região, marcadores e nota.
 // Direita no desktop; no celular sobe da base da tela.
 
-import { useState } from 'react'
+import { useCallback, useState, useSyncExternalStore } from 'react'
 import type { ControladorMapa } from './controlador'
 import { novoId } from './controlador'
-import type { Hex } from './hex'
+import { chaveChunk, type Hex } from './hex'
 import { Icone } from './Icones'
 import { arvoreDeRegioes } from './operacoes'
 import { useRascunho, useVersaoDasRegioes, useVersaoDoMapa } from './rascunho'
@@ -16,9 +16,11 @@ interface Props {
   tileset: Tileset
   hex: Hex
   aoFechar: () => void
+  /** Falso quando o mestre escolheu ver como jogador: a seção só do mestre some. */
+  comMestre?: boolean
 }
 
-export function InspetorHexagono({ ctrl, tileset, hex, aoFechar }: Props) {
+export function InspetorHexagono({ ctrl, tileset, hex, aoFechar, comMestre = true }: Props) {
   const armazem = ctrl.armazem
   useVersaoDoMapa(armazem)
   useVersaoDasRegioes(armazem)
@@ -43,12 +45,13 @@ export function InspetorHexagono({ ctrl, tileset, hex, aoFechar }: Props) {
         </button>
       </header>
 
+      <div className="mapa-painel__corpo">
       {!h ? (
         <p className="mapa-painel__vazio">
           Este hexágono está vazio. Use a ferramenta Pintar para construir terreno aqui, e depois volte para dar nome e anotar.
         </p>
       ) : (
-        <div className="mapa-painel__corpo">
+        <>
           <label className="mapa-campo">
             <span>Nome</span>
             <input
@@ -138,9 +141,139 @@ export function InspetorHexagono({ ctrl, tileset, hex, aoFechar }: Props) {
               onBlur={nota.aoDesfocar}
             />
           </label>
-        </div>
+        </>
       )}
+      {ctrl.mestre && comMestre && <SecaoMestre ctrl={ctrl} tileset={tileset} hex={hex} />}
+      </div>
     </aside>
+  )
+}
+
+/** O que só o mestre vê neste hexágono: a nota privada e o hexágono oculto, com ocultar e revelar. */
+function SecaoMestre({ ctrl, tileset, hex }: { ctrl: ControladorMapa; tileset: Tileset; hex: Hex }) {
+  const m = ctrl.mestre!
+  useVersaoDoMapa(m.ocultos)
+  useSyncExternalStore(
+    useCallback((cb: () => void) => m.notas.ouvir(cb), [m]),
+    () => m.notas.versao,
+  )
+  const publico = ctrl.armazem.ler(hex.q, hex.r)
+  const oculto = m.ocultos.ler(hex.q, hex.r)
+  const nota = m.notas.ler(hex.q, hex.r)
+  const [tipoNovo, setTipoNovo] = useState(tileset.def.marcadores[0]?.id ?? '')
+  const pronto = m.temChunk(chaveChunk(hex))
+
+  const rascunhoNota = useRascunho(nota?.texto ?? '', (v) => ctrl.editarNota(hex.q, hex.r, v, `notamestre:${hex.q},${hex.r}`))
+  const rascunhoNome = useRascunho(oculto?.nome ?? '', (v) => ctrl.editarOculto(hex.q, hex.r, { nome: v }, `nomeoculto:${hex.q},${hex.r}`))
+  const editarMarcadores = (marcadores: Marcador[], grupo?: string) => ctrl.editarOculto(hex.q, hex.r, { marcadores }, grupo)
+
+  const removerOculto = () => {
+    const t = ctrl.iniciarTraco('oculta')
+    t.apagar([hex])
+    t.confirmar()
+  }
+
+  return (
+    <section className="mapa-mestre" aria-label="Só o mestre vê">
+      <h3 className="mapa-mestre__titulo">Só o mestre vê</h3>
+
+      <label className="mapa-campo mapa-campo--nota">
+        <span>Nota do mestre</span>
+        <textarea
+          value={rascunhoNota.valor}
+          rows={4}
+          disabled={!pronto}
+          placeholder="Segredos, ganchos e o que acontece aqui. Os jogadores não recebem esta nota."
+          onChange={(e) => rascunhoNota.aoMudar(e.target.value)}
+          onBlur={rascunhoNota.aoDesfocar}
+        />
+      </label>
+
+      {oculto ? (
+        <div className="mapa-mestre__oculto">
+          <p className="mapa-painel__dica">
+            Há um hexágono oculto aqui. Os jogadores veem {publico ? `o terreno público (${tileset.terreno(publico.terreno)?.nome ?? publico.terreno})` : 'o espaço vazio'}.
+          </p>
+          <label className="mapa-campo">
+            <span>Nome do oculto</span>
+            <input
+              type="text"
+              value={rascunhoNome.valor}
+              placeholder="Sem nome"
+              maxLength={80}
+              onChange={(e) => rascunhoNome.aoMudar(e.target.value)}
+              onBlur={rascunhoNome.aoDesfocar}
+            />
+          </label>
+          <label className="mapa-campo">
+            <span>Terreno do oculto</span>
+            <select value={oculto.terreno} onChange={(e) => ctrl.editarOculto(hex.q, hex.r, { terreno: e.target.value })}>
+              {!tileset.terreno(oculto.terreno) && <option value={oculto.terreno}>{oculto.terreno}</option>}
+              {tileset.def.terrenos.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+          <section className="mapa-campo" aria-label="Marcadores do oculto">
+            <span>Marcadores do oculto</span>
+            <ul className="mapa-marcadores">
+              {oculto.marcadores.map((mc) => (
+                <LinhaMarcador
+                  key={mc.id}
+                  marcador={mc}
+                  tileset={tileset}
+                  aoRenomear={(v) => editarMarcadores(oculto.marcadores.map((x) => (x.id === mc.id ? { ...x, nome: v } : x)), `marcadoroculto:${mc.id}`)}
+                  aoRemover={() => editarMarcadores(oculto.marcadores.filter((x) => x.id !== mc.id))}
+                />
+              ))}
+            </ul>
+            {tileset.def.marcadores.length > 0 && (
+              <div className="mapa-marcadores__novo">
+                <select value={tipoNovo} onChange={(e) => setTipoNovo(e.target.value)} aria-label="Tipo do novo marcador oculto">
+                  {tileset.def.marcadores.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.nome}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="botao-topo" onClick={() => editarMarcadores([...oculto.marcadores, { id: novoId(), tipo: tipoNovo, nome: '' }])}>
+                  <Icone nome="mais" tamanho={14} /> Adicionar
+                </button>
+              </div>
+            )}
+          </section>
+          <div className="mapa-mestre__acoes">
+            <button
+              type="button"
+              className="botao-topo"
+              title="Os jogadores passam a ver este hexágono, no lugar do que há aí agora"
+              onClick={() => ctrl.revelar([hex])}
+            >
+              Revelar aos jogadores
+            </button>
+            <button type="button" className="botao-topo" title="Apaga o hexágono oculto. Dá para desfazer" onClick={removerOculto}>
+              Remover oculto
+            </button>
+          </div>
+        </div>
+      ) : publico ? (
+        <div className="mapa-mestre__acoes">
+          <button
+            type="button"
+            className="botao-topo"
+            disabled={!pronto}
+            title="Tira este hexágono do mapa dos jogadores e o guarda na camada oculta"
+            onClick={() => ctrl.ocultar([hex])}
+          >
+            Ocultar este hexágono
+          </button>
+        </div>
+      ) : (
+        <p className="mapa-painel__dica">Para esconder um lugar ainda não descoberto, escolha a camada Oculta na barra e pinte aqui.</p>
+      )}
+    </section>
   )
 }
 

@@ -140,7 +140,20 @@ O servidor entrou como a classe `RepositorioPocketBase`, e o `MapaHex.tsx` já a
 - **Eco:** para o controlador, o lote que volta com o `id` de um lote que ele enviou é o próprio lote, mesmo se voltar em dois pedaços (o mestre recebe a parte privada à parte). Quando chega um lote de outra pessoa antes do eco do meu, as minhas edições que ainda não voltaram são reaplicadas por cima, porque o servidor as ordenou depois.
 - **Edição recusada:** se o servidor recusar um lote (por exemplo, mapa travado pelo mestre), o controlador desfaz a edição na tela, tira ela do desfazer e mostra a mensagem do servidor.
 - **Mapa desatualizado:** quando o repositório avisa (`aoDesatualizar`), o mapa recarrega sozinho com o aviso "Mapa atualizado.". Se há edição que ainda não foi enviada (`controlador.pendente`), aparece um aviso com o botão **Recarregar**, e o que não foi enviado se perde.
-- **Ainda não tem na tela:** camada do mestre (notas privadas e hexágonos ocultos), trava do mapa, levar o mapa do navegador para a campanha e viagem da campanha. O repositório já oferece os métodos, falta a interface.
+- **Ainda não tem na tela:** a trava do mapa, levar o mapa do navegador para a campanha e a viagem da campanha. O repositório já oferece os métodos, falta a interface.
+
+### Camada do mestre
+
+Só aparece para quem é mestre da campanha. Jogador não recebe nada disso do servidor, e o app nem cria a camada.
+
+- **Hexágono oculto:** um hexágono que só o mestre vê, com terreno, nome e marcadores como qualquer outro. Pode ficar num lugar vazio (uma masmorra ainda não descoberta) ou sobre um hexágono público, que os jogadores continuam vendo como estava. Na tela do mestre ele aparece com um véu violeta, contorno tracejado e o selo de olho riscado.
+- **Pintar o oculto:** na barra, escolha **Oculta** (ao lado de **Pública**) e use Pintar, Apagar e Marcador. Região, rio e estrada valem só para a camada pública, e o mapa avisa se a ferramenta for uma delas.
+- **Ocultar e revelar:** no painel do hexágono, a seção "Só o mestre vê" tem **Ocultar este hexágono** (sai do mapa dos jogadores e vai para a camada oculta) e, num oculto, **Revelar aos jogadores** (entra no mapa público no lugar do que houver ali) e **Remover oculto**. Ocultar e revelar são um lote só: entra tudo ou nada, e o Ctrl+Z desfaz.
+- **Nota do mestre:** em qualquer posição, vazia ou não, a seção tem uma nota que só o mestre lê. Um papelzinho amarelo no canto marca os hexágonos com nota. Apagar o texto apaga a nota.
+- **Ver como jogador:** o botão esconde a camada oculta, as notas e a seção do painel, para conferir o que os jogadores veem.
+- **Desfazer:** a parte privada entra no mesmo passo do desfazer, e conflitos com outro mestre são pulados como nos hexágonos públicos.
+- **Ainda não faz:** a exportação e a importação de arquivo não levam a camada do mestre (o repositório já tem `exportarCamadaMestre`), e a importação não cria ocultos.
+- **Testar sem servidor:** no `npm run dev`, abrir o mapa com `?mestre=teste` no endereço simula um mestre em memória (`repositorio-mestre-teste.ts`). Nada é guardado, e esse código não vai para o site publicado.
 
 ## Tilesets (trocar a arte)
 

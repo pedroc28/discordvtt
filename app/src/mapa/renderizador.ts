@@ -54,6 +54,8 @@ const RAIO_MIN_GRADE = 7
 const LIMITE_GRADE = 9000
 const LIMITE_CHUNKS = 400
 const COR_PADRAO_MARCADOR = '#d6336c'
+/** Cor do que só o mestre vê: contorno e selo dos hexágonos ocultos. */
+const COR_MESTRE = '#8e5bd9'
 /** Largura, em pixels da arte, de um hexágono no tileset em pixel art. Define o tamanho do "pixel" de rios e estradas. */
 const RESOLUCAO_ARTE = 128
 const FONTE = "'Atkinson Hyperlegible Next', system-ui, sans-serif"
@@ -89,6 +91,7 @@ export class Renderizador {
   private sair: () => void
   private sairRegioes: () => void
   private sairToken: () => void
+  private sairMestre: () => void
   private canvas: HTMLCanvasElement
   private ctrl: ControladorMapa
   private tileset: Tileset
@@ -107,12 +110,20 @@ export class Renderizador {
     this.sair = ctrl.armazem.ouvir(() => this.pedirQuadro())
     this.sairRegioes = ctrl.armazem.ouvirRegioes(() => this.pedirQuadro())
     this.sairToken = ctrl.ouvirToken(() => this.pedirQuadro())
+    const m = ctrl.mestre
+    const sairOcultos = m?.ocultos.ouvir(() => this.pedirQuadro())
+    const sairNotas = m?.notas.ouvir(() => this.pedirQuadro())
+    this.sairMestre = () => {
+      sairOcultos?.()
+      sairNotas?.()
+    }
   }
 
   destruir() {
     this.sair()
     this.sairRegioes()
     this.sairToken()
+    this.sairMestre()
     if (this.quadro) cancelAnimationFrame(this.quadro)
   }
 
@@ -149,6 +160,12 @@ export class Renderizador {
 
   definirGrade(mostrar: boolean) {
     this.mostrarGrade = mostrar
+    this.pedirQuadro()
+  }
+
+  /** O mestre vê o mapa como os jogadores: a camada oculta e as notas somem da tela. */
+  definirVerComoJogador(ver: boolean) {
+    if (this.ctrl.mestre) this.ctrl.mestre.verComoJogador = ver
     this.pedirQuadro()
   }
 
@@ -323,6 +340,9 @@ export class Renderizador {
     // 2. regiões: cor suave por cima do terreno e borda onde a região muda
     if (this.mostrarRegioes) this.desenharRegioes(visiveis, z)
 
+    // 2b. camada do mestre: hexágonos ocultos por cima do que os jogadores veem
+    const ocultosVisiveis = this.desenharOcultos(lim, comImagem)
+
     // 3. grade, cada aresta uma vez (as arestas leste, sudeste e sudoeste de cada hexágono)
     if (this.mostrarGrade && R * z >= RAIZ3 * RAIO_MIN_GRADE * 0.6) {
       const total = (lim.qmax - lim.qmin + 1) * (lim.rmax - lim.rmin + 1)
@@ -356,6 +376,9 @@ export class Renderizador {
 
     // 5. marcadores e nomes dos hexágonos
     if (z >= ZOOM_SO_COR) this.desenharMarcadoresENomes(visiveis, z)
+
+    // 5b. marcadores e selo dos ocultos, e o sinal das notas privadas
+    this.desenharSelosEMarcasDoMestre(ocultosVisiveis, lim, z)
 
     // 6. rótulos das regiões
     if (this.mostrarRegioes) this.desenharRotulos(lim, z)
@@ -416,6 +439,118 @@ export class Renderizador {
 
     // 10. token do grupo, por cima de tudo
     this.desenharToken(z)
+  }
+
+  /** Hexágonos da camada oculta dentro da tela. Vazio para jogador e para o mestre que escolheu ver como jogador. */
+  private ocultosNaTela(lim: { qmin: number; qmax: number; rmin: number; rmax: number; x0: number; x1: number; y0: number; y1: number }): HexVisivel[] {
+    const m = this.ctrl.mestre
+    if (!m || m.verComoJogador) return []
+    const { R } = this
+    const saida: HexVisivel[] = []
+    const folga = this.tileset.def.largura
+    for (let cq = Math.floor(lim.qmin / TAMANHO_CHUNK); cq <= Math.floor(lim.qmax / TAMANHO_CHUNK); cq++) {
+      for (let cr = Math.floor(lim.rmin / TAMANHO_CHUNK); cr <= Math.floor(lim.rmax / TAMANHO_CHUNK); cr++) {
+        for (const h of m.ocultos.hexagonosDoChunk(chave(cq, cr))) {
+          const { x, y } = hexParaPixel(h, R)
+          if (x < lim.x0 - folga || x > lim.x1 + folga || y < lim.y0 - folga || y > lim.y1 + folga) continue
+          saida.push({
+            q: h.q,
+            r: h.r,
+            x,
+            y,
+            terreno: h.terreno,
+            nome: h.nome,
+            marcadores: h.marcadores,
+            rios: h.rios,
+            estradas: h.estradas,
+            regiao: null,
+          })
+        }
+      }
+    }
+    return saida.sort((a, b) => a.r - b.r || a.q - b.q)
+  }
+
+  /** Desenha o terreno dos ocultos, com um véu e contorno violeta. Devolve a lista, para os selos depois. */
+  private desenharOcultos(lim: Parameters<Renderizador['ocultosNaTela']>[0], comImagem: boolean): HexVisivel[] {
+    const lista = this.ocultosNaTela(lim)
+    if (!lista.length) return lista
+    const { ctx, R } = this
+    const largTile = this.tileset.def.largura
+    for (const v of lista) {
+      const def = this.tileset.terreno(v.terreno)
+      ctx.fillStyle = def?.cor ?? '#7a7a7a'
+      this.caminhoHex(v.x, v.y, R + 1)
+      ctx.fill()
+      const img = comImagem && def ? this.tileset.imagem(v.terreno, v.q, v.r) : null
+      if (img) ctx.drawImage(img, v.x - largTile / 2, v.y - R - def!.extra, largTile, 2 * R + def!.extra)
+      // O véu deixa claro que os jogadores não veem isto.
+      ctx.fillStyle = 'rgba(110, 70, 190, 0.28)'
+      this.caminhoHex(v.x, v.y)
+      ctx.fill()
+    }
+    ctx.strokeStyle = COR_MESTRE
+    ctx.lineWidth = Math.max(2 / this.camera.zoom, R * 0.04)
+    ctx.setLineDash([R * 0.18, R * 0.12])
+    for (const v of lista) {
+      this.caminhoHex(v.x, v.y, R * 0.94)
+      ctx.stroke()
+    }
+    ctx.setLineDash([])
+    return lista
+  }
+
+  /** Marcadores dos ocultos, o selo de "só o mestre vê" e o sinal de nota privada. */
+  private desenharSelosEMarcasDoMestre(ocultos: HexVisivel[], lim: Parameters<Renderizador['ocultosNaTela']>[0], z: number) {
+    const m = this.ctrl.mestre
+    if (!m || m.verComoJogador) return
+    const { ctx, R } = this
+    if (z >= ZOOM_SO_COR && ocultos.length) this.desenharMarcadoresENomes(ocultos, z)
+    // selo: olho riscado, no canto de cima à direita
+    for (const v of ocultos) {
+      const cx = v.x + R * 0.5
+      const cy = v.y - R * 0.55
+      const raio = R * 0.2
+      ctx.fillStyle = COR_MESTRE
+      ctx.beginPath()
+      ctx.arc(cx, cy, raio, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#fff'
+      ctx.lineWidth = raio * 0.22
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.ellipse(cx, cy, raio * 0.62, raio * 0.36, 0, 0, Math.PI * 2)
+      ctx.moveTo(cx - raio * 0.6, cy + raio * 0.6)
+      ctx.lineTo(cx + raio * 0.6, cy - raio * 0.6)
+      ctx.stroke()
+      ctx.lineCap = 'butt'
+    }
+    // nota privada: papelzinho amarelo no canto de baixo à direita
+    const folga = this.tileset.def.largura
+    for (let cq = Math.floor(lim.qmin / TAMANHO_CHUNK); cq <= Math.floor(lim.qmax / TAMANHO_CHUNK); cq++) {
+      for (let cr = Math.floor(lim.rmin / TAMANHO_CHUNK); cr <= Math.floor(lim.rmax / TAMANHO_CHUNK); cr++) {
+        for (const n of m.notas.notasDoChunk(chave(cq, cr))) {
+          const { x, y } = hexParaPixel(n, R)
+          if (x < lim.x0 - folga || x > lim.x1 + folga || y < lim.y0 - folga || y > lim.y1 + folga) continue
+          const lado = R * 0.3
+          const nx = x + R * 0.38
+          const ny = y + R * 0.4
+          ctx.fillStyle = '#f2d45c'
+          ctx.strokeStyle = '#6b5a1a'
+          ctx.lineWidth = lado * 0.08
+          ctx.beginPath()
+          ctx.rect(nx, ny, lado, lado)
+          ctx.fill()
+          ctx.stroke()
+          ctx.beginPath()
+          for (const t of [0.3, 0.55, 0.8]) {
+            ctx.moveTo(nx + lado * 0.15, ny + lado * t)
+            ctx.lineTo(nx + lado * 0.85, ny + lado * t)
+          }
+          ctx.stroke()
+        }
+      }
+    }
   }
 
   /** Em cada borda onde o vizinho é de outro terreno, põe a faixa de mistura com a textura dele. */

@@ -7,7 +7,7 @@
 //   Roda do mouse (ou pinça no touchpad): zoom no ponto sob o cursor.
 
 import { arrastar, zoomEm } from './camera'
-import type { ControladorMapa, Traco } from './controlador'
+import type { CamadaDeEdicao, ControladorMapa, Traco } from './controlador'
 import { arestasDoCaminho, arestasEntrePontos, disco, linha, mesmoHex, type Hex } from './hex'
 import type { Renderizador } from './renderizador'
 import { tocarRegua } from './regua'
@@ -30,6 +30,8 @@ export interface OpcoesEntrada {
   raio: number
   /** Rio e Estrada: tira o traço em vez de desenhar. */
   tirarTraco: boolean
+  /** Só o mestre: pinta e apaga na camada oculta, que os jogadores não veem. */
+  camada?: CamadaDeEdicao
 }
 
 const usaPincel = (f: Ferramenta) => f === 'pintar' || f === 'apagar' || f === 'regiao'
@@ -164,7 +166,7 @@ export class EntradaMapa {
       return
     }
     this.modo = 'traco'
-    this.traco = this.ctrl.iniciarTraco()
+    this.traco = this.ctrl.iniciarTraco(this.opcoes.camada)
     this.ultimoHex = null
     this.ultimoPonto = null
     this.pincelar(p)

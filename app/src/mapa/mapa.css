@@ -1029,3 +1029,34 @@
 .mapa__origem {
   opacity: 0.75;
 }
+
+.mapa-mestre {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px dashed #8e5bd9;
+  border-radius: 8px;
+  background: color-mix(in srgb, #8e5bd9 8%, transparent);
+}
+
+.mapa-mestre__titulo {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8e5bd9;
+}
+
+.mapa-mestre__oculto {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mapa-mestre__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

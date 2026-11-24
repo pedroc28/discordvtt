@@ -1,6 +1,6 @@
 # Servidor
 
-Dono: Pedro. Passos 1, 2 e 3 prontos: o PocketBase tem contas, campanhas e participantes (mestre ou jogador), com regras de acesso testadas, o app tem a aba Campanha, e o servidor está no ar pelo Tailscale Funnel no PC do Pedro, com backup a cada hora copiado para o Google Drive. O passo 4 está pela metade: o servidor já guarda o mapa de cada campanha e o app já tem o `RepositorioPocketBase`, mas o mapa do app ainda não está ligado nele. A aba Dados já usa o servidor: ele sorteia e guarda as rolagens de cada campanha. O servidor também já guarda o quadro de cortiça de cada campanha (imagens e notas), e a aba Quadro vem a seguir. As fichas ainda não usam o servidor.
+Dono: Pedro. Passos 1, 2 e 3 prontos: o PocketBase tem contas, campanhas e participantes (mestre ou jogador), com regras de acesso testadas, o app tem a aba Campanha, e o servidor está no ar pelo Tailscale Funnel no PC do Pedro, com backup a cada hora copiado para o Google Drive. O passo 4 está pela metade: o servidor já guarda o mapa de cada campanha e o app já tem o `RepositorioPocketBase`, mas o mapa do app ainda não está ligado nele. A aba Dados já usa o servidor: ele sorteia e guarda as rolagens de cada campanha. A aba Quadro também: o servidor guarda o quadro de cortiça de cada campanha, com as imagens e as notas. As fichas ainda não usam o servidor.
 
 Para jogar, o PC do Pedro precisa estar ligado, acordado e com o `iniciar.bat` aberto. Os amigos entram pelo link de convite da aba Campanha.
 

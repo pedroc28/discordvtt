@@ -140,3 +140,17 @@ export function carregarCamera(mapaId: string): Camera {
 }
 
 export const salvarCamera = (mapaId: string, c: Camera) => gravar(prefixoCamera + mapaId, JSON.stringify(c))
+
+// ---------- levar o mapa do navegador para a campanha ----------
+
+/** O que o mestre respondeu à oferta de levar o mapa deste navegador para uma campanha. */
+export type RespostaLevar = 'nao' | 'feito'
+
+const prefixoLevar = 'mapa:levar:'
+
+export function carregarRespostaLevar(campanhaId: string): RespostaLevar | null {
+  const v = ler(prefixoLevar + campanhaId)
+  return v === 'nao' || v === 'feito' ? v : null
+}
+
+export const salvarRespostaLevar = (campanhaId: string, resposta: RespostaLevar) => gravar(prefixoLevar + campanhaId, resposta)

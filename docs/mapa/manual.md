@@ -140,7 +140,10 @@ O servidor entrou como a classe `RepositorioPocketBase`, e o `MapaHex.tsx` já a
 - **Eco:** para o controlador, o lote que volta com o `id` de um lote que ele enviou é o próprio lote, mesmo se voltar em dois pedaços (o mestre recebe a parte privada à parte). Quando chega um lote de outra pessoa antes do eco do meu, as minhas edições que ainda não voltaram são reaplicadas por cima, porque o servidor as ordenou depois.
 - **Edição recusada:** se o servidor recusar um lote (por exemplo, mapa travado pelo mestre), o controlador desfaz a edição na tela, tira ela do desfazer e mostra a mensagem do servidor.
 - **Mapa desatualizado:** quando o repositório avisa (`aoDesatualizar`), o mapa recarrega sozinho com o aviso "Mapa atualizado.". Se há edição que ainda não foi enviada (`controlador.pendente`), aparece um aviso com o botão **Recarregar**, e o que não foi enviado se perde.
-- **Ainda não tem na tela:** a trava do mapa, levar o mapa do navegador para a campanha e a viagem da campanha. O repositório já oferece os métodos, falta a interface.
+- **Trava do mapa:** o mestre vê o botão **Travar o mapa** na barra. Travado, só o mestre edita: para os jogadores, as ferramentas que mudam o mapa (Pintar, Apagar, Região, Marcador, Rio, Estrada) ficam desativadas, o painel do hexágono não grava, desfazer e importar não funcionam e aparece "Mapa travado pelo mestre". Navegar, régua, rota e **mover o token** continuam livres. O mestre nunca é travado. Se o servidor recusar travar, o botão volta ao que era e a mensagem aparece.
+- **Levar o mapa do navegador para a campanha:** quando o mestre abre uma campanha sem mapa (sem hexágonos e sem regiões) e tem um mapa neste navegador, o app oferece **Levar**, **Agora não** ou **Não perguntar mais**. **Levar** baixa uma cópia em JSON e importa o mapa do navegador, com o token, num lote de importação só (um passo do desfazer). O mapa do navegador nunca é apagado. **Agora não** pergunta de novo na próxima vez. **Não perguntar mais** e **Levar** guardam a resposta, por campanha, neste navegador.
+- **Importar para a campanha:** a importação vai como lote `importacao`, só do mestre, com até 20 mil mudanças. Acima disso, o mapa recusa antes de mudar qualquer coisa e pede para dividir o arquivo. Jogador que tente importar leva a recusa do servidor, e a edição é desfeita na tela.
+- **Ainda não tem na tela:** exportar a camada do mestre e a viagem da campanha. O repositório já oferece o que falta, falta a interface.
 
 ### Camada do mestre
 
@@ -153,7 +156,7 @@ Só aparece para quem é mestre da campanha. Jogador não recebe nada disso do s
 - **Ver como jogador:** o botão esconde a camada oculta, as notas e a seção do painel, para conferir o que os jogadores veem.
 - **Desfazer:** a parte privada entra no mesmo passo do desfazer, e conflitos com outro mestre são pulados como nos hexágonos públicos.
 - **Ainda não faz:** a exportação e a importação de arquivo não levam a camada do mestre (o repositório já tem `exportarCamadaMestre`), e a importação não cria ocultos.
-- **Testar sem servidor:** no `npm run dev`, abrir o mapa com `?mestre=teste` no endereço simula um mestre em memória (`repositorio-mestre-teste.ts`). Nada é guardado, e esse código não vai para o site publicado.
+- **Testar sem servidor:** no `npm run dev`, abrir o mapa com `?mestre=teste` no endereço simula um mestre em memória (`repositorio-mestre-teste.ts`, que também simula a trava). Nada é guardado, e esse código não vai para o site publicado.
 
 ## Tilesets (trocar a arte)
 

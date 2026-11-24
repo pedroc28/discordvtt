@@ -27,7 +27,7 @@ import {
   regiaoNova,
   reverterLote,
 } from './operacoes'
-import { temCamadaMestre, type RepositorioMapa } from './repositorio'
+import { temCamadaMestre, temPermissao, type RepositorioMapa } from './repositorio'
 import type {
   Hexagono,
   Lote,
@@ -38,7 +38,9 @@ import type {
   PartePrivada,
   PatchHexagono,
   PatchRegiao,
+  PermissaoMapa,
   Regiao,
+  TipoLote,
   TokenGrupo,
 } from './tipos'
 
@@ -54,6 +56,7 @@ interface Partes {
   regioes?: MudancaRegiao[]
   /** Só o mestre: hexágonos ocultos e notas privadas. */
   privado?: PartePrivada
+  tipo?: TipoLote
 }
 
 /** Em que camada uma pincelada pinta: a que todos veem ou a oculta, que só o mestre vê. */
@@ -152,6 +155,11 @@ export class Traco {
 
   private aplicar(mudancas: Mudanca[]) {
     if (this.encerrado || !mudancas.length) return
+    // Mapa travado: ninguém além do mestre pinta. A pincelada nem começa.
+    if (this.ctrl.travado) {
+      this.ctrl.avisarTravado()
+      return
+    }
     this.abrir()
     this.alvo.aplicarMudancas(mudancas)
     this.mudancas.push(...mudancas)
@@ -210,16 +218,83 @@ export class ControladorMapa {
    * que ainda não voltaram são reaplicadas por cima do que chegou.
    */
   private reaplicarPendentes: boolean
+  /** Quantas mudanças cabem num lote de importação. Sem limite no mapa do navegador. */
+  private limiteImportacao: number
+  /** Quem edita o mapa agora. Só muda com um repositório que tem a trava (o do servidor). */
+  permissao: PermissaoMapa = 'todos'
+  /** Sobe a cada mudança da trava. */
+  versaoPermissao = 0
+  private ouvintesPermissao = new Set<() => void>()
+  private cancelarPermissao: () => void = () => {}
+  private ultimoAvisoTrava = 0
   /** Hora (do relógio deste aparelho) da última posição do token que este cliente gravou. */
   private tsDoMeuToken = 0
 
-  constructor(repo: RepositorioMapa, autor: string, opcoes: { reaplicarPendentes?: boolean } = {}) {
+  constructor(repo: RepositorioMapa, autor: string, opcoes: { reaplicarPendentes?: boolean; limiteImportacao?: number } = {}) {
     this.repo = repo
     this.autor = autor
     this.reaplicarPendentes = opcoes.reaplicarPendentes ?? false
+    this.limiteImportacao = opcoes.limiteImportacao ?? Infinity
     this.mestre = temCamadaMestre(repo) ? new CamadaMestre() : null
     this.cancelarAssinatura = repo.assinar((lote) => this.receber(lote))
     this.cancelarAssinaturaToken = repo.assinarToken?.((t) => this.definirToken(t, false)) ?? (() => {})
+    if (temPermissao(repo)) this.cancelarPermissao = repo.assinarPermissao((p) => this.definirPermissao(p))
+  }
+
+  /** O mapa está travado e quem usa não é mestre: ninguém edita além do mestre. O token continua livre. */
+  get travado() {
+    return this.permissao === 'mestre' && !this.mestre
+  }
+
+  /** Quem usa é mestre e o repositório sabe travar. */
+  get podeTravar() {
+    return !!this.mestre && temPermissao(this.repo)
+  }
+
+  ouvirPermissao(ouvinte: () => void): () => void {
+    this.ouvintesPermissao.add(ouvinte)
+    return () => this.ouvintesPermissao.delete(ouvinte)
+  }
+
+  /** Busca a trava no repositório (uma vez, na abertura). */
+  async carregarPermissao(): Promise<void> {
+    if (!temPermissao(this.repo)) return
+    const versao = this.versaoPermissao
+    try {
+      const p = await this.repo.carregarPermissao()
+      // Se o mestre travou ou destravou enquanto carregava, o aviso é mais novo que a leitura.
+      if (this.versaoPermissao === versao) this.definirPermissao(p)
+    } catch (e) {
+      this.aoErro(`Não consegui saber se o mapa está travado: ${mensagemDe(e)}`)
+    }
+  }
+
+  /** O mestre trava (só ele edita) ou destrava o mapa. Vale na hora aqui, e o servidor confirma. */
+  travar(travar: boolean) {
+    const repo = this.repo
+    if (!this.podeTravar || !temPermissao(repo)) return
+    const antes = this.permissao
+    const nova: PermissaoMapa = travar ? 'mestre' : 'todos'
+    this.definirPermissao(nova)
+    repo.gravarPermissao(nova).catch((e) => {
+      this.definirPermissao(antes)
+      this.aoErro(`Não consegui ${travar ? 'travar' : 'destravar'} o mapa: ${mensagemDe(e)}`)
+    })
+  }
+
+  private definirPermissao(p: PermissaoMapa) {
+    if (p === this.permissao) return
+    this.permissao = p
+    this.versaoPermissao++
+    for (const o of [...this.ouvintesPermissao]) o()
+  }
+
+  /** Diz que o mapa está travado, no máximo uma vez a cada 3 segundos: quem arrasta o pincel gera dezenas de tentativas. */
+  avisarTravado() {
+    const agora = Date.now()
+    if (agora - this.ultimoAvisoTrava < 3000) return
+    this.ultimoAvisoTrava = agora
+    this.aoErro('O mestre travou o mapa: só ele edita agora. Você ainda pode mover o token.')
   }
 
   /** Há edição que ainda não está segura no repositório: pincelada aberta ou lote em envio. */
@@ -469,6 +544,7 @@ export class ControladorMapa {
    * onde o arquivo diz). O modo `substituir` exige um repositório com `exportarTudo`.
    */
   async importar(arquivo: ArquivoMapa, modo: ModoImportacao): Promise<{ aplicados: number; removidos: number }> {
+    if (this.travado) throw new Error('O mestre travou o mapa: só ele importa. Peça para destravar.')
     let existente: { hexagonos: Hexagono[]; regioes: Regiao[] } | undefined
     if (modo === 'substituir') {
       if (!this.repo.exportarTudo) throw new Error('Este mapa não consegue listar tudo o que tem, então não dá para substituir. Use mesclar.')
@@ -481,7 +557,14 @@ export class ControladorMapa {
     await Promise.all([...chunks].map((c) => this.garantirChunk(c)))
     await this.carregarRegioes()
     const plano = planejarImportacao(this.armazem, arquivo, modo, existente)
-    this.editar({ mudancas: plano.mudancas, regioes: plano.regioes })
+    const total = plano.mudancas.length + plano.regioes.length
+    if (total > this.limiteImportacao) {
+      throw new Error(
+        `O arquivo muda ${total} itens, e num lote só cabem ${this.limiteImportacao}. Divida o mapa em partes menores e importe uma de cada vez.`,
+      )
+    }
+    // Importar é um lote de importação: o servidor aceita lote maior, e só do mestre.
+    this.editar({ mudancas: plano.mudancas, regioes: plano.regioes, tipo: 'importacao' })
     if (modo === 'substituir') {
       if (arquivo.token) this.moverToken(arquivo.token)
       else this.tirarToken()
@@ -504,16 +587,20 @@ export class ControladorMapa {
     const regioes = partes.regioes ?? []
     const privado = this.mestre && !privadoVazio(partes.privado) ? partes.privado : undefined
     if (!mudancas.length && !regioes.length && !privado) return null
+    if (this.travado) {
+      this.avisarTravado()
+      return null
+    }
     this.armazem.aplicarMudancas(mudancas)
     this.armazem.aplicarRegioes(regioes)
     this.aplicarPrivado(privado)
-    return this.registrar({ mudancas, regioes, privado }, grupo)
+    return this.registrar({ mudancas, regioes, privado, tipo: partes.tipo }, grupo)
   }
 
   /** Guarda no histórico e envia um lote próprio cujas mudanças já estão no armazém. */
   registrar(partes: Partes, grupo?: string): Lote {
     const agora = Date.now()
-    const novo = { mudancas: partes.mudancas ?? [], regioes: partes.regioes ?? [], ...(privadoVazio(partes.privado) ? {} : { privado: partes.privado }) }
+    const novo = { mudancas: partes.mudancas ?? [], regioes: partes.regioes ?? [], ...(privadoVazio(partes.privado) ? {} : { privado: partes.privado }), ...(partes.tipo ? { tipo: partes.tipo } : {}) }
     const topo = this.feitos[this.feitos.length - 1]
     const g = this.ultimoGrupo
     let lote: Lote
@@ -601,6 +688,7 @@ export class ControladorMapa {
     this.destruido = true
     this.cancelarAssinatura()
     this.cancelarAssinaturaToken()
+    this.cancelarPermissao()
     for (const f of this.falhasChunk.values()) if (f.timer) clearTimeout(f.timer)
     if (this.falhaRegioes?.timer) clearTimeout(this.falhaRegioes.timer)
     this.falhasChunk.clear()
@@ -608,6 +696,10 @@ export class ControladorMapa {
   }
 
   private reverter(sentido: 'desfazer' | 'refazer'): number {
+    if (this.travado) {
+      this.avisarTravado()
+      return 0
+    }
     const origem = sentido === 'desfazer' ? this.feitos : this.desfeitos
     const destino = sentido === 'desfazer' ? this.desfeitos : this.feitos
     const original = origem.pop()

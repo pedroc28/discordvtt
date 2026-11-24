@@ -2,7 +2,7 @@
 # Começa uma tarefa: cria uma branch nova a partir da main mais recente.
 #
 # Uso: scripts/comecar.sh <area> <nome-da-tarefa>
-#   area: mapa, servidor, dados, ficha ou geral
+#   area: mapa, servidor, dados, quadro, ficha ou geral
 #   nome: curto, minúsculo, com hífens. Ex.: notas-por-hexagono
 set -euo pipefail
 
@@ -10,8 +10,8 @@ area="${1:-}"
 tarefa="${2:-}"
 
 case "$area" in
-  mapa | servidor | dados | ficha | geral) ;;
-  *) echo "Área inválida: use mapa, servidor, dados, ficha ou geral." >&2; exit 1 ;;
+  mapa | servidor | dados | quadro | ficha | geral) ;;
+  *) echo "Área inválida: use mapa, servidor, dados, quadro, ficha ou geral." >&2; exit 1 ;;
 esac
 if ! [[ "$tarefa" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
   echo "Nome da tarefa inválido: use minúsculas, números e hífens. Ex.: notas-por-hexagono" >&2

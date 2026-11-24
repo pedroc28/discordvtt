@@ -2,6 +2,10 @@
 
 Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em cima. Cada entrada diz o que foi decidido e por quê.
 
+## 2026-11-24
+
+- **Área própria para o quadro de cortiça, do Pedro.** Cada campanha ganha um quadro, que todos veem, com imagens enviadas ao servidor (itens achados na campanha) e notas dos jogadores. Ele não cabe em nenhuma área atual. Com área própria (`app/src/quadro/`), a aba entra sem mexer em arquivos de outros. As coleções, as regras e o repositório no servidor seguem na área `servidor`.
+
 ## 2026-11-23
 
 - **O servidor sorteia os dados.** O app manda só qual dado, e o hook sorteia com o gerador criptográfico do servidor. Se o navegador sorteasse, bastaria mandar o pedido à mão para escolher o resultado. A regra recusa um pedido que traga o resultado ou quem rolou.

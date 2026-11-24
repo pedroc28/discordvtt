@@ -12,6 +12,7 @@ import {
   limitarLargura,
   limitarPosicao,
   nomeDoArquivo,
+  posicoesEmGrade,
   paraQuadro,
   podeEditarNota,
   podeGerirImagem,
@@ -143,6 +144,22 @@ describe('itens novos', () => {
     const nova = itemDeNota('  Pista  ', 'rosa', { x: -50, y: 9999 }, [], metade)
     expect(nova).toEqual({ tipo: 'nota', texto: 'Pista', cor: 'rosa', x: 0, y: 2000, largura: 200, rotacao: 0, z: 1 })
     expect(itemDeNota('a'.repeat(600), 'azul', { x: 1, y: 1 }, [], metade)).toMatchObject({ texto: 'a'.repeat(500) })
+  })
+
+  it('várias coisas novas entram em grade em volta do ponto, dentro do quadro', () => {
+    expect(posicoesEmGrade({ x: 1600, y: 1000 }, 1)).toEqual([{ x: 1600, y: 1000 }])
+    expect(posicoesEmGrade({ x: 1600, y: 1000 }, 6)).toEqual([
+      { x: 1270, y: 850 },
+      { x: 1600, y: 850 },
+      { x: 1930, y: 850 },
+      { x: 1270, y: 1150 },
+      { x: 1600, y: 1150 },
+      { x: 1930, y: 1150 },
+    ])
+    expect(posicoesEmGrade({ x: 0, y: 0 }, 2)).toEqual([
+      { x: 0, y: 0 },
+      { x: 165, y: 0 },
+    ])
   })
 
   it('posição e largura ficam nos limites do contrato', () => {

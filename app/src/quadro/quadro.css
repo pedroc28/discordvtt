@@ -393,6 +393,16 @@
   outline-offset: 1px;
 }
 
+.quadro__exemplos {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px;
+  background: var(--ui-papel-2);
+  border-radius: 6px;
+}
+
 .quadro__galeria {
   display: flex;
   flex-direction: column;

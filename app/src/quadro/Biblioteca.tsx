@@ -49,6 +49,15 @@ export function Biblioteca({ quadro, estado, eu, centro, aoAbrir, aoFechar }: Pr
         Usado: {formatarMB(usado)} de {formatarMB(LIMITES_QUADRO.bytesCampanha)}.
       </p>
 
+      {estado.imagens.length === 0 && estado.ehMestre && !estado.carregando && (
+        <div className="quadro__exemplos">
+          <p className="quadro__dica">Para testar sem escolher arquivos: seis desenhos de RPG (mapa, carta, cartaz, poção, chave e moeda). Dá para apagar depois.</p>
+          <button type="button" className="botao-topo" disabled={estado.enviando > 0} onClick={() => void quadro.enviarExemplos(centro())}>
+            Pôr imagens de exemplo
+          </button>
+        </div>
+      )}
+
       {estado.imagens.length === 0 ? (
         <p className="quadro__dica">Nenhuma imagem ainda.</p>
       ) : (

@@ -4,7 +4,7 @@
 // O quadro cria o repositório ao abrir e o fecha ao fechar, e pode abrir de novo depois: o React, em
 // desenvolvimento, monta, desmonta e monta de novo cada tela para achar efeitos mal feitos.
 
-import { aplicarEvento, itemDeImagem, itemDeNota, limparTextoNota, ordenar, type DadosQuadro } from './operacoes'
+import { aplicarEvento, itemDeImagem, itemDeNota, limparTextoNota, ordenar, posicoesEmGrade, type DadosQuadro } from './operacoes'
 import type { ImagemPreparada } from './preparar-imagem'
 import type { RepositorioQuadro } from './repositorio'
 import type { CorNota, EventoQuadro, ImagemQuadro, ItemQuadro, Posicao } from './tipos'
@@ -25,6 +25,8 @@ export interface EstadoQuadro extends DadosQuadro {
 export interface OpcoesQuadro {
   /** Prepara a imagem antes de enviar. Nos testes, uma de mentira. */
   preparar: (arquivo: File) => Promise<ImagemPreparada>
+  /** As imagens de exemplo que vêm com o app. Nos testes, umas de mentira. */
+  carregarExemplos?: () => Promise<File[]>
   aleatorio?: () => number
 }
 
@@ -60,7 +62,7 @@ export class QuadroEstado {
 
   constructor(criarRepositorio: () => RepositorioQuadro, opcoes: OpcoesQuadro) {
     this.criarRepositorio = criarRepositorio
-    this.opcoes = { aleatorio: Math.random, ...opcoes }
+    this.opcoes = { aleatorio: Math.random, carregarExemplos: async () => [], ...opcoes }
   }
 
   get estado(): EstadoQuadro {
@@ -192,21 +194,20 @@ export class QuadroEstado {
 
   // ---------- biblioteca ----------
 
-  /** Prepara e envia cada arquivo e prende a imagem no quadro, a partir de `ponto`. */
+  /** Prepara e envia cada arquivo e prende as imagens no quadro, em grade em volta de `ponto`. */
   async enviar(arquivos: readonly File[], ponto: { x: number; y: number }) {
     const repositorio = this.repositorio
     if (!repositorio || !arquivos.length) return
     const sessao = this.sessao
     this.mudar({ enviando: this.atual.enviando + arquivos.length, erro: null })
+    const posicoes = posicoesEmGrade(ponto, arquivos.length)
     for (const [indice, arquivo] of arquivos.entries()) {
       try {
         const preparada = await this.opcoes.preparar(arquivo)
         if (sessao !== this.sessao) return
         const imagem = await repositorio.enviarImagem(preparada.arquivo, preparada)
         if (sessao !== this.sessao) return
-        // Várias de uma vez entram em escada, para uma não esconder a outra.
-        const deslocado = { x: ponto.x + indice * 40, y: ponto.y + indice * 40 }
-        await repositorio.criarItem(itemDeImagem(imagem, deslocado, this.atual.itens, this.opcoes.aleatorio))
+        await repositorio.criarItem(itemDeImagem(imagem, posicoes[indice] ?? ponto, this.atual.itens, this.opcoes.aleatorio))
       } catch (erro) {
         if (sessao !== this.sessao) return
         this.falhou(`enviar "${arquivo.name}"`, erro)
@@ -214,6 +215,19 @@ export class QuadroEstado {
         if (sessao === this.sessao) this.mudar({ enviando: Math.max(0, this.atual.enviando - 1) })
       }
     }
+  }
+
+  /** As imagens de exemplo do app, enviadas e presas como se a pessoa tivesse escolhido os arquivos. */
+  async enviarExemplos(ponto: { x: number; y: number }) {
+    if (!this.repositorio) return
+    let arquivos: File[]
+    try {
+      arquivos = await this.opcoes.carregarExemplos()
+    } catch (erro) {
+      this.falhou('pegar as imagens de exemplo', erro)
+      return
+    }
+    await this.enviar(arquivos, ponto)
   }
 
   async renomear(imagemId: string, nome: string) {

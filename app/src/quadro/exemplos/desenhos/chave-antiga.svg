@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420">
+  <defs>
+    <linearGradient id="ferro" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b9b19f"/>
+      <stop offset="0.45" stop-color="#7d7462"/>
+      <stop offset="1" stop-color="#3e3830"/>
+    </linearGradient>
+    <filter id="ferrugem" x="-10%" y="-20%" width="120%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="3" seed="21" result="r"/>
+      <feColorMatrix in="r" type="matrix" values="0 0 0 0 0.55  0 0 0 0 0.25  0 0 0 0 0.08  0 0 0 1.6 -0.95" result="f"/>
+      <feComposite in="f" in2="SourceGraphic" operator="in" result="d"/>
+      <feMerge><feMergeNode in="SourceGraphic"/><feMergeNode in="d"/></feMerge>
+    </filter>
+  </defs>
+  <ellipse cx="470" cy="360" rx="380" ry="18" fill="rgb(0 0 0 / 0.16)"/>
+  <g filter="url(#ferrugem)" stroke="#2a251f" stroke-width="6" stroke-linejoin="round" fill="url(#ferro)">
+    <path d="M60 210 a70 70 0 1 0 140 0 a70 70 0 1 0 -140 0 Z M100 210 a30 30 0 1 1 60 0 a30 30 0 1 1 -60 0 Z" fill-rule="evenodd"/>
+    <circle cx="130" cy="122" r="26"/><circle cx="130" cy="298" r="26"/><circle cx="42" cy="210" r="26"/>
+    <rect x="196" y="190" width="560" height="40" rx="10"/>
+    <rect x="236" y="176" width="26" height="68" rx="8"/>
+    <path d="M680 230 h76 v96 h-24 v-42 h-18 v62 h-34 Z"/>
+  </g>
+  <path d="M210 198 h520" stroke="#fff" stroke-width="5" opacity="0.35" stroke-linecap="round"/>
+</svg>

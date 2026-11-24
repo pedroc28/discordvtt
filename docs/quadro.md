@@ -22,7 +22,7 @@ Dono: Pedro. Um quadro de cortiça por campanha, que todos veem: imagens de iten
   - **Renomear** e **Apagar** aparecem para quem enviou a imagem e para o mestre
   - apagar uma imagem tira ela do quadro também
   - embaixo de "Enviar imagem" aparece o espaço usado da campanha
-- **Tempo real:** o que uma pessoa faz aparece para as outras. Um item arrastado muda de lugar para os outros quando a pessoa solta.
+- **Tempo real:** o que uma pessoa faz aparece para as outras, em geral em menos de um segundo. Um item arrastado pula para o lugar novo, na tela dos outros, quando a pessoa solta: o arraste em si não vai para o servidor, que fica mais leve.
 
 ## Imagens
 
@@ -31,6 +31,14 @@ Dono: Pedro. Um quadro de cortiça por campanha, que todos veem: imagens de iten
 - No teste, uma foto de 3000 por 2000 px com 2,3 MB virou 1600 por 1067 px com 480 KB.
 - O servidor aceita até 2 MB por imagem e 50 MB por campanha. As imagens são protegidas: só quem participa da campanha abre, mesmo com o link.
 - No quadro aparece a miniatura de 320 px. Com muito zoom num item grande, e ao abrir, o app baixa a imagem inteira.
+
+## Imagens de exemplo
+
+Para testar sem escolher arquivos, a biblioteca de uma campanha vazia mostra ao mestre o botão **Pôr imagens de exemplo**: seis desenhos de RPG (mapa do tesouro, carta selada, cartaz de procurado, poção misteriosa, chave antiga e moeda de ouro). Um toque envia as seis para aquela campanha e prende no quadro, em grade. Juntas, usam uns 150 KB, e dá para apagar depois como qualquer imagem.
+
+- Elas vêm dentro do site e só entram na campanha em que o mestre tocar no botão. Outras campanhas não recebem nada.
+- São desenhos feitos para o projeto, sem imagens de terceiros. As fontes em SVG ficam em `app/src/quadro/exemplos/desenhos/`, e os arquivos `.webp` foram gerados delas com o Chrome. A lista, com nome e dimensões de cada uma, fica em `exemplos/lista.json`.
+- O servidor de teste usa a mesma lista para montar o quadro da "Mesa de teste".
 
 ## Como funciona
 
@@ -47,6 +55,7 @@ Dono: Pedro. Um quadro de cortiça por campanha, que todos veem: imagens de iten
   - mover muda na hora, e volta se o servidor recusar
   - cria o repositório ao abrir e pode abrir de novo, como o React faz em desenvolvimento
 - `preparar-imagem.ts`: a redução e a conversão no navegador.
+- `exemplos.ts`: as imagens de exemplo, baixadas do próprio site só quando o mestre pede.
 - `TelaQuadro.tsx`: os gestos (arrastar, pinça, roda, alça, teclado) e o desenho. `Biblioteca.tsx` é o painel de imagens, e `Janela.tsx`, a janela de ver e de escrever.
 - `TelaQuadroSobDemanda.tsx`: a aba só é baixada quando alguém abre o quadro, para não pesar no carregamento do resto do app.
 
@@ -56,4 +65,3 @@ No servidor, as coleções, as regras e o limite estão em `docs/servidor/README
 
 - Itens secretos do mestre: imagens enviadas antes de serem achadas, numa parte que só o mestre vê, reveladas na hora certa.
 - Barbante ligando itens.
-- Ver o item sendo arrastado pelos outros durante o arraste, e não só quando a pessoa solta.

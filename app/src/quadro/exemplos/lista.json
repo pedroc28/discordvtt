@@ -1,0 +1,41 @@
+{
+  "aviso": "Imagens de exemplo do quadro, desenhadas para o projeto (fontes em desenhos/). O app usa esta lista no botão \"Pôr imagens de exemplo\", e o servidor de teste (pocketbase/servidor-de-teste.mjs) monta com ela o quadro da Mesa de teste. Largura e altura são as dos arquivos .webp: ao trocar um desenho, atualize aqui.",
+  "imagens": [
+    {
+      "arquivo": "mapa-do-tesouro.webp",
+      "nome": "Mapa do tesouro",
+      "largura": 900,
+      "altura": 640
+    },
+    {
+      "arquivo": "carta-selada.webp",
+      "nome": "Carta selada",
+      "largura": 860,
+      "altura": 600
+    },
+    {
+      "arquivo": "cartaz-de-procurado.webp",
+      "nome": "Cartaz de procurado",
+      "largura": 600,
+      "altura": 820
+    },
+    {
+      "arquivo": "pocao.webp",
+      "nome": "Poção misteriosa",
+      "largura": 600,
+      "altura": 800
+    },
+    {
+      "arquivo": "chave-antiga.webp",
+      "nome": "Chave antiga",
+      "largura": 900,
+      "altura": 420
+    },
+    {
+      "arquivo": "moeda-de-ouro.webp",
+      "nome": "Moeda de ouro",
+      "largura": 600,
+      "altura": 600
+    }
+  ]
+}

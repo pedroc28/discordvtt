@@ -97,6 +97,23 @@ export function itemDeImagem(imagem: ImagemQuadro, ponto: { x: number; y: number
   return { tipo: 'imagem', imagemId: imagem.id, ...limitarPosicao(ponto), largura, rotacao: rotacaoAleatoria(aleatorio), z: proximoZ(itens) }
 }
 
+/**
+ * Lugares para várias coisas novas de uma vez, em grade de até 3 colunas em volta do ponto, para
+ * uma não esconder a outra.
+ */
+export function posicoesEmGrade(ponto: { x: number; y: number }, quantidade: number): Array<{ x: number; y: number }> {
+  const colunas = Math.min(3, quantidade)
+  const linhas = Math.ceil(quantidade / 3)
+  const passoX = 330
+  const passoY = 300
+  return Array.from({ length: quantidade }, (_, i) =>
+    limitarPosicao({
+      x: ponto.x + ((i % 3) - (colunas - 1) / 2) * passoX,
+      y: ponto.y + (Math.floor(i / 3) - (linhas - 1) / 2) * passoY,
+    }),
+  )
+}
+
 export function itemDeNota(texto: string, cor: CorNota, ponto: { x: number; y: number }, itens: readonly ItemQuadro[], aleatorio: () => number): NovoItem {
   return { tipo: 'nota', texto: limparTextoNota(texto), cor, ...limitarPosicao(ponto), largura: 200, rotacao: rotacaoAleatoria(aleatorio), z: proximoZ(itens) }
 }

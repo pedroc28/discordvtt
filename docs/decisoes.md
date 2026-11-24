@@ -4,6 +4,9 @@ Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em ci
 
 ## 2026-11-24
 
+- **No quadro, o arraste chega aos outros quando a pessoa solta.** O item pula para o lugar novo na tela dos outros, em vez de deslizar. Mandar a posição durante o arraste seria uma gravação no servidor a cada fração de segundo, porque o PocketBase não tem mensagem que passe sem gravar. O Pedro preferiu deixar o servidor mais leve.
+- **Imagens de exemplo desenhadas para o projeto.** Para testar o quadro sem escolher arquivos, o app traz seis desenhos de RPG feitos aqui, sem imagens de terceiros. Elas só entram na campanha em que o mestre pede.
+
 - **Imagens do quadro protegidas.** O servidor fica na internet e o repositório é público. Com o arquivo protegido, só quem participa da campanha abre a imagem, mesmo com o link. O app baixa cada imagem uma vez, com o token de arquivo, e mostra pela memória do navegador.
 - **50 MB de imagens por campanha, 2 MB por imagem.** Cada backup copia todas as imagens: com 24 cópias no PC e 48 na nuvem, uma campanha cheia vira até 2,4 GB na nuvem, dentro dos 15 GB grátis do Google Drive. O app reduz as imagens antes (lado maior de 1600 px), então cabem umas 170. Se o quadro crescer mais que isso, o caminho é guardar menos cópias de backup na nuvem.
 - **Sem SVG no quadro.** SVG é texto e pode carregar código. Só PNG, JPEG e WebP, conferidos pelo conteúdo.

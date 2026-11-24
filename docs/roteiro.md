@@ -50,6 +50,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 
 - [x] Servidor do quadro: imagens protegidas da campanha, itens e notas, com regras testadas e limite de espaço, e o `RepositorioQuadroPocketBase`
 - [x] Aba Quadro: quadro de cortiça por campanha, biblioteca de imagens e notas, em tempo real
+- [x] Imagens de exemplo para testar o quadro, e a Mesa de teste com o quadro montado
 - [ ] Barbante ligando itens e itens secretos do mestre (depois)
 
 ## Fichas (os dois, congelada)

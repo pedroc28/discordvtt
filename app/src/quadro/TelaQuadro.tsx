@@ -23,6 +23,7 @@ import {
   zoomEm,
   type Vista,
 } from './operacoes'
+import { carregarExemplos } from './exemplos'
 import { prepararImagem } from './preparar-imagem'
 import { CORES_NOTA, LIMITES_QUADRO, type CorNota, type ItemQuadro } from './tipos'
 
@@ -81,7 +82,7 @@ function Quadro({ servidor, nomeCampanha }: { servidor: EstadoServidor; nomeCamp
           if (!repositorio) throw new Error('nenhuma campanha aberta. Escolha uma na aba Campanha.')
           return repositorio
         },
-        { preparar: prepararImagem },
+        { preparar: prepararImagem, carregarExemplos },
       ),
   )
   useEffect(() => {
@@ -359,7 +360,12 @@ function Quadro({ servidor, nomeCampanha }: { servidor: EstadoServidor; nomeCamp
           </div>
 
           {estado.carregando && <p className="quadro__recado">Abrindo o quadro.</p>}
-          {vazio && <p className="quadro__recado">O quadro está vazio. Envie uma imagem em "Imagens" ou prenda uma nota.</p>}
+          {vazio && (
+            <p className="quadro__recado">
+              O quadro está vazio. Envie uma imagem em "Imagens" ou prenda uma nota.
+              {estado.ehMestre && estado.imagens.length === 0 && ' Para testar, "Imagens" tem imagens de exemplo.'}
+            </p>
+          )}
 
           <div className="quadro__avisos">
             {servidor.semResposta && <p className="quadro__aviso">A conexão com o servidor caiu. As mudanças dos outros aparecem quando ela voltar.</p>}

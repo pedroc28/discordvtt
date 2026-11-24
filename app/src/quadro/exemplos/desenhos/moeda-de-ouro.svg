@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+  <defs>
+    <radialGradient id="ouro" cx="38%" cy="32%" r="75%">
+      <stop offset="0" stop-color="#ffe9a3"/>
+      <stop offset="0.45" stop-color="#e2b24a"/>
+      <stop offset="1" stop-color="#8f6512"/>
+    </radialGradient>
+    <path id="arco" d="M120 300 a180 180 0 0 1 360 0"/>
+  </defs>
+  <ellipse cx="310" cy="560" rx="200" ry="20" fill="rgb(0 0 0 / 0.18)"/>
+  <circle cx="300" cy="290" r="250" fill="#7a5410"/>
+  <circle cx="300" cy="280" r="250" fill="url(#ouro)" stroke="#6b4a0e" stroke-width="6"/>
+  <circle cx="300" cy="280" r="215" fill="none" stroke="#8f6512" stroke-width="5" stroke-dasharray="4 10"/>
+  <circle cx="300" cy="280" r="196" fill="none" stroke="#8f6512" stroke-width="4"/>
+  <text font-family="Georgia, 'DejaVu Serif', serif" font-size="34" font-weight="700" fill="#7a5410" letter-spacing="6">
+    <textPath href="#arco" startOffset="50%" text-anchor="middle">REINO DE VALDOR</textPath>
+  </text>
+  <g transform="translate(300 300)" fill="#a9781b" stroke="#6b4a0e" stroke-width="5" stroke-linejoin="round">
+    <path d="M-110 50 L-120 -60 L-60 -10 L0 -90 L60 -10 L120 -60 L110 50 Z"/>
+    <rect x="-112" y="50" width="224" height="34" rx="6"/>
+    <circle cx="-120" cy="-68" r="14"/><circle cx="0" cy="-100" r="16"/><circle cx="120" cy="-68" r="14"/>
+  </g>
+  <path d="M170 170 a160 160 0 0 1 90 -60" fill="none" stroke="#fff6d2" stroke-width="12" stroke-linecap="round" opacity="0.6"/>
+</svg>

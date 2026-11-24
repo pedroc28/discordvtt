@@ -1,4 +1,5 @@
-// Sobe um PocketBase local para testes, com uma campanha pronta: uma conta de mestre e duas de jogador.
+// Sobe um PocketBase local para testes, com uma campanha pronta: uma conta de mestre e duas de jogador,
+// e o quadro da campanha montado com as imagens de exemplo do app.
 //
 // Uso, na raiz do repositório: node pocketbase/servidor-de-teste.mjs [caminho-do-pocketbase] [--porta=8092]
 // Sem caminho, usa o pocketbase.exe (Windows) ou o pocketbase desta pasta.
@@ -26,6 +27,7 @@ const porta = opcaoPorta ? Number(opcaoPorta.slice('--porta='.length)) : 8092
 const executavel = argumentos.find((a) => !a.startsWith('--')) ?? join(pasta, process.platform === 'win32' ? 'pocketbase.exe' : 'pocketbase')
 const versaoFixada = readFileSync(join(pasta, 'VERSAO'), 'utf8').trim()
 const teste = JSON.parse(readFileSync(join(pasta, '..', 'app', 'src', 'servidor', 'contas-de-teste.json'), 'utf8'))
+const pastaExemplos = join(pasta, '..', 'app', 'src', 'quadro', 'exemplos')
 const base = `http://127.0.0.1:${porta}`
 
 const esperar = (ms) => new Promise((resolver) => setTimeout(resolver, ms))
@@ -71,7 +73,49 @@ async function prepararCampanha() {
     await api('POST', '/api/collections/participantes/records', admin, { campanha: campanha.id, usuario: ids[conta.id], papel: conta.papel })
   }
   const mapas = await api('GET', `/api/collections/mapas/records?filter=${encodeURIComponent(`campanha = "${campanha.id}"`)}`, admin)
+  await montarQuadro(admin, campanha.id, ids)
   return { campanha: campanha.id, mapa: mapas.items[0]?.id ?? '' }
+}
+
+/**
+ * Monta o quadro da campanha com as imagens de exemplo, enviadas pelo mestre, e uma nota da jogadora.
+ * Os hooks do quadro só aceitam contas do app, então o administrador age como cada conta
+ * (impersonate), sem login e sem gastar o limite de tentativas.
+ */
+async function montarQuadro(admin, campanha, ids) {
+  const comoConta = async (id) => (await api('POST', `/api/collections/users/impersonate/${id}`, admin, { duration: 3600 })).token
+  const mestre = await comoConta(ids.mestre)
+  const { imagens } = JSON.parse(readFileSync(join(pastaExemplos, 'lista.json'), 'utf8'))
+  // Em grade, em volta do meio do quadro (3200 por 2000), como o app faz.
+  const posicoes = [[1270, 850], [1600, 850], [1930, 850], [1270, 1150], [1600, 1150], [1930, 1150]]
+  for (const [i, imagem] of imagens.entries()) {
+    const formulario = new FormData()
+    formulario.append('campanha', campanha)
+    formulario.append('nome', imagem.nome)
+    formulario.append('largura', String(imagem.largura))
+    formulario.append('altura', String(imagem.altura))
+    formulario.append('arquivo', new Blob([readFileSync(join(pastaExemplos, imagem.arquivo))], { type: 'image/webp' }), imagem.arquivo)
+    const resposta = await fetch(`${base}/api/collections/quadro_imagens/records`, { method: 'POST', headers: { Authorization: mestre }, body: formulario })
+    const enviada = await resposta.json()
+    if (!resposta.ok) throw new Error(`Não consegui pôr "${imagem.nome}" no quadro (${resposta.status}): ${JSON.stringify(enviada)}`)
+    const [x, y] = posicoes[i % posicoes.length]
+    const largura = imagem.largura >= imagem.altura ? 280 : 200
+    await api('POST', '/api/collections/quadro_itens/records', mestre, { campanha, tipo: 'imagem', imagem: enviada.id, x, y, largura, rotacao: (i % 3) * 2 - 2, z: i + 1 })
+    // Sem pressa: o limite de pedidos do PocketBase é de 20 criações a cada 5 segundos.
+    await esperar(250)
+  }
+  const jogadora = await comoConta(ids.jogadora)
+  await api('POST', '/api/collections/quadro_itens/records', jogadora, {
+    campanha,
+    tipo: 'nota',
+    texto: 'Quem é o Corvo Rubro? E o que essa chave abre?',
+    cor: 'amarelo',
+    x: 2330,
+    y: 1000,
+    largura: 200,
+    rotacao: 3,
+    z: 10,
+  })
 }
 
 async function main() {
@@ -136,7 +180,7 @@ async function main() {
 
     console.log(`Servidor de teste em ${base} (PocketBase ${versao.replace(/^pocketbase version /, '')}, dados temporários).`)
     console.log(`Painel: ${base}/_/ com ${teste.administrador.email} e a senha ${teste.administrador.senha}`)
-    console.log(`Campanha "${teste.campanha}": ${campanha}, mapa ${mapa}`)
+    console.log(`Campanha "${teste.campanha}": ${campanha}, mapa ${mapa}, quadro com as imagens de exemplo`)
     for (const conta of teste.contas) console.log(`  ${conta.papel.padEnd(7)} ${conta.email}, senha ${conta.senha}`)
     console.log('No app (npm run dev, em app/), entre com uma dessas contas e este endereço de servidor.')
     console.log(`Testes do repositório contra este servidor, em app/: DISCORDVTT_SERVIDOR_TESTE=${base} npx vitest run src/servidor/repositorio-mapa.servidor.test.ts`)

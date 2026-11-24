@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="640" viewBox="0 0 900 640">
+  <defs>
+    <filter id="rasgado" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" seed="4" result="r"/>
+      <feDisplacementMap in="SourceGraphic" in2="r" scale="22" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="manchas" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="4" seed="11" result="r"/>
+      <feColorMatrix in="r" type="matrix" values="0 0 0 0 0.45  0 0 0 0 0.30  0 0 0 0 0.12  0 0 0 1.1 -0.35" result="m"/>
+      <feComposite in="m" in2="SourceGraphic" operator="in" result="d"/>
+      <feBlend in="d" in2="SourceGraphic" mode="multiply"/>
+    </filter>
+    <radialGradient id="queimado" cx="50%" cy="50%" r="62%">
+      <stop offset="70%" stop-color="#e8d4a2"/>
+      <stop offset="100%" stop-color="#b98a4a"/>
+    </radialGradient>
+    <pattern id="mar" width="26" height="14" patternUnits="userSpaceOnUse">
+      <path d="M2 8 q5 -5 10 0 t10 0" fill="none" stroke="#7a6a4c" stroke-width="1.3" opacity="0.55"/>
+    </pattern>
+  </defs>
+  <g filter="url(#rasgado)">
+    <rect x="34" y="30" width="832" height="580" rx="6" fill="url(#queimado)" filter="url(#manchas)"/>
+  </g>
+  <rect x="70" y="66" width="760" height="508" fill="url(#mar)"/>
+  <path d="M250 170 C300 120 420 130 470 160 C540 140 640 150 680 210 C730 270 700 350 650 390 C610 440 640 500 560 510 C470 525 420 480 360 490 C290 500 220 460 210 400 C200 340 160 300 190 250 C205 220 225 190 250 170 Z"
+        fill="#d8bf86" stroke="#5c4024" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M262 186 C310 146 420 152 466 180 C534 162 628 172 664 222" fill="none" stroke="#5c4024" stroke-width="1.5" opacity="0.5"/>
+  <g fill="none" stroke="#5c4024" stroke-width="3" stroke-linejoin="round">
+    <path d="M300 260 l28 -46 l28 46 M334 260 l24 -38 l24 38"/>
+    <path d="M520 230 l30 -50 l30 50"/>
+    <path d="M312 247 l16 -10 l14 8" stroke-width="2"/>
+  </g>
+  <g fill="#6b7f3c" stroke="#3f4d22" stroke-width="2">
+    <circle cx="420" cy="330" r="13"/><circle cx="445" cy="345" r="11"/><circle cx="400" cy="355" r="12"/>
+    <circle cx="600" cy="300" r="12"/><circle cx="622" cy="318" r="10"/>
+  </g>
+  <path d="M250 430 C300 400 330 420 360 400 S450 380 470 410 S540 440 560 420" fill="none" stroke="#7d2a1a" stroke-width="4" stroke-dasharray="12 10" stroke-linecap="round"/>
+  <g stroke="#a3123f" stroke-width="9" stroke-linecap="round">
+    <path d="M552 400 l30 30 M582 400 l-30 30"/>
+  </g>
+  <g transform="translate(760 160)" stroke="#5c4024" stroke-width="2.5" fill="#e8d4a2">
+    <circle r="54" fill="none"/>
+    <path d="M0 -70 L12 -12 L70 0 L12 12 L0 70 L-12 12 L-70 0 L-12 -12 Z"/>
+    <path d="M0 -70 L12 -12 L0 0 Z M70 0 L12 12 L0 0 Z M0 70 L-12 12 L0 0 Z M-70 0 L-12 -12 L0 0 Z" fill="#5c4024"/>
+    <text y="-80" text-anchor="middle" font-family="Georgia, 'DejaVu Serif', serif" font-size="26" font-weight="700" fill="#5c4024" stroke="none">N</text>
+  </g>
+  <text x="120" y="560" font-family="Georgia, 'DejaVu Serif', serif" font-style="italic" font-size="40" fill="#4a3018">Ilha do Corvo</text>
+  <path d="M120 572 h250" stroke="#4a3018" stroke-width="2"/>
+</svg>

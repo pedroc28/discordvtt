@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="820" viewBox="0 0 600 820">
+  <defs>
+    <filter id="velho" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="4" seed="6" result="r"/>
+      <feColorMatrix in="r" type="matrix" values="0 0 0 0 0.5  0 0 0 0 0.36  0 0 0 0 0.16  0 0 0 1.3 -0.45" result="m"/>
+      <feComposite in="m" in2="SourceGraphic" operator="in" result="d"/>
+      <feBlend in="d" in2="SourceGraphic" mode="multiply"/>
+    </filter>
+    <filter id="rasgado" x="-5%" y="-5%" width="110%" height="110%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" seed="2" result="r"/>
+      <feDisplacementMap in="SourceGraphic" in2="r" scale="14" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <g filter="url(#rasgado)"><rect x="24" y="20" width="552" height="780" fill="#e4cf9c" filter="url(#velho)"/></g>
+  <g font-family="Georgia, 'DejaVu Serif', serif" fill="#3a2614" text-anchor="middle">
+    <text x="300" y="118" font-size="62" font-weight="700" letter-spacing="2">PROCURADO</text>
+    <text x="300" y="170" font-size="30" letter-spacing="6">VIVO OU MORTO</text>
+  </g>
+  <rect x="140" y="200" width="320" height="330" fill="#d9c08a" stroke="#3a2614" stroke-width="6"/>
+  <path d="M300 250 c48 0 70 36 70 80 c0 34 -14 58 -34 72 c56 14 96 50 110 110 H154 c14 -60 54 -96 110 -110 c-20 -14 -34 -38 -34 -72 c0 -44 22 -80 70 -80 Z" fill="#3a2614"/>
+  <path d="M244 300 c30 -18 82 -18 112 0 c-4 -16 -30 -26 -56 -26 s-52 10 -56 26 Z" fill="#1c120a"/>
+  <g font-family="Georgia, 'DejaVu Serif', serif" fill="#3a2614" text-anchor="middle">
+    <text x="300" y="590" font-size="40" font-style="italic">Corvo Rubro</text>
+    <text x="300" y="660" font-size="30">Recompensa</text>
+    <text x="300" y="712" font-size="44" font-weight="700">500 peças de ouro</text>
+  </g>
+  <g fill="#5a5048" stroke="#2a251f" stroke-width="3">
+    <circle cx="54" cy="50" r="10"/><circle cx="546" cy="50" r="10"/><circle cx="54" cy="770" r="10"/><circle cx="546" cy="770" r="10"/>
+  </g>
+</svg>

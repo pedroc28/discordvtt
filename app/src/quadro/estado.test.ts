@@ -132,7 +132,7 @@ describe('QuadroEstado', () => {
     expect(quadro.estado.inteiras).toEqual({ a: 'blob:a/inteira' })
   })
 
-  it('enviar prepara, envia e prende cada imagem, em escada', async () => {
+  it('enviar prepara, envia e prende cada imagem, em grade em volta do ponto', async () => {
     const { quadro, repositorio } = abrir()
     await quadro.abrir()
     const enviando = quadro.enviar([new File(['a'], 'Carta.png'), new File(['b'], 'Mapa.jpg')], { x: 500, y: 400 })
@@ -142,10 +142,34 @@ describe('QuadroEstado', () => {
     expect(repositorio.pedidos.filter((p) => !p.startsWith('baixar'))).toEqual(['enviar Carta', 'prender imagem', 'enviar Mapa', 'prender imagem'])
     const presas = quadro.estado.itens
     expect(presas.map((i) => [i.x, i.y])).toEqual([
-      [500, 400],
-      [540, 440],
+      [335, 400],
+      [665, 400],
     ])
     expect(presas[1]?.z).toBeGreaterThan(presas[0]?.z ?? 0)
+  })
+
+  it('as imagens de exemplo são enviadas e presas como arquivos escolhidos', async () => {
+    const repositorio = new RepositorioFalso()
+    const quadro = new QuadroEstado(() => repositorio, {
+      preparar: preparadaFalsa,
+      carregarExemplos: async () => [new File(['a'], 'Mapa do tesouro.webp'), new File(['b'], 'Chave antiga.webp')],
+    })
+    await quadro.abrir()
+    await quadro.enviarExemplos({ x: 1600, y: 1000 })
+    expect(repositorio.pedidos.filter((p) => p.startsWith('enviar'))).toEqual(['enviar Mapa do tesouro', 'enviar Chave antiga'])
+    expect(quadro.estado.itens).toHaveLength(2)
+  })
+
+  it('se as imagens de exemplo não carregam, diz o motivo', async () => {
+    const quadro = new QuadroEstado(() => new RepositorioFalso(), {
+      preparar: preparadaFalsa,
+      carregarExemplos: async () => {
+        throw new Error('o site não respondeu. Confira a internet e tente de novo.')
+      },
+    })
+    await quadro.abrir()
+    await quadro.enviarExemplos({ x: 1, y: 1 })
+    expect(quadro.estado.erro).toBe('Não consegui pegar as imagens de exemplo: o site não respondeu. Confira a internet e tente de novo.')
   })
 
   it('envio que falha diz qual arquivo e por quê', async () => {

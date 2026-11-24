@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800" viewBox="0 0 600 800">
+  <defs>
+    <linearGradient id="liquido" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5fd0a5"/>
+      <stop offset="1" stop-color="#1d7a5c"/>
+    </linearGradient>
+    <clipPath id="corpo"><circle cx="300" cy="520" r="200"/></clipPath>
+  </defs>
+  <ellipse cx="300" cy="735" rx="170" ry="22" fill="rgb(0 0 0 / 0.18)"/>
+  <rect x="245" y="150" width="110" height="200" rx="10" fill="rgb(220 240 235 / 0.35)" stroke="#2c3b36" stroke-width="8"/>
+  <path d="M232 92 h136 l-10 70 h-116 Z" fill="#a8774a" stroke="#4d3320" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M250 112 h100 M248 132 h104" stroke="#7c5533" stroke-width="4"/>
+  <g clip-path="url(#corpo)">
+    <rect x="80" y="300" width="440" height="440" fill="rgb(220 240 235 / 0.3)"/>
+    <path d="M90 470 q55 -24 105 0 t105 0 t105 0 t110 0 V760 H90 Z" fill="url(#liquido)"/>
+    <circle cx="240" cy="560" r="14" fill="rgb(255 255 255 / 0.5)"/>
+    <circle cx="350" cy="610" r="9" fill="rgb(255 255 255 / 0.45)"/>
+    <circle cx="300" cy="520" r="6" fill="rgb(255 255 255 / 0.5)"/>
+    <circle cx="380" cy="540" r="5" fill="rgb(255 255 255 / 0.5)"/>
+  </g>
+  <circle cx="300" cy="520" r="200" fill="none" stroke="#2c3b36" stroke-width="8"/>
+  <path d="M170 430 a150 150 0 0 1 70 -80" fill="none" stroke="#fff" stroke-width="16" stroke-linecap="round" opacity="0.55"/>
+  <g transform="rotate(-8 300 330)">
+    <path d="M300 352 C330 360 360 380 372 404" fill="none" stroke="#6d5a3e" stroke-width="4"/>
+    <rect x="330" y="400" width="120" height="86" rx="4" fill="#efe3c3" stroke="#6d5a3e" stroke-width="4"/>
+    <text x="390" y="462" text-anchor="middle" font-family="Georgia, 'DejaVu Serif', serif" font-size="56" font-weight="700" fill="#4a3a26">?</text>
+  </g>
+</svg>

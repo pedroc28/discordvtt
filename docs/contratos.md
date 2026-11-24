@@ -173,6 +173,40 @@ abrirRepositorioDados(): RepositorioDadosPocketBase | null   // da campanha aber
 - Trocar de campanha, sair, trocar de servidor ou mudar de papel fecha o repositório do servidor. Quem usa abre outro.
 - A ficha, quando ganhar botões de rolagem (`roll@forca`, no roteiro), pode usar este mesmo contrato.
 
+## Quadro e servidor
+
+Arquivos: `app/src/quadro/tipos.ts` e `app/src/quadro/repositorio.ts` (área do quadro), `app/src/servidor/repositorio-quadro.ts` e `abrirRepositorioQuadro()` em `app/src/servidor/conexao.ts` (área do servidor). Os dois lados são do Pedro.
+
+```ts
+const LARGURA_QUADRO = 3200, ALTURA_QUADRO = 2000   // a posição de um item é o centro dele
+const CORES_NOTA = ['amarelo', 'rosa', 'azul', 'verde', 'branco']
+
+interface ImagemQuadro { id, autorId, nome, arquivo, largura, altura, bytes, enviada }
+interface Posicao { x, y, largura, rotacao, z }
+type ItemQuadro =
+  | { id, autorId, tipo: 'imagem', imagemId, ...Posicao }
+  | { id, autorId, tipo: 'nota', texto, cor, ...Posicao }
+
+interface RepositorioQuadro {
+  readonly ehMestre: boolean
+  carregar(): Promise<{ imagens, itens }>
+  assinar(ouvinte: (evento: EventoQuadro) => void): () => void   // imagem, imagemApagada, item, itemApagado, tudo
+  enviarImagem(arquivo: Blob, info: { nome, nomeArquivo, largura, altura }): Promise<ImagemQuadro>
+  renomearImagem(id, nome), apagarImagem(id)
+  urlDaImagem(imagem, 'miniatura' | 'inteira'): Promise<string>   // endereço blob:, válido até fechar
+  criarItem(novo), moverItem(id, posicao), editarNota(id, { texto?, cor? }), tirarItem(id)
+  fechar(): Promise<void>
+}
+
+abrirRepositorioQuadro(): RepositorioQuadroPocketBase | null   // da campanha aberta, ou null
+```
+
+- O quadro existe só no servidor: sem campanha aberta, não há repositório.
+- Limites que o servidor confere: imagem PNG, JPEG ou WebP de até 2 MB e 4096 px de lado, 50 MB por campanha, nota de até 500 caracteres, nome de imagem de até 80, largura de item de 60 a 1600, rotação de até 10 graus para cada lado e posição dentro do quadro. Estão em `LIMITES_QUADRO`.
+- `assinar` avisa também o que a própria pessoa fez, às vezes duas vezes (resposta e eco). Quem ouve junta pelo id. O evento `tudo` substitui o quadro inteiro.
+- Os erros dizem a causa e o que fazer, começando em minúscula. Quem mostra põe antes o que tentava: "Não consegui mover: ...".
+- Trocar de campanha, sair, trocar de servidor ou mudar de papel fecha o repositório. Quem usa abre outro.
+
 ## Configuração
 
 - `VITE_POCKETBASE_URL`: endereço padrão do PocketBase (modelo em `app/.env.example`). A pessoa pode trocar na tela de login, e o app guarda o endereço escolhido no navegador.

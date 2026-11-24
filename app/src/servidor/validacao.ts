@@ -3,6 +3,7 @@
 
 import { ehLados } from '../dados/operacoes'
 import type { Rolagem } from '../dados/tipos'
+import { ALTURA_QUADRO, CORES_NOTA, LARGURA_QUADRO, LIMITES_QUADRO, type CorNota, type ImagemQuadro, type ItemQuadro } from '../quadro/tipos'
 import { normalizarHexagono, normalizarRegiao } from '../mapa/armazenamento'
 import type { Hexagono, Lote, Mudanca, MudancaNota, MudancaRegiao, NotaPrivada, Regiao, TipoLote, TokenGrupo } from '../mapa/tipos'
 import type { CamadaMestreDoServidor, Campanha, LoteDoServidor, MapaDoServidor, Papel, Participacao, TokenDoServidor, Usuario } from './tipos'
@@ -191,4 +192,45 @@ export function normalizarRolagemDoServidor(bruto: unknown, secreta: boolean): R
   const quando = horaDoServidor(bruto.created)
   if (quando === null) return null
   return { id: bruto.id, autorId: bruto.autor, lados, resultado: bruto.resultado, quando, secreta }
+}
+
+// ---------- quadro ----------
+
+const numeroEntre = (v: unknown, min: number, max: number): v is number => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max
+const ehCorNota = (v: unknown): v is CorNota => typeof v === 'string' && (CORES_NOTA as readonly string[]).includes(v)
+// Relação vazia vem como string vazia: a conta de quem fez foi apagada.
+const idOuVazio = (v: unknown) => (typeof v === 'string' ? v : '')
+
+/** Registro de `quadro_imagens`. Sem arquivo ou com dimensões fora do contrato, descarta. */
+export function normalizarImagemQuadroDoServidor(bruto: unknown): ImagemQuadro | null {
+  if (!ehObj(bruto) || !id(bruto.id) || !id(bruto.arquivo)) return null
+  const { largura, altura, bytes } = bruto
+  const lado = LIMITES_QUADRO.ladoImagem
+  if (!inteiro(largura) || !inteiro(altura) || largura < 1 || altura < 1 || largura > lado || altura > lado) return null
+  if (!inteiro(bytes) || bytes < 1) return null
+  const enviada = horaDoServidor(bruto.created)
+  if (enviada === null) return null
+  const nome = typeof bruto.nome === 'string' ? bruto.nome.trim().slice(0, LIMITES_QUADRO.nomeImagem) : ''
+  return { id: bruto.id, autorId: idOuVazio(bruto.autor), nome, arquivo: bruto.arquivo, largura, altura, bytes, enviada }
+}
+
+/** Registro de `quadro_itens`. Fora do quadro, de tipo desconhecido ou incompleto, descarta. */
+export function normalizarItemQuadroDoServidor(bruto: unknown): ItemQuadro | null {
+  if (!ehObj(bruto) || !id(bruto.id)) return null
+  const { x, y, largura } = bruto
+  if (!numeroEntre(x, 0, LARGURA_QUADRO) || !numeroEntre(y, 0, ALTURA_QUADRO)) return null
+  if (!numeroEntre(largura, LIMITES_QUADRO.larguraMinima, LIMITES_QUADRO.larguraMaxima)) return null
+  const limite = LIMITES_QUADRO.rotacaoMaxima
+  const rotacao = numeroEntre(bruto.rotacao, -limite, limite) ? bruto.rotacao : 0
+  const z = inteiro(bruto.z) && bruto.z >= 0 ? bruto.z : 0
+  const base = { id: bruto.id, autorId: idOuVazio(bruto.autor), x, y, largura, rotacao, z }
+  if (bruto.tipo === 'imagem') {
+    if (!id(bruto.imagem)) return null
+    return { ...base, tipo: 'imagem', imagemId: bruto.imagem }
+  }
+  if (bruto.tipo === 'nota') {
+    const textoNota = typeof bruto.texto === 'string' ? bruto.texto.slice(0, LIMITES_QUADRO.textoNota) : ''
+    return { ...base, tipo: 'nota', texto: textoNota, cor: ehCorNota(bruto.cor) ? bruto.cor : 'amarelo' }
+  }
+  return null
 }

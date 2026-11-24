@@ -4,6 +4,12 @@ Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em ci
 
 ## 2026-11-24
 
+- **Imagens do quadro protegidas.** O servidor fica na internet e o repositório é público. Com o arquivo protegido, só quem participa da campanha abre a imagem, mesmo com o link. O app baixa cada imagem uma vez, com o token de arquivo, e mostra pela memória do navegador.
+- **50 MB de imagens por campanha, 2 MB por imagem.** Cada backup copia todas as imagens: com 24 cópias no PC e 48 na nuvem, uma campanha cheia vira até 2,4 GB na nuvem, dentro dos 15 GB grátis do Google Drive. O app reduz as imagens antes (lado maior de 1600 px), então cabem umas 170. Se o quadro crescer mais que isso, o caminho é guardar menos cópias de backup na nuvem.
+- **Sem SVG no quadro.** SVG é texto e pode carregar código. Só PNG, JPEG e WebP, conferidos pelo conteúdo.
+- **Quem faz o quê no quadro.** Todos enviam imagens e prendem, movem e mudam o tamanho de qualquer item. A nota só quem escreveu edita, nem o mestre. Tirar um item: quem prendeu ou o mestre. Renomear e apagar imagens: quem enviou ou o mestre. Itens secretos do mestre e barbante ficam para depois.
+- **O que uma conta apagada fez fica.** Imagens e itens de quem teve a conta apagada continuam na campanha, sem autor. As pistas são da campanha, não da pessoa.
+
 - **Área própria para o quadro de cortiça, do Pedro.** Cada campanha ganha um quadro, que todos veem, com imagens enviadas ao servidor (itens achados na campanha) e notas dos jogadores. Ele não cabe em nenhuma área atual. Com área própria (`app/src/quadro/`), a aba entra sem mexer em arquivos de outros. As coleções, as regras e o repositório no servidor seguem na área `servidor`.
 
 ## 2026-11-23

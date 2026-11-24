@@ -1,15 +1,17 @@
-// Conexão do app com o PocketBase: login, campanhas, participantes e os clientes do mapa e dos dados.
+// Conexão do app com o PocketBase: login, campanhas, participantes e os clientes do mapa, dos dados e do quadro.
 // É o único lugar do app que usa o SDK do servidor (ver o CLAUDE.md da área). A tela só lê
 // o estado com useServidor() e chama os métodos de `conexao`. O mapa recebe um RepositorioPocketBase
-// pronto, por abrirRepositorioMapa(), e a aba Dados, um RepositorioDadosPocketBase, por abrirRepositorioDados().
+// pronto, por abrirRepositorioMapa(), a aba Dados, um RepositorioDadosPocketBase, por abrirRepositorioDados(),
+// e a aba Quadro, um RepositorioQuadroPocketBase, por abrirRepositorioQuadro().
 
 import PocketBase, { LocalAuthStore } from 'pocketbase'
 import { useEffect, useSyncExternalStore } from 'react'
 import { ENDERECO_PADRAO, enderecoDoLink, normalizarEndereco, semParametroDoServidor } from './endereco'
-import { DADOS_FECHADO, MAPA_FECHADO, mensagemDeErro, type Acao } from './erros'
+import { DADOS_FECHADO, MAPA_FECHADO, mensagemDeErro, QUADRO_FECHADO, type Acao } from './erros'
 import { campanhaValida, limparNomeCampanha, mapaContinuaAberto, montarCampanhas, montarParticipantes, problemaNaNovaSenha } from './operacoes'
 import { RepositorioDadosPocketBase, type ClienteDados } from './repositorio-dados'
 import { RepositorioPocketBase, type ClienteMapa, type FiltroServidor } from './repositorio-mapa'
+import { RepositorioQuadroPocketBase, type ClienteQuadro } from './repositorio-quadro'
 import type { EstadoServidor, FaseConexao, Papel } from './tipos'
 import { emailDaConta, normalizarCampanha, normalizarLista, normalizarParticipacao, normalizarUsuario } from './validacao'
 
@@ -496,7 +498,7 @@ export class ConexaoServidor {
     }
   }
 
-  // ---------- mapa e dados ----------
+  // ---------- mapa, dados e quadro ----------
 
   /** Campanha aberta e papel da pessoa nela, ou null sem login ou sem campanha aberta. */
   private campanhaAberta(): { campanhaId: string; papel: Papel } | null {
@@ -520,6 +522,15 @@ export class ConexaoServidor {
     const aberta = this.campanhaAberta()
     if (!aberta) return null
     const repositorio = new RepositorioDadosPocketBase(this.clienteDados(this.geracao), aberta.campanhaId, { papel: aberta.papel })
+    this.abertos.push({ repositorio, geracao: this.geracao })
+    return repositorio
+  }
+
+  /** O quadro de cortiça da campanha aberta. Null sem login ou sem campanha aberta. */
+  abrirRepositorioQuadro(): RepositorioQuadroPocketBase | null {
+    const aberta = this.campanhaAberta()
+    if (!aberta) return null
+    const repositorio = new RepositorioQuadroPocketBase(this.clienteQuadro(this.geracao), aberta.campanhaId, { papel: aberta.papel })
     this.abertos.push({ repositorio, geracao: this.geracao })
     return repositorio
   }
@@ -585,6 +596,45 @@ export class ConexaoServidor {
     }
   }
 
+  /** O que o RepositorioQuadroPocketBase precisa do SDK, preso à sessão atual. */
+  private clienteQuadro(geracao: number): ClienteQuadro {
+    const pb = this.pb
+    const daSessao = this.daSessao(geracao, QUADRO_FECHADO)
+    // O token de arquivo vale 3 minutos no PocketBase. Um token é pedido para vários downloads seguidos,
+    // e renovado antes de vencer.
+    let token: { valor: string; ate: number } | null = null
+    const tokenDeArquivo = async () => {
+      if (!token || Date.now() > token.ate) token = { valor: await pb.files.getToken(), ate: Date.now() + 120_000 }
+      return token.valor
+    }
+    return {
+      endereco: this.atual.endereco,
+      listar: (colecao, f) => daSessao(pb.collection(colecao).getFullList({ filter: pb.filter(f.expressao, f.valores), batch: 500 })),
+      criar: (colecao, dados) => daSessao(pb.collection(colecao).create(dados)),
+      atualizar: (colecao, id, dados) => daSessao(pb.collection(colecao).update(id, dados)),
+      apagar: async (colecao, id) => {
+        await daSessao(pb.collection(colecao).delete(id))
+      },
+      baixarImagem: async (id, arquivo, miniatura) => {
+        const url = pb.files.getURL({ id, collectionName: 'quadro_imagens', collectionId: 'quadro_imagens' }, arquivo, {
+          token: await tokenDeArquivo(),
+          ...(miniatura ? { thumb: '320x0' } : {}),
+        })
+        let resposta: Response
+        try {
+          resposta = await fetch(url)
+        } catch {
+          // Mesmo formato de erro do SDK, para a mensagem dizer que o servidor não respondeu.
+          throw Object.assign(new Error('sem resposta'), { status: 0 })
+        }
+        if (!resposta.ok) throw Object.assign(new Error(`download ${resposta.status}`), { status: resposta.status })
+        return daSessao(resposta.blob())
+      },
+      assinar: (colecao, f, ouvinte) => this.assinarColecao(geracao, colecao, f, ouvinte),
+      aoReconectar: (ouvinte) => this.aoReconectar(geracao, ouvinte),
+    }
+  }
+
   private assinarColecao(geracao: number, colecao: string, f: FiltroServidor, ouvinte: (evento: { acao: string; registro: unknown }) => void) {
     return this.pb.collection(colecao).subscribe(
       '*',
@@ -627,6 +677,14 @@ export function abrirRepositorioMapa(): RepositorioPocketBase | null {
  */
 export function abrirRepositorioDados(): RepositorioDadosPocketBase | null {
   return conexao.abrirRepositorioDados()
+}
+
+/**
+ * O quadro de cortiça da campanha aberta, guardado no servidor. Null sem login ou sem campanha aberta.
+ * Fecha sozinho como o mapa. Detalhes em docs/contratos.md.
+ */
+export function abrirRepositorioQuadro(): RepositorioQuadroPocketBase | null {
+  return conexao.abrirRepositorioQuadro()
 }
 
 /**

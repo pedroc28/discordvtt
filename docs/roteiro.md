@@ -48,7 +48,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 
 ## Quadro (Pedro)
 
-- [ ] Servidor do quadro: imagens protegidas da campanha, itens e notas, com regras testadas e limite de espaço
+- [x] Servidor do quadro: imagens protegidas da campanha, itens e notas, com regras testadas e limite de espaço, e o `RepositorioQuadroPocketBase`
 - [ ] Aba Quadro: quadro de cortiça por campanha, biblioteca de imagens e notas, em tempo real
 - [ ] Barbante ligando itens e itens secretos do mestre (depois)
 

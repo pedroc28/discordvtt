@@ -46,6 +46,12 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Aba Dados: um botão para cada dado (d2 a d20), sorteio no servidor, histórico da campanha e rolagem secreta do mestre
 - [ ] Dados 3D caindo sobre o mapa (depende do GrifoCaolho aprovar o visual)
 
+## Quadro (Pedro)
+
+- [ ] Servidor do quadro: imagens protegidas da campanha, itens e notas, com regras testadas e limite de espaço
+- [ ] Aba Quadro: quadro de cortiça por campanha, biblioteca de imagens e notas, em tempo real
+- [ ] Barbante ligando itens e itens secretos do mestre (depois)
+
 ## Fichas (os dois, congelada)
 
 - [ ] Fórmulas e rolagens: campos calculados e botões como `roll@forca`

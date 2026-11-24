@@ -12,7 +12,7 @@
 
 ## Área
 
-<!-- mapa, servidor, dados, ficha ou geral -->
+<!-- mapa, servidor, dados, quadro, ficha ou geral -->
 
 ## Mexe na área do outro
 

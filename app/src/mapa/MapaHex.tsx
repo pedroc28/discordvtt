@@ -7,7 +7,7 @@ import { abrirRepositorioMapa, useServidor } from '../servidor/conexao'
 import { carregarCamera, autorLocal, salvarCamera, metaPadrao, carregarViagem, salvarViagem, carregarPainelAberto, salvarPainelAberto, CAMERA_INICIAL } from './armazenamento'
 import { lerArquivo, nomeDoArquivo, terrenosDesconhecidos, type ArquivoMapa, type ModoImportacao, type ResumoLeitura } from './arquivo'
 import { zoomEm } from './camera'
-import { ControladorMapa, novoId } from './controlador'
+import { ControladorMapa, novoId, type CamadaDeEdicao } from './controlador'
 import { EntradaMapa, type Ferramenta } from './entrada'
 import type { Hex } from './hex'
 import { Icone, type NomeIcone } from './Icones'
@@ -38,6 +38,10 @@ function urlDoTileset(): string {
   }
   return `${import.meta.env.BASE_URL}tilesets/${id}/tileset.json`
 }
+
+/** Ferramentas que só existem na camada pública: na oculta, não fazem nada. */
+const AVISA_CAMADA = new Set<Ferramenta>(['regiao', 'rio', 'estrada'])
+const AVISO_CAMADA = 'Região, rio e estrada valem só para a camada pública. Volte para Pública para usá-los.'
 
 interface Motor {
   ctrl: ControladorMapa
@@ -126,6 +130,9 @@ export function MapaHex() {
   const [raio, setRaio] = useState(0)
   /** Rio e Estrada: tira o traço em vez de desenhar. */
   const [tirarTraco, setTirarTraco] = useState(false)
+  /** Só o mestre: em que camada Pintar e Apagar agem, e se ele vê o mapa como os jogadores. */
+  const [camada, setCamada] = useState<CamadaDeEdicao>('publica')
+  const [verComoJogador, setVerComoJogador] = useState(false)
   const [versaoRegua, setVersaoRegua] = useState(0)
   const [grade, setGrade] = useState(true)
   const [mostrarRegioes, setMostrarRegioes] = useState(true)
@@ -164,25 +171,31 @@ export function MapaHex() {
       // O painel do hexágono cobriria a paleta e atrapalharia pintar: sai da frente.
       if (f === 'pintar' || f === 'apagar' || f === 'regiao' || f === 'rio' || f === 'estrada') limparSelecao()
       if (f !== 'regiao') setRegiaoEditando(null)
+      if (camada === 'oculta' && AVISA_CAMADA.has(f)) setAviso(AVISO_CAMADA)
       if (f !== 'regua' && motor?.render.regua) motor.render.definirRegua(null)
       if (f === 'rota') setPainelAberto(true)
     },
-    [limparSelecao, motor],
+    [limparSelecao, motor, camada],
   )
 
   const aoMarcarRef = useRef<(h: Hex) => void>(() => {})
   useEffect(() => {
     aoMarcarRef.current = (h) => {
       if (!motor) return
-      const existente = motor.ctrl.armazem.ler(h.q, h.r)
+      const oculta = !!motor.ctrl.mestre && camada === 'oculta'
+      const existente = oculta ? motor.ctrl.mestre!.ocultos.ler(h.q, h.r) : motor.ctrl.armazem.ler(h.q, h.r)
       if (!existente) {
-        setAviso('Pinte o terreno deste hexágono antes de colocar um marcador nele.')
+        setAviso(
+          oculta
+            ? 'Pinte um hexágono oculto aqui antes de colocar um marcador nele.'
+            : 'Pinte o terreno deste hexágono antes de colocar um marcador nele.',
+        )
         return
       }
       if (marcadorAtivo) {
-        motor.ctrl.editarHexagono(h.q, h.r, {
-          marcadores: [...existente.marcadores, { id: novoId(), tipo: marcadorAtivo, nome: '' }],
-        })
+        const marcadores = [...existente.marcadores, { id: novoId(), tipo: marcadorAtivo, nome: '' }]
+        if (oculta) motor.ctrl.editarOculto(h.q, h.r, { marcadores })
+        else motor.ctrl.editarHexagono(h.q, h.r, { marcadores })
       }
       selecionar(h)
     }
@@ -199,12 +212,19 @@ export function MapaHex() {
     let cancelado = false
     let desmontar: (() => void) | null = null
     setPedirRecarga(false)
+    // Ao montar outro mapa (campanha, papel), a escolha de camada volta ao padrão.
+    setCamada('publica')
+    setVerComoJogador(false)
 
     Tileset.carregar(urlDoTileset())
-      .then((tileset) => {
+      .then(async (tileset) => {
         if (cancelado) return
         const doServidor = campanhaId && usuarioId ? abrirRepositorioMapa() : null
-        const repo: RepositorioMapa = doServidor ?? new RepositorioLocal(MAPA_ID)
+        // Só no `npm run dev`: `?mestre=teste` simula um mestre em memória, para ver a camada do mestre sem servidor.
+        const simulaMestre = import.meta.env.DEV && !doServidor && new URLSearchParams(window.location.search).get('mestre') === 'teste'
+        const repoDeTeste = simulaMestre ? new (await import('./repositorio-mestre-teste')).RepositorioMestreDeTeste() : null
+        if (cancelado) return
+        const repo: RepositorioMapa = doServidor ?? repoDeTeste ?? new RepositorioLocal(MAPA_ID)
         const autor = doServidor && usuarioId ? usuarioId : autorLocal()
         // Câmera e visão de cada mapa ficam separadas: o da campanha não herda a posição do mapa local.
         const mapaChave = doServidor ? `campanha-${campanhaId}` : MAPA_ID
@@ -268,7 +288,7 @@ export function MapaHex() {
           entrada.destruir()
           render.destruir()
           ctrl.destruir()
-          void (doServidor ?? (repo as RepositorioLocal)).fechar()
+          void (doServidor ?? (repoDeTeste ? undefined : (repo as RepositorioLocal)))?.fechar()
         }
       })
       .catch((e) => !cancelado && setErroCarga(e instanceof Error ? e.message : String(e)))
@@ -341,8 +361,21 @@ export function MapaHex() {
   const ferramentaEfetiva: Ferramenta = ferramenta === 'regiao' && regiaoAtivaValida === undefined ? 'navegar' : ferramenta
   useEffect(() => {
     if (!motor) return
-    motor.entrada.definirOpcoes({ ferramenta: ferramentaEfetiva, terreno, regiaoId: regiaoAtivaValida ?? null, raio, tirarTraco })
-  }, [motor, ferramentaEfetiva, terreno, regiaoAtivaValida, raio, tirarTraco, versaoRegioes])
+    motor.entrada.definirOpcoes({
+      ferramenta: ferramentaEfetiva,
+      terreno,
+      regiaoId: regiaoAtivaValida ?? null,
+      raio,
+      tirarTraco,
+      camada: motor.ctrl.mestre ? camada : 'publica',
+    })
+  }, [motor, ferramentaEfetiva, terreno, regiaoAtivaValida, raio, tirarTraco, versaoRegioes, camada])
+
+  // ----- camada do mestre -----
+  const ehMestre = !!motor?.ctrl.mestre
+  useEffect(() => {
+    motor?.render.definirVerComoJogador(verComoJogador)
+  }, [motor, verComoJogador])
 
   useEffect(() => {
     motor?.render.definirGrade(grade)
@@ -565,6 +598,41 @@ export function MapaHex() {
           </div>
         )}
 
+        {ehMestre && (
+          <>
+            <div className="modo" role="radiogroup" aria-label="Camada em que Pintar e Apagar agem">
+              <button type="button" role="radio" aria-checked={camada === 'publica'} title="O que os jogadores veem" onClick={() => setCamada('publica')}>
+                Pública
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={camada === 'oculta'}
+                title="Só o mestre vê. Revele quando os jogadores descobrirem"
+                onClick={() => {
+                  setCamada('oculta')
+                  setVerComoJogador(false)
+                  if (AVISA_CAMADA.has(ferramenta)) setAviso(AVISO_CAMADA)
+                }}
+              >
+                Oculta
+              </button>
+            </div>
+            <button
+              type="button"
+              className="botao-topo"
+              aria-pressed={verComoJogador}
+              title="Esconde a camada oculta e as notas privadas para conferir o que os jogadores veem"
+              onClick={() => {
+                setVerComoJogador((v) => !v)
+                setCamada('publica')
+              }}
+            >
+              Ver como jogador
+            </button>
+          </>
+        )}
+
         <span className="espaco" />
 
         <div className="grupo-botoes">
@@ -771,7 +839,7 @@ export function MapaHex() {
         </div>
 
         {motor && selecionado && !regiaoEditando && (
-          <InspetorHexagono key={`${selecionado.q},${selecionado.r}`} ctrl={motor.ctrl} tileset={motor.tileset} hex={selecionado} aoFechar={limparSelecao} />
+          <InspetorHexagono key={`${selecionado.q},${selecionado.r}`} ctrl={motor.ctrl} tileset={motor.tileset} hex={selecionado} aoFechar={limparSelecao} comMestre={!verComoJogador} />
         )}
         {motor && regiaoEditando && <EditorDeRegiao key={regiaoEditando} ctrl={motor.ctrl} id={regiaoEditando} aoFechar={() => setRegiaoEditando(null)} />}
 

@@ -21,7 +21,8 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Campo, geleira e cânion retrabalhados
 - [x] Exportar e importar o mapa em arquivo JSON (mesclar ou substituir, com desfazer)
 - [x] Fase 4, parte 1: mapa ligado ao servidor (repositório por campanha, conta como autor, eco, chunk que falha, token na ordem de chegada, mapa desatualizado, edição recusada)
-- [ ] Fase 4, parte 2: camada do mestre na tela (notas privadas, hexágonos ocultos, revelar), trava do mapa, levar o mapa do navegador para a campanha e viagem da campanha
+- [x] Fase 4, parte 2: camada do mestre na tela (notas privadas, hexágonos ocultos, ocultar e revelar, ver como jogador)
+- [ ] Fase 4, parte 3: trava do mapa, levar o mapa do navegador para a campanha, exportar a camada do mestre e viagem da campanha
 - [ ] Presença (fora por enquanto: o PocketBase não tem mensagem efêmera)
 - [x] Paleta de terrenos com pastas e pesquisa por tag (mínimo 3 tags por terreno)
 - [x] Arte final dos terrenos em pixel art (PixelLab): os 45 terrenos feitos, guia e lista em `docs/mapa/arte.md`

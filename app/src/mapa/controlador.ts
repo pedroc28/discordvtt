@@ -5,24 +5,42 @@
 // O desfazer é seletivo: só reverte o que ainda está como o lote deixou (ver operacoes.ts).
 
 import { ArmazemMapa } from './armazem'
+import { CamadaMestre } from './camada-mestre'
 import { montarArquivo, planejarImportacao, type ArquivoMapa, type ModoImportacao } from './arquivo'
 import { chaveChunk, type Aresta, type Hex } from './hex'
 import {
   fundirMudancas,
   fundirMudancasRegiao,
+  fundirPrivado,
   mudancaCriarRegiao,
   mudancaEditarHexagono,
   mudancaEditarRegiao,
   mudancaExcluirRegiao,
   mudancasApagar,
   mudancasArestas,
+  mudancaNota,
+  mudancasOcultar,
   mudancasPintar,
   mudancasRegiaoDosHexagonos,
+  mudancasRevelar,
+  privadoVazio,
   regiaoNova,
   reverterLote,
 } from './operacoes'
-import type { RepositorioMapa } from './repositorio'
-import type { Hexagono, Lote, MapaMeta, Mudanca, MudancaRegiao, PatchHexagono, PatchRegiao, Regiao, TokenGrupo } from './tipos'
+import { temCamadaMestre, type RepositorioMapa } from './repositorio'
+import type {
+  Hexagono,
+  Lote,
+  MapaMeta,
+  Mudanca,
+  MudancaNota,
+  MudancaRegiao,
+  PartePrivada,
+  PatchHexagono,
+  PatchRegiao,
+  Regiao,
+  TokenGrupo,
+} from './tipos'
 
 const LIMITE_HISTORICO = 200
 const LIMITE_ECOS = 300
@@ -34,7 +52,12 @@ export const novoId = () => crypto.randomUUID()
 interface Partes {
   mudancas?: Mudanca[]
   regioes?: MudancaRegiao[]
+  /** Só o mestre: hexágonos ocultos e notas privadas. */
+  privado?: PartePrivada
 }
+
+/** Em que camada uma pincelada pinta: a que todos veem ou a oculta, que só o mestre vê. */
+export type CamadaDeEdicao = 'publica' | 'oculta'
 
 export interface DadosRegiao {
   nome: string
@@ -49,9 +72,17 @@ export class Traco {
   private encerrado = false
   private contado = false
   private ctrl: ControladorMapa
+  private camada: CamadaDeEdicao
 
-  constructor(ctrl: ControladorMapa) {
+  constructor(ctrl: ControladorMapa, camada: CamadaDeEdicao = 'publica') {
     this.ctrl = ctrl
+    // Sem camada do mestre (jogador), a pincelada é sempre pública.
+    this.camada = camada === 'oculta' && ctrl.mestre ? 'oculta' : 'publica'
+  }
+
+  /** O que esta pincelada lê e escreve: o mapa público ou a camada oculta. */
+  private get alvo() {
+    return this.camada === 'oculta' ? this.ctrl.mestre!.ocultos : this.ctrl.armazem
   }
 
   /** Enquanto a pincelada está aberta, ela conta como edição ainda não enviada (ver `pendente`). */
@@ -68,25 +99,28 @@ export class Traco {
   }
 
   pintar(hexes: readonly Hex[], terreno: string) {
-    this.aplicar(mudancasPintar(this.ctrl.armazem, this.carregados(hexes), terreno))
+    this.aplicar(mudancasPintar(this.alvo, this.carregados(hexes), terreno))
   }
 
   apagar(hexes: readonly Hex[]) {
-    this.aplicar(mudancasApagar(this.ctrl.armazem, this.carregados(hexes)))
+    this.aplicar(mudancasApagar(this.alvo, this.carregados(hexes)))
   }
 
   /** Põe os hexágonos que existem numa região, ou tira de qualquer região com null. */
   regiao(hexes: readonly Hex[], regiaoId: string | null) {
+    if (this.camada === 'oculta') return
     this.aplicar(mudancasRegiaoDosHexagonos(this.ctrl.armazem, this.carregados(hexes), regiaoId))
   }
 
   /** Liga ou tira rio nas arestas. Só vale onde os dois hexágonos existem (ao ligar). */
   rio(arestas: readonly Aresta[], ligar: boolean) {
+    if (this.camada === 'oculta') return
     this.aplicar(mudancasArestas(this.ctrl.armazem, arestas, 'rios', ligar))
   }
 
   /** Liga ou tira estrada nas arestas (cada uma liga o centro de dois hexágonos vizinhos). */
   estrada(arestas: readonly Aresta[], ligar: boolean) {
+    if (this.camada === 'oculta') return
     this.aplicar(mudancasArestas(this.ctrl.armazem, arestas, 'estradas', ligar))
   }
 
@@ -100,7 +134,7 @@ export class Traco {
     this.fechar()
     const mudancas = fundirMudancas(this.mudancas)
     if (!mudancas.length) return null
-    return this.ctrl.registrar({ mudancas })
+    return this.ctrl.registrar(this.camada === 'oculta' ? { privado: { ocultos: mudancas, notas: [] } } : { mudancas })
   }
 
   cancelar() {
@@ -108,24 +142,26 @@ export class Traco {
     this.encerrado = true
     this.fechar()
     const inversas = fundirMudancas(this.mudancas).map((m) => ({ ...m, antes: m.depois, depois: m.antes }))
-    this.ctrl.armazem.aplicarMudancas(inversas)
+    this.alvo.aplicarMudancas(inversas)
   }
 
   /** Só edita chunk já carregado, senão a edição se perderia quando o chunk chegar. */
   private carregados(hexes: readonly Hex[]) {
-    return hexes.filter((h) => this.ctrl.armazem.temChunk(chaveChunk(h)))
+    return hexes.filter((h) => this.ctrl.armazem.temChunk(chaveChunk(h)) && (this.camada === 'publica' || this.ctrl.mestre!.temChunk(chaveChunk(h))))
   }
 
   private aplicar(mudancas: Mudanca[]) {
     if (this.encerrado || !mudancas.length) return
     this.abrir()
-    this.ctrl.armazem.aplicarMudancas(mudancas)
+    this.alvo.aplicarMudancas(mudancas)
     this.mudancas.push(...mudancas)
   }
 }
 
 export class ControladorMapa {
   readonly armazem = new ArmazemMapa()
+  /** Hexágonos ocultos e notas privadas. Só existe para o mestre da campanha. */
+  readonly mestre: CamadaMestre | null
   /** Chamado quando gravar falha (disco cheio, servidor fora). */
   aoErro: (mensagem: string) => void = () => {}
 
@@ -141,6 +177,8 @@ export class ControladorMapa {
   private carregamentos = new Map<string, Promise<void>>()
   /** Lotes que chegaram enquanto o chunk ainda carregava. Entram assim que ele chegar. */
   private pendentes = new Map<string, Mudanca[]>()
+  /** O mesmo para a camada do mestre: ocultos e notas que chegaram com o chunk ainda carregando. */
+  private pendentesPrivados = new Map<string, PartePrivada>()
   private carregandoRegioes: Promise<void> | null = null
   private regioesPendentes: MudancaRegiao[] = []
   /** Chunks e regiões que falharam: esperam um tempo e tentam de novo. Nunca viram "vazio". */
@@ -179,6 +217,7 @@ export class ControladorMapa {
     this.repo = repo
     this.autor = autor
     this.reaplicarPendentes = opcoes.reaplicarPendentes ?? false
+    this.mestre = temCamadaMestre(repo) ? new CamadaMestre() : null
     this.cancelarAssinatura = repo.assinar((lote) => this.receber(lote))
     this.cancelarAssinaturaToken = repo.assinarToken?.((t) => this.definirToken(t, false)) ?? (() => {})
   }
@@ -248,12 +287,24 @@ export class ControladorMapa {
     let p = this.carregamentos.get(chaveDoChunk)
     if (!p) {
       this.pendentes.set(chaveDoChunk, [])
-      p = this.repo
-        .carregarChunk(chaveDoChunk)
-        .then((hexagonos) => {
+      this.pendentesPrivados.set(chaveDoChunk, { ocultos: [], notas: [] })
+      const repo = this.repo
+      // O mestre carrega a camada dele junto com o chunk: as duas chegam ou nenhuma, e a edição só abre quando as duas chegaram.
+      const camadas = temCamadaMestre(repo)
+        ? Promise.all([repo.carregarChunk(chaveDoChunk), repo.carregarChunkOculto(chaveDoChunk), repo.carregarNotasPrivadas(chaveDoChunk)])
+        : repo.carregarChunk(chaveDoChunk).then((h) => [h, null, null] as const)
+      p = camadas
+        .then(([hexagonos, ocultos, notas]) => {
           this.armazem.definirChunk(chaveDoChunk, hexagonos)
           const atrasadas = this.pendentes.get(chaveDoChunk) ?? []
           if (atrasadas.length) this.armazem.aplicarMudancas(atrasadas)
+          if (this.mestre && ocultos && notas) {
+            this.mestre.ocultos.definirChunk(chaveDoChunk, ocultos)
+            this.mestre.notas.definirChunk(chaveDoChunk, notas)
+            const privadas = this.pendentesPrivados.get(chaveDoChunk)
+            if (privadas?.ocultos.length) this.mestre.ocultos.aplicarMudancas(privadas.ocultos)
+            if (privadas?.notas.length) this.mestre.notas.aplicar(privadas.notas)
+          }
           if (this.falhasChunk.delete(chaveDoChunk)) this.recuperou()
         })
         .catch((e) => {
@@ -265,6 +316,7 @@ export class ControladorMapa {
         })
         .finally(() => {
           this.pendentes.delete(chaveDoChunk)
+          this.pendentesPrivados.delete(chaveDoChunk)
           this.carregamentos.delete(chaveDoChunk)
         })
       this.carregamentos.set(chaveDoChunk, p)
@@ -316,8 +368,46 @@ export class ControladorMapa {
     return this.carregandoRegioes
   }
 
-  iniciarTraco(): Traco {
-    return new Traco(this)
+  iniciarTraco(camada: CamadaDeEdicao = 'publica'): Traco {
+    return new Traco(this, camada)
+  }
+
+  // ----- camada do mestre -----
+
+  /** Esconde dos jogadores os hexágonos que existem: saem do mapa público e entram na camada oculta. Retorna quantos. */
+  ocultar(hexes: readonly Hex[]): number {
+    const m = this.mestre
+    if (!m) return 0
+    const prontos = hexes.filter((h) => m.temChunk(chaveChunk(h)) && this.armazem.temChunk(chaveChunk(h)))
+    const { mudancas, ocultos } = mudancasOcultar(this.armazem, m.ocultos, prontos)
+    this.editar({ mudancas, privado: { ocultos, notas: [] } })
+    return mudancas.length
+  }
+
+  /** Revela hexágonos ocultos: entram no mapa público e saem da camada oculta, num lote só. Retorna quantos. */
+  revelar(hexes: readonly Hex[]): number {
+    const m = this.mestre
+    if (!m) return 0
+    const prontos = hexes.filter((h) => m.temChunk(chaveChunk(h)) && this.armazem.temChunk(chaveChunk(h)))
+    const { mudancas, ocultos } = mudancasRevelar(this.armazem, m.ocultos, prontos)
+    this.editar({ mudancas, privado: { ocultos, notas: [] } })
+    return mudancas.length
+  }
+
+  /** Edita campos de um hexágono oculto (nome, terreno, marcadores...). Null se não há oculto ali ou nada mudou. */
+  editarOculto(q: number, r: number, patch: PatchHexagono, grupo?: string): Lote | null {
+    const m = this.mestre
+    if (!m) return null
+    const mud = mudancaEditarHexagono(m.ocultos, q, r, patch)
+    return mud ? this.editar({ privado: { ocultos: [mud], notas: [] } }, grupo) : null
+  }
+
+  /** Escreve a nota privada de uma posição (texto vazio apaga). Null se não é mestre, o chunk não chegou ou nada mudou. */
+  editarNota(q: number, r: number, texto: string, grupo?: string): Lote | null {
+    const m = this.mestre
+    if (!m || !m.temChunk(chaveChunk({ q, r }))) return null
+    const mud = mudancaNota(m.notas, q, r, texto)
+    return mud ? this.editar({ privado: { ocultos: [], notas: [mud] } }, grupo) : null
   }
 
   /**
@@ -412,16 +502,18 @@ export class ControladorMapa {
   private editar(partes: Partes, grupo?: string): Lote | null {
     const mudancas = partes.mudancas ?? []
     const regioes = partes.regioes ?? []
-    if (!mudancas.length && !regioes.length) return null
+    const privado = this.mestre && !privadoVazio(partes.privado) ? partes.privado : undefined
+    if (!mudancas.length && !regioes.length && !privado) return null
     this.armazem.aplicarMudancas(mudancas)
     this.armazem.aplicarRegioes(regioes)
-    return this.registrar({ mudancas, regioes }, grupo)
+    this.aplicarPrivado(privado)
+    return this.registrar({ mudancas, regioes, privado }, grupo)
   }
 
   /** Guarda no histórico e envia um lote próprio cujas mudanças já estão no armazém. */
   registrar(partes: Partes, grupo?: string): Lote {
     const agora = Date.now()
-    const novo = { mudancas: partes.mudancas ?? [], regioes: partes.regioes ?? [] }
+    const novo = { mudancas: partes.mudancas ?? [], regioes: partes.regioes ?? [], ...(privadoVazio(partes.privado) ? {} : { privado: partes.privado }) }
     const topo = this.feitos[this.feitos.length - 1]
     const g = this.ultimoGrupo
     let lote: Lote
@@ -433,6 +525,7 @@ export class ControladorMapa {
         ts: agora,
         mudancas: fundirMudancas([...topo.mudancas, ...novo.mudancas]),
         regioes: fundirMudancasRegiao([...topo.regioes, ...novo.regioes]),
+        ...(topo.privado || novo.privado ? { privado: fundirPrivado([topo.privado, novo.privado]) } : {}),
       }
       this.feitos[this.feitos.length - 1] = lote
     } else {
@@ -454,13 +547,13 @@ export class ControladorMapa {
       this.naoVoltaram = this.naoVoltaram.filter((l) => l.id !== lote.id)
       return
     }
-    this.aplicarDeFora(lote.mudancas, lote.regioes)
+    this.aplicarDeFora(lote.mudancas, lote.regioes, lote.privado)
     // Meus lotes ainda a caminho valem mais do que este, que o servidor ordenou antes deles.
-    for (const meu of this.naoVoltaram) this.aplicarDeFora(meu.mudancas, meu.regioes)
+    for (const meu of this.naoVoltaram) this.aplicarDeFora(meu.mudancas, meu.regioes, meu.privado)
   }
 
   /** Aplica mudanças que não vieram de uma edição aqui, respeitando chunks e regiões ainda carregando. */
-  private aplicarDeFora(mudancas: readonly Mudanca[], regioes: readonly MudancaRegiao[]) {
+  private aplicarDeFora(mudancas: readonly Mudanca[], regioes: readonly MudancaRegiao[], privado?: PartePrivada) {
     const porChunk = new Map<string, Mudanca[]>()
     for (const m of mudancas) {
       const ck = chaveChunk(m)
@@ -477,6 +570,31 @@ export class ControladorMapa {
       if (this.armazem.regioesProntas) this.armazem.aplicarRegioes(regioes)
       else this.regioesPendentes.push(...regioes)
     }
+    const m = this.mestre
+    if (m && privado) {
+      // A parte privada de lote nenhum chega a quem não é mestre, então só o mestre passa por aqui.
+      const porChunk = new Map<string, { ocultos: Mudanca[]; notas: MudancaNota[] }>()
+      const parte = (ck: string) => porChunk.get(ck) ?? porChunk.set(ck, { ocultos: [], notas: [] }).get(ck)!
+      for (const o of privado.ocultos) parte(chaveChunk(o)).ocultos.push(o)
+      for (const n of privado.notas) parte(chaveChunk(n)).notas.push(n)
+      for (const [ck, p] of porChunk) {
+        const espera = this.pendentesPrivados.get(ck)
+        if (espera) {
+          espera.ocultos.push(...p.ocultos)
+          espera.notas.push(...p.notas)
+        } else {
+          m.ocultos.aplicarMudancas(p.ocultos)
+          m.notas.aplicar(p.notas)
+        }
+      }
+    }
+  }
+
+  /** Aplica na camada do mestre uma parte privada de uma edição feita aqui. */
+  private aplicarPrivado(privado: PartePrivada | undefined) {
+    if (!privado || !this.mestre) return
+    this.mestre.ocultos.aplicarMudancas(privado.ocultos)
+    this.mestre.notas.aplicar(privado.notas)
   }
 
   destruir() {
@@ -495,14 +613,16 @@ export class ControladorMapa {
     const original = origem.pop()
     if (!original) return 0
     this.ultimoGrupo = null
-    const { lote, conflitos } = reverterLote(this.armazem, original, {
-      id: novoId(),
-      autor: this.autor,
-      ts: Date.now(),
-    })
+    const { lote, conflitos } = reverterLote(
+      this.armazem,
+      original,
+      { id: novoId(), autor: this.autor, ts: Date.now() },
+      this.mestre ?? undefined,
+    )
     if (lote) {
       this.armazem.aplicarMudancas(lote.mudancas)
       this.armazem.aplicarRegioes(lote.regioes)
+      this.aplicarPrivado(lote.privado)
       // Vai para a outra pilha o lote que acabou de ser aplicado: desfazê-lo é o oposto.
       // (As revisões mudam a cada aplicação, então não dá para guardar o original.)
       destino.push(lote)
@@ -540,10 +660,11 @@ export class ControladorMapa {
     this.naoVoltaram = this.naoVoltaram.filter((l) => l.id !== lote.id)
     this.feitos = this.feitos.filter((l) => l.id !== lote.id)
     this.desfeitos = this.desfeitos.filter((l) => l.id !== lote.id)
-    const { lote: inverso } = reverterLote(this.armazem, lote, { id: novoId(), autor: this.autor, ts: Date.now() })
+    const { lote: inverso } = reverterLote(this.armazem, lote, { id: novoId(), autor: this.autor, ts: Date.now() }, this.mestre ?? undefined)
     if (inverso) {
       this.armazem.aplicarMudancas(inverso.mudancas)
       this.armazem.aplicarRegioes(inverso.regioes)
+      this.aplicarPrivado(inverso.privado)
     }
     this.mudouHistorico()
   }

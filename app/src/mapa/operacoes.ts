@@ -8,7 +8,10 @@ import type {
   Leitor,
   Lote,
   Mudanca,
+  MudancaNota,
   MudancaRegiao,
+  NotaPrivada,
+  PartePrivada,
   PatchHexagono,
   PatchRegiao,
   Regiao,
@@ -214,6 +217,26 @@ export function fundirMudancas(sequencia: readonly Mudanca[]): Mudanca[] {
   return [...mapa.values()].filter((m) => !(m.antes === null && m.depois === null))
 }
 
+export function fundirMudancasNota(sequencia: readonly MudancaNota[]): MudancaNota[] {
+  const mapa = new Map<string, MudancaNota>()
+  for (const m of sequencia) {
+    const k = chave(m.q, m.r)
+    const existente = mapa.get(k)
+    mapa.set(k, existente ? { q: m.q, r: m.r, antes: existente.antes, depois: m.depois } : m)
+  }
+  return [...mapa.values()].filter((m) => !(m.antes === null && m.depois === null))
+}
+
+/** Junta duas partes privadas em uma, como `fundirMudancas` faz com os hexágonos. */
+export function fundirPrivado(sequencia: readonly (PartePrivada | undefined)[]): PartePrivada {
+  return {
+    ocultos: fundirMudancas(sequencia.flatMap((p) => p?.ocultos ?? [])),
+    notas: fundirMudancasNota(sequencia.flatMap((p) => p?.notas ?? [])),
+  }
+}
+
+export const privadoVazio = (p: PartePrivada | undefined): boolean => !p || (!p.ocultos.length && !p.notas.length)
+
 export function fundirMudancasRegiao(sequencia: readonly MudancaRegiao[]): MudancaRegiao[] {
   const mapa = new Map<string, MudancaRegiao>()
   for (const m of sequencia) {
@@ -253,13 +276,20 @@ export function mesmoConteudo(a: object | null, b: object | null): boolean {
 export interface ResultadoDesfazer {
   /** Lote que desfaz o original. Null se nada pôde ser revertido. */
   lote: Lote | null
-  /** Itens (hexágonos ou regiões) que não foram revertidos porque outra pessoa mexeu neles depois. */
+  /** Itens (hexágonos, regiões, ocultos ou notas) que não foram revertidos porque outra pessoa mexeu neles depois. */
   conflitos: number
+}
+
+/** O que o desfazer precisa ler da camada do mestre. */
+export interface LeitorMestre {
+  ocultos: Leitor
+  notas: { ler(q: number, r: number): NotaPrivada | null }
 }
 
 /**
  * Monta o lote que desfaz `original`, de forma seletiva: só reverte o que ainda está
  * exatamente como o original deixou. Se outra pessoa mexeu depois, esse item é pulado.
+ * Com `mestre`, a parte privada do lote (hexágonos ocultos e notas) é desfeita do mesmo jeito.
  *
  * Refazer é desfazer o lote de reversão, então não precisa de função própria.
  */
@@ -267,20 +297,25 @@ export function reverterLote(
   leitor: Leitor,
   original: Lote,
   novoLote: { id: string; autor: string; ts: number },
+  mestre?: LeitorMestre,
 ): ResultadoDesfazer {
-  const mudancas: Mudanca[] = []
-  const regioes: MudancaRegiao[] = []
   let conflitos = 0
-  for (const m of original.mudancas) {
-    const atual = leitor.ler(m.q, m.r)
-    if (!mesmoConteudo(atual, m.depois)) {
-      conflitos++
-      continue
+  const reverterHexagonos = (lista: readonly Mudanca[], fonte: Leitor): Mudanca[] => {
+    const saida: Mudanca[] = []
+    for (const m of lista) {
+      const atual = fonte.ler(m.q, m.r)
+      if (!mesmoConteudo(atual, m.depois)) {
+        conflitos++
+        continue
+      }
+      if (!atual && !m.antes) continue
+      const rev = Math.max(atual?.rev ?? 0, m.antes?.rev ?? 0) + 1
+      saida.push({ q: m.q, r: m.r, antes: atual, depois: m.antes ? { ...m.antes, rev } : null })
     }
-    if (!atual && !m.antes) continue
-    const rev = Math.max(atual?.rev ?? 0, m.antes?.rev ?? 0) + 1
-    mudancas.push({ q: m.q, r: m.r, antes: atual, depois: m.antes ? { ...m.antes, rev } : null })
+    return saida
   }
+  const mudancas = reverterHexagonos(original.mudancas, leitor)
+  const regioes: MudancaRegiao[] = []
   for (const m of original.regioes) {
     const atual = leitor.lerRegiao(m.id)
     if (!mesmoConteudo(atual, m.depois)) {
@@ -291,6 +326,65 @@ export function reverterLote(
     const rev = Math.max(atual?.rev ?? 0, m.antes?.rev ?? 0) + 1
     regioes.push({ id: m.id, antes: atual, depois: m.antes ? { ...m.antes, rev } : null })
   }
-  const vazio = !mudancas.length && !regioes.length
-  return { lote: vazio ? null : { ...novoLote, mudancas, regioes }, conflitos }
+  let privado: PartePrivada | undefined
+  if (mestre && original.privado) {
+    const ocultos = reverterHexagonos(original.privado.ocultos, mestre.ocultos)
+    const notas: MudancaNota[] = []
+    for (const m of original.privado.notas) {
+      const atual = mestre.notas.ler(m.q, m.r)
+      if (!mesmoConteudo(atual, m.depois)) {
+        conflitos++
+        continue
+      }
+      if (!atual && !m.antes) continue
+      const rev = Math.max(atual?.rev ?? 0, m.antes?.rev ?? 0) + 1
+      notas.push({ q: m.q, r: m.r, antes: atual, depois: m.antes ? { ...m.antes, rev } : null })
+    }
+    if (ocultos.length || notas.length) privado = { ocultos, notas }
+  }
+  const vazio = !mudancas.length && !regioes.length && !privado
+  return { lote: vazio ? null : { ...novoLote, mudancas, regioes, ...(privado ? { privado } : {}) }, conflitos }
+}
+
+// ---------- camada do mestre ----------
+
+/** Escreve (ou apaga, com texto vazio) a nota privada de uma posição. Null se nada mudou. */
+export function mudancaNota(leitor: { ler(q: number, r: number): NotaPrivada | null }, q: number, r: number, texto: string): MudancaNota | null {
+  const antes = leitor.ler(q, r)
+  if (!texto) return antes ? { q, r, antes, depois: null } : null
+  if (antes?.texto === texto) return null
+  return { q, r, antes, depois: { q, r, texto, rev: (antes?.rev ?? 0) + 1 } }
+}
+
+/**
+ * Esconde hexágonos dos jogadores: o hexágono sai do mapa público e entra, igual, na camada oculta.
+ * Pula as posições que já têm um oculto (haveria dois) e as que não têm hexágono público.
+ */
+export function mudancasOcultar(publico: Leitor, ocultos: Leitor, hexes: readonly Hex[]): { mudancas: Mudanca[]; ocultos: Mudanca[] } {
+  const mudancas: Mudanca[] = []
+  const novos: Mudanca[] = []
+  for (const { q, r } of hexes) {
+    const aberto = publico.ler(q, r)
+    if (!aberto || ocultos.ler(q, r)) continue
+    mudancas.push({ q, r, antes: aberto, depois: null })
+    novos.push({ q, r, antes: null, depois: { ...aberto, rev: 1 } })
+  }
+  return { mudancas, ocultos: novos }
+}
+
+/**
+ * Revela hexágonos ocultos: o hexágono entra no mapa público (no lugar do que houver ali) e sai da camada
+ * oculta. É um lote só: entra tudo ou nada.
+ */
+export function mudancasRevelar(publico: Leitor, ocultos: Leitor, hexes: readonly Hex[]): { mudancas: Mudanca[]; ocultos: Mudanca[] } {
+  const mudancas: Mudanca[] = []
+  const saida: Mudanca[] = []
+  for (const { q, r } of hexes) {
+    const oculto = ocultos.ler(q, r)
+    if (!oculto) continue
+    const antes = publico.ler(q, r)
+    mudancas.push({ q, r, antes, depois: { ...oculto, rev: (antes?.rev ?? 0) + 1 } })
+    saida.push({ q, r, antes: oculto, depois: null })
+  }
+  return { mudancas, ocultos: saida }
 }

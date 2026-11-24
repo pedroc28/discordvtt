@@ -220,14 +220,14 @@ describe('token do grupo', () => {
     expect(beto.token).toMatchObject({ q: 2, r: 2 })
   })
 
-  it('aviso atrasado não sobrepõe uma posição mais nova', async () => {
+  it('o aviso de outra pessoa vale na ordem de chegada, sem olhar o relógio dela', async () => {
     const repo = new RepositorioMemoria()
     const c = await cliente(repo, 'ana')
     c.moverToken({ q: 5, r: 5 })
     const atual = c.token!
-    // Simula um aviso velho chegando do repositório.
+    // O relógio do Beto está atrasado, mas o servidor entregou o aviso dele depois: é a posição atual.
     await repo.gravarToken({ q: 0, r: 0, ts: atual.ts - 1000, autor: 'beto' })
-    expect(c.token).toMatchObject({ q: 5, r: 5 })
+    expect(c.token).toMatchObject({ q: 0, r: 0 })
   })
 
   it('repositório sem suporte deixa o token só na memória', async () => {

@@ -124,15 +124,23 @@ interface RepositorioMapa {
 }
 ```
 
-Para o servidor, basta uma classe nova (`RepositorioPocketBase`) e trocar a linha `new RepositorioLocal(...)` em `MapaHex.tsx`. Pontos de atenção:
+O servidor entrou como a classe `RepositorioPocketBase`, e o `MapaHex.tsx` já a usa quando há login e uma campanha aberta (`abrirRepositorioMapa()`). Sem login, o mapa continua no navegador, com o `RepositorioLocal`. Pontos de atenção:
 
 - `aplicar` deve ser atômico por lote (a API de batch do PocketBase serve).
 - `assinar` recebe lotes de **outros** clientes. O servidor pode devolver o próprio lote, que o controlador ignora pelo `id`.
 - A ordem em que os lotes chegam do servidor é a verdade: o armazém aplica sem conferir revisão.
-- Hoje, se um chunk falha ao carregar, o controlador o trata como vazio para não repetir o pedido a cada quadro. Com servidor isso precisa mudar: um chunk vazio por falha de rede não pode ser gravado por cima do verdadeiro.
+- Chunk que falha ao carregar não vira vazio: o controlador espera (1 s, 2 s, 4 s, até 15 s) e tenta de novo, e enquanto não chega o hexágono não aceita edição. As regiões seguem a mesma regra. Um aviso diz que está tentando de novo e some quando chega.
 - O PocketBase assina por coleção, não por chunk: o cliente filtra o que não está visível.
 - O hexágono ganhou `rios` e `estradas` (listas de números). A coleção de hexágonos precisa guardá-los, e dado sem esses campos vale como lista vazia.
-- O token do grupo precisa de um registro por mapa com `q`, `r`, `ts` e `autor`. A regra é "vale o `ts` mais recente".
+- O token do grupo tem `q`, `r`, `ts` e `autor`. O controlador aplica o que chega na ordem em que o repositório entrega, sem comparar o `ts` com o relógio do aparelho. Só o eco de uma posição minha já superada por outra minha é descartado.
+
+### Como o mapa usa o servidor
+
+- **Qual mapa abre:** o da campanha aberta, com a conta logada como autor. Trocar de campanha, de papel ou de conta monta o mapa de novo. A câmera é guardada por mapa. A barra de status diz de onde ele vem ("Mapa da campanha ..." ou "Mapa só neste navegador").
+- **Eco:** para o controlador, o lote que volta com o `id` de um lote que ele enviou é o próprio lote, mesmo se voltar em dois pedaços (o mestre recebe a parte privada à parte). Quando chega um lote de outra pessoa antes do eco do meu, as minhas edições que ainda não voltaram são reaplicadas por cima, porque o servidor as ordenou depois.
+- **Edição recusada:** se o servidor recusar um lote (por exemplo, mapa travado pelo mestre), o controlador desfaz a edição na tela, tira ela do desfazer e mostra a mensagem do servidor.
+- **Mapa desatualizado:** quando o repositório avisa (`aoDesatualizar`), o mapa recarrega sozinho com o aviso "Mapa atualizado.". Se há edição que ainda não foi enviada (`controlador.pendente`), aparece um aviso com o botão **Recarregar**, e o que não foi enviado se perde.
+- **Ainda não tem na tela:** camada do mestre (notas privadas e hexágonos ocultos), trava do mapa, levar o mapa do navegador para a campanha e viagem da campanha. O repositório já oferece os métodos, falta a interface.
 
 ## Tilesets (trocar a arte)
 

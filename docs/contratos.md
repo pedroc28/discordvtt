@@ -50,7 +50,7 @@ interface RepositorioMapa {
 
 - `Hexagono` tem `rios: number[]` e `estradas: number[]`: direções de aresta 0 (leste), 1 (sudeste) e 2 (sudoeste) em que há rio ou estrada saindo daquele hexágono. A aresta pertence ao hexágono dono (`arestaCanonica`). Dado antigo sem os campos vale como lista vazia.
 - `exportarTudo` é opcional. Sem ele, exportar leva só o que está carregado e o modo substituir da importação fica indisponível (mesclar funciona). Com servidor, o `RepositorioPocketBase` lista todos os hexágonos e regiões públicos do mapa. A camada do mestre sai à parte, em `exportarCamadaMestre`, só para o mestre.
-- `TokenGrupo` é `{ q, r, ts, autor }`. Vale o `ts` mais recente. Não passa por `aplicar` nem entra no desfazer.
+- `TokenGrupo` é `{ q, r, ts, autor }`. O controlador aplica o que o repositório entrega, na ordem de chegada, sem comparar `ts` com o relógio do aparelho. Não passa por `aplicar` nem entra no desfazer.
 - O servidor implementa `RepositorioPocketBase` em `app/src/servidor/`.
 - `aplicar` é atômico por lote. `assinar` entrega lotes de outros clientes, e o próprio eco é ignorado pelo `id` do lote.
 - A ordem em que os lotes chegam do servidor é a verdade.
@@ -100,6 +100,7 @@ class RepositorioPocketBase implements RepositorioMapa {
 - Lotes com mais de 7 dias são apagados no servidor. Se o repositório precisar de um deles, ele para de entregar lotes, fica `desatualizado`, avisa `aoDesatualizar`, e a leitura passa a falhar pedindo para recarregar o mapa. Quem usa cria um repositório e um controlador novos.
 - Uma edição comum ou reversão tem no máximo 2.000 mudanças, somando hexágonos, ocultos e notas. A importação tem até 20 mil e 16 MB, num lote só. O servidor recusa um item fora do formato e, com ele, o lote inteiro.
 - `gravarToken(null)` grava a hora de quem tirou o token, e um aviso de token mais velho que o último entregue é ignorado.
+- **Do lado do mapa (controlador):** com o servidor, as edições do próprio cliente que ainda não voltaram como eco são reaplicadas por cima de lote de outra pessoa que chegue antes delas. Um lote que chega com o `id` de um lote enviado é eco, inclusive o segundo pedaço do lote do mestre. Um `aplicar` que falha desfaz a edição na tela. Chunk e regiões que falham são pedidos de novo, nunca tratados como vazios.
 - **Testes contra o servidor de verdade:** um teste do mapa que precise do PocketBase usa os ajudantes de `app/src/servidor/teste-servidor.ts` (`entrarComoTeste`, `campanhaDeTeste` e `instalarEventSource`) e o nome do arquivo termina em `.servidor.test.ts`. Ele roda contra o `pocketbase/servidor-de-teste.mjs` na verificação do GitHub e é pulado no `npm test` comum. Detalhes em `docs/servidor/README.md`, seção "Servidor de teste".
 
 ## Campanhas e papéis (servidor)

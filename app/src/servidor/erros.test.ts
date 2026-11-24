@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DADOS_FECHADO, MAPA_FECHADO, mensagemDeErro, mensagemDeErroDados, mensagemDeErroMapa } from './erros'
+import { DADOS_FECHADO, MAPA_FECHADO, mensagemDeErro, mensagemDeErroDados, mensagemDeErroMapa, mensagemDeErroQuadro, QUADRO_FECHADO } from './erros'
 
 // Mesmo formato do ClientResponseError do SDK do PocketBase.
 const erro = (status: number, message = '', data: Record<string, unknown> = {}) => ({ status, response: { status, message, data } })
@@ -92,5 +92,37 @@ describe('mensagens de erro dos dados', () => {
   it('mensagens do próprio repositório passam como estão', () => {
     expect(mensagemDeErroDados(new Error(DADOS_FECHADO), ENDERECO)).toBe(DADOS_FECHADO)
     expect(mensagemDeErroDados(new Error('outra coisa'), ENDERECO)).toContain('Tente de novo')
+  })
+})
+
+describe('mensagens de erro do quadro', () => {
+  const comCampo = (campo: string, code: string) => Object.assign(new Error(''), { status: 400, response: { message: 'Failed to create record.', data: { [campo]: { code } } } })
+
+  it('dizem a causa e o que fazer, começando com letra minúscula', () => {
+    expect(mensagemDeErroQuadro(erro(0), ENDERECO, 'enviar')).toContain('não respondeu')
+    expect(mensagemDeErroQuadro(erro(401), ENDERECO, 'mover')).toContain('Entre de novo na aba Campanha')
+    expect(mensagemDeErroQuadro(erro(429), ENDERECO, 'enviar')).toContain('Espere alguns segundos')
+    expect(mensagemDeErroQuadro(erro(413), ENDERECO, 'enviar')).toContain('passou de 2 MB')
+  })
+
+  it('o motivo escrito pelo servidor passa adiante', () => {
+    expect(mensagemDeErroQuadro(erro(400, 'Imagem recusada: a campanha chegou ao limite.'), ENDERECO, 'enviar')).toBe('o servidor recusou: a campanha chegou ao limite.')
+    expect(mensagemDeErroQuadro(erro(400, 'Item recusado: a imagem não é desta campanha.'), ENDERECO, 'prender')).toBe('o servidor recusou: a imagem não é desta campanha.')
+  })
+
+  it('arquivo grande demais ou que não é imagem tem mensagem própria', () => {
+    expect(mensagemDeErroQuadro(comCampo('arquivo', 'validation_file_size_limit'), ENDERECO, 'enviar')).toContain('passou de 2 MB')
+    expect(mensagemDeErroQuadro(comCampo('arquivo', 'validation_invalid_mime_type'), ENDERECO, 'enviar')).toContain('PNG, JPEG ou WebP')
+    expect(mensagemDeErroQuadro(comCampo('texto', 'validation_max_text_constraint'), ENDERECO, 'editar')).toContain('500 caracteres')
+  })
+
+  it('recusa sem motivo é falta de permissão, explicada para cada ação', () => {
+    expect(mensagemDeErroQuadro(erro(400, 'Failed to update record.'), ENDERECO, 'editar')).toBe('só quem escreveu a nota edita.')
+    expect(mensagemDeErroQuadro(erro(404), ENDERECO, 'tirar')).toContain('só quem prendeu o item ou o mestre')
+    expect(mensagemDeErroQuadro(erro(404), ENDERECO, 'renomear')).toContain('só quem enviou a imagem ou o mestre')
+  })
+
+  it('mensagens do próprio repositório passam como estão', () => {
+    expect(mensagemDeErroQuadro(new Error(QUADRO_FECHADO), ENDERECO, 'mover')).toBe(QUADRO_FECHADO)
   })
 })

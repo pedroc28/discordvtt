@@ -16,6 +16,7 @@ import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { crc32, deflateSync } from 'node:zlib'
 
 const pasta = dirname(fileURLToPath(import.meta.url))
 const executavel = process.argv[2] ?? join(pasta, process.platform === 'win32' ? 'pocketbase.exe' : 'pocketbase')
@@ -60,11 +61,13 @@ async function api(metodo, caminho, { token, corpo, ip } = {}) {
   const cabecalhos = {}
   if (token) cabecalhos.Authorization = token
   if (ip) cabecalhos['X-Forwarded-For'] = ip
-  if (corpo !== undefined) cabecalhos['Content-Type'] = 'application/json'
+  // Formulário (envio de arquivo) vai como está: o fetch monta o cabeçalho multipart sozinho.
+  const formulario = corpo instanceof FormData
+  if (corpo !== undefined && !formulario) cabecalhos['Content-Type'] = 'application/json'
   const resposta = await fetch(base + caminho, {
     method: metodo,
     headers: cabecalhos,
-    body: corpo === undefined ? undefined : JSON.stringify(corpo),
+    body: corpo === undefined ? undefined : formulario ? corpo : JSON.stringify(corpo),
   })
   const texto = await resposta.text()
   let dados = null
@@ -302,6 +305,7 @@ async function testar() {
 
   await testarMapa({ admin, contas, Ana, Bruno, Carla, mesaBruno })
   await testarDados({ admin, contas, Ana, Bruno, Carla, Davi })
+  await testarQuadro({ admin, contas, Ana, Bruno, Carla, Davi })
 
   console.log('\nTrocar senha')
   const NOVA = 'nova-senha-123'
@@ -965,6 +969,222 @@ async function testarDados({ admin, contas, Ana, Bruno, Carla, Davi }) {
   confere('apagar a campanha apaga as rolagens dela, abertas e secretas', apagou.ok && restos.every((n) => n === 0), restos)
 }
 
+// ---------- quadro ----------
+
+/** PNG de verdade, de uma cor só: o servidor precisa conseguir abrir para fazer a miniatura. */
+function pngDeVerdade(largura, altura) {
+  const pedaco = (tipo, conteudo) => {
+    const tamanho = Buffer.alloc(4)
+    tamanho.writeUInt32BE(conteudo.length)
+    const corpo = Buffer.concat([Buffer.from(tipo, 'latin1'), conteudo])
+    const conferencia = Buffer.alloc(4)
+    conferencia.writeUInt32BE(crc32(corpo))
+    return Buffer.concat([tamanho, corpo, conferencia])
+  }
+  const cabecalho = Buffer.alloc(13)
+  cabecalho.writeUInt32BE(largura, 0)
+  cabecalho.writeUInt32BE(altura, 4)
+  cabecalho[8] = 8 // 8 bits por canal
+  cabecalho[9] = 6 // RGBA
+  const linha = Buffer.alloc(1 + largura * 4)
+  for (let x = 0; x < largura; x++) linha.set([180, 40, 90, 255], 1 + x * 4)
+  const pixels = Buffer.concat(Array.from({ length: altura }, () => linha))
+  return Buffer.concat([ASSINATURA_PNG, pedaco('IHDR', cabecalho), pedaco('IDAT', deflateSync(pixels)), pedaco('IEND', Buffer.alloc(0))])
+}
+
+const ASSINATURA_PNG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+// WebP sem perdas de 1 por 1 pixel.
+const WEBP_PEQUENO = Buffer.from('UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==', 'base64')
+
+/** Envia uma imagem como o app envia: formulário com o arquivo, a campanha, o nome e as dimensões. */
+function enviarImagem(token, campanha, { arquivo = pngDeVerdade(40, 30), tipo = 'image/png', nomeArquivo = 'item.png', largura = 40, altura = 30, nome = 'Carta', extra = {}, ip } = {}) {
+  const formulario = new FormData()
+  formulario.append('campanha', campanha)
+  formulario.append('largura', String(largura))
+  formulario.append('altura', String(altura))
+  if (nome) formulario.append('nome', nome)
+  for (const [campo, valor] of Object.entries(extra)) formulario.append(campo, String(valor))
+  formulario.append('arquivo', new Blob([arquivo], { type: tipo }), nomeArquivo)
+  return api('POST', '/api/collections/quadro_imagens/records', { token, corpo: formulario, ip })
+}
+
+const criarItem = (token, corpo, ip) => api('POST', '/api/collections/quadro_itens/records', { token, corpo, ip })
+const mudarItem = (token, id, corpo, ip) => api('PATCH', `/api/collections/quadro_itens/records/${id}`, { token, corpo, ip })
+const mudarImagem = (token, id, corpo, ip) => api('PATCH', `/api/collections/quadro_imagens/records/${id}`, { token, corpo, ip })
+
+async function tokenDeArquivo(token) {
+  return (await api('POST', '/api/files/token', { token })).dados?.token ?? ''
+}
+
+/** Baixa o arquivo de uma imagem, como o navegador faria, com o que vier em `busca` (token, miniatura). */
+async function baixarImagem(registro, busca = '') {
+  const resposta = await fetch(`${base}/api/files/quadro_imagens/${registro.id}/${registro.arquivo}${busca}`)
+  await resposta.arrayBuffer()
+  return { status: resposta.status, tipo: resposta.headers.get('content-type') ?? '' }
+}
+
+async function testarQuadro({ admin, contas, Ana, Bruno, Carla, Davi }) {
+  console.log('\nQuadro: biblioteca de imagens')
+  const mesa = (await api('POST', '/api/collections/campanhas/records', { token: Ana, corpo: { nome: 'Mesa do quadro' } })).dados
+  for (const nome of ['Bruno', 'Davi']) {
+    await api('POST', '/api/collections/participantes/records', { token: Ana, corpo: { campanha: mesa.id, usuario: contas[nome].id, papel: 'jogador' } })
+  }
+  // Carla fica de fora desta mesa e tem a própria.
+  const daCarla = (await api('POST', '/api/collections/campanhas/records', { token: Carla, corpo: { nome: 'Mesa da Carla' } })).dados
+  // Cada pessoa num IP, como atrás do Funnel, para o limite de pedidos de uma não atrapalhar as outras.
+  const ip = { Ana: '198.51.100.31', Bruno: '198.51.100.32', Carla: '198.51.100.33', Davi: '198.51.100.34' }
+  const tempoRealBruno = await abrirTempoReal(Bruno, ['quadro_imagens/*', 'quadro_itens/*'])
+  const tempoRealCarla = await abrirTempoReal(Carla, ['quadro_imagens/*', 'quadro_itens/*'])
+
+  const png = pngDeVerdade(40, 30)
+  const carta = await enviarImagem(Bruno, mesa.id, { arquivo: png, ip: ip.Bruno })
+  confere('quem participa envia uma imagem', carta.ok && Boolean(carta.dados?.arquivo), carta)
+  confere('o servidor grava quem enviou e o tamanho', carta.dados?.autor === contas.Bruno.id && carta.dados?.bytes === png.length, [carta.dados?.autor, carta.dados?.bytes, png.length])
+  const fingeTamanho = await enviarImagem(Bruno, mesa.id, { ip: ip.Bruno, extra: { bytes: 1 } })
+  confere('ninguém informa o tamanho da própria imagem', !fingeTamanho.ok, fingeTamanho.status)
+  const fingeAutor = await enviarImagem(Bruno, mesa.id, { ip: ip.Bruno, extra: { autor: contas.Ana.id } })
+  confere('ninguém envia em nome de outra pessoa', !fingeAutor.ok, fingeAutor.status)
+  const deFora = await enviarImagem(Carla, mesa.id, { ip: ip.Carla })
+  confere('quem está fora não envia imagem para a campanha', !deFora.ok, deFora.status)
+  const doPainel = await enviarImagem(admin, mesa.id)
+  confere('o administrador do painel não envia: ele não participa de campanhas', !doPainel.ok, doPainel.dados)
+
+  const html = await enviarImagem(Bruno, mesa.id, { arquivo: Buffer.from('<html><body><script>alert(1)</script></body></html>'), nomeArquivo: 'falso.png', ip: ip.Bruno })
+  confere('arquivo que não é imagem é recusado, mesmo com nome de imagem', !html.ok, html.status)
+  const svg = await enviarImagem(Bruno, mesa.id, {
+    arquivo: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'),
+    tipo: 'image/svg+xml',
+    nomeArquivo: 'desenho.svg',
+    ip: ip.Bruno,
+  })
+  confere('SVG é recusado', !svg.ok, svg.status)
+  const grande = await enviarImagem(Davi, mesa.id, { arquivo: Buffer.concat([ASSINATURA_PNG, Buffer.alloc(2.1 * 1024 * 1024)]), ip: ip.Davi })
+  confere('imagem de mais de 2 MB é recusada', !grande.ok, grande.status)
+  const semDimensao = await enviarImagem(Davi, mesa.id, { largura: 0, ip: ip.Davi })
+  confere('imagem sem as dimensões é recusada', !semDimensao.ok, semDimensao.status)
+  const webp = await enviarImagem(Ana, mesa.id, { arquivo: WEBP_PEQUENO, tipo: 'image/webp', nomeArquivo: 'ponto.webp', largura: 1, altura: 1, nome: '', ip: ip.Ana })
+  confere('WebP é aceito', webp.ok, webp.dados)
+
+  const vistasBruno = await api('GET', registros('quadro_imagens', `campanha = "${mesa.id}"`), { token: Bruno })
+  confere('quem participa vê a biblioteca da campanha', vistasBruno.dados?.items?.length === 2, vistasBruno.dados?.items?.length)
+  const vistasCarla = await api('GET', registros('quadro_imagens', `campanha = "${mesa.id}"`), { token: Carla })
+  confere('quem está fora não vê a biblioteca', vistasCarla.ok && vistasCarla.dados.items.length === 0, vistasCarla.dados)
+  const diretaCarla = await api('GET', `/api/collections/quadro_imagens/records/${carta.dados.id}`, { token: Carla })
+  confere('nem pelo id', !diretaCarla.ok, diretaCarla.status)
+
+  console.log('\nQuadro: arquivos protegidos')
+  const tokenBruno = await tokenDeArquivo(Bruno)
+  const comToken = await baixarImagem(carta.dados, `?token=${tokenBruno}`)
+  confere('quem participa abre a imagem com o token de arquivo', comToken.status === 200 && comToken.tipo.startsWith('image/png'), comToken)
+  const semToken = await baixarImagem(carta.dados)
+  confere('sem token, a imagem não abre, mesmo com o link', semToken.status !== 200, semToken)
+  const tokenCarla = await tokenDeArquivo(Carla)
+  const comTokenDeFora = await baixarImagem(carta.dados, `?token=${tokenCarla}`)
+  confere('com o token de quem está fora, também não', comTokenDeFora.status !== 200, comTokenDeFora)
+  const miniatura = await baixarImagem(carta.dados, `?thumb=320x0&token=${tokenBruno}`)
+  confere('a miniatura abre com o token', miniatura.status === 200 && miniatura.tipo.startsWith('image/'), miniatura)
+  const miniaturaWebp = await baixarImagem(webp.dados, `?thumb=320x0&token=${tokenBruno}`)
+  confere('a miniatura do WebP também', miniaturaWebp.status === 200 && miniaturaWebp.tipo.startsWith('image/'), miniaturaWebp)
+
+  console.log('\nQuadro: renomear e apagar imagens')
+  const renomeia = await mudarImagem(Bruno, carta.dados.id, { nome: 'Carta do duque' }, ip.Bruno)
+  confere('quem enviou renomeia', renomeia.ok && renomeia.dados.nome === 'Carta do duque', renomeia.dados)
+  const renomeiaOutro = await mudarImagem(Davi, carta.dados.id, { nome: 'Minha' }, ip.Davi)
+  confere('outro jogador não renomeia', !renomeiaOutro.ok, renomeiaOutro.status)
+  const renomeiaMestre = await mudarImagem(Ana, carta.dados.id, { nome: 'Carta selada' }, ip.Ana)
+  confere('o mestre renomeia', renomeiaMestre.ok, renomeiaMestre.status)
+  const mudaDimensao = await mudarImagem(Bruno, carta.dados.id, { largura: 4000 }, ip.Bruno)
+  confere('as dimensões não mudam depois do envio', !mudaDimensao.ok, mudaDimensao.status)
+  const mudaTamanho = await mudarImagem(Ana, carta.dados.id, { bytes: 1 }, ip.Ana)
+  confere('nem o tamanho, nem pelo mestre', !mudaTamanho.ok, mudaTamanho.status)
+  const troca = new FormData()
+  troca.append('arquivo', new Blob([pngDeVerdade(10, 10)], { type: 'image/png' }), 'outra.png')
+  const trocaArquivo = await api('PATCH', `/api/collections/quadro_imagens/records/${carta.dados.id}`, { token: Bruno, corpo: troca, ip: ip.Bruno })
+  confere('o arquivo não é trocado: imagem nova é envio novo', !trocaArquivo.ok, trocaArquivo.status)
+  const mudaCampanha = await mudarImagem(Ana, carta.dados.id, { campanha: daCarla.id }, ip.Ana)
+  confere('a imagem não muda de campanha', !mudaCampanha.ok, mudaCampanha.status)
+
+  console.log('\nQuadro: itens e notas')
+  const pino = await criarItem(Bruno, { campanha: mesa.id, tipo: 'imagem', imagem: carta.dados.id, x: 400, y: 300, largura: 240, rotacao: -3, z: 1 }, ip.Bruno)
+  confere('quem participa prende uma imagem no quadro', pino.ok && pino.dados.autor === contas.Bruno.id, pino.dados)
+  const nota = await criarItem(Davi, { campanha: mesa.id, tipo: 'nota', texto: 'O duque mente.', x: 800, y: 500, largura: 180, rotacao: 2, z: 2 }, ip.Davi)
+  confere('quem participa prende uma nota, amarela se não disser a cor', nota.ok && nota.dados.cor === 'amarelo' && nota.dados.texto === 'O duque mente.', nota.dados)
+  const pinoComTexto = await criarItem(Ana, { campanha: mesa.id, tipo: 'imagem', imagem: carta.dados.id, texto: 'escondido', cor: 'rosa', x: 100, y: 100, largura: 200 }, ip.Ana)
+  confere('imagem no quadro não guarda texto nem cor', pinoComTexto.ok && pinoComTexto.dados.texto === '' && pinoComTexto.dados.cor === '', pinoComTexto.dados)
+
+  const imagemDaCarla = await enviarImagem(Carla, daCarla.id, { ip: ip.Carla })
+  const imagemDeFora = await criarItem(Bruno, { campanha: mesa.id, tipo: 'imagem', imagem: imagemDaCarla.dados?.id, x: 10, y: 10, largura: 100 }, ip.Bruno)
+  confere('imagem de outra campanha não entra no quadro', imagemDaCarla.ok && !imagemDeFora.ok && String(imagemDeFora.dados?.message).startsWith('Item recusado:'), imagemDeFora.dados)
+  const semImagem = await criarItem(Bruno, { campanha: mesa.id, tipo: 'imagem', x: 10, y: 10, largura: 100 }, ip.Bruno)
+  confere('item de imagem sem imagem é recusado', !semImagem.ok, semImagem.status)
+  const notaComImagem = await criarItem(Bruno, { campanha: mesa.id, tipo: 'nota', imagem: carta.dados.id, texto: 'x', x: 10, y: 10, largura: 100 }, ip.Bruno)
+  confere('nota com imagem é recusada', !notaComImagem.ok, notaComImagem.status)
+  const textoLongo = await criarItem(Bruno, { campanha: mesa.id, tipo: 'nota', texto: 'a'.repeat(501), x: 10, y: 10, largura: 100 }, ip.Bruno)
+  confere('nota com mais de 500 caracteres é recusada', !textoLongo.ok, textoLongo.status)
+  const foraDoQuadro = await criarItem(Bruno, { campanha: mesa.id, tipo: 'nota', texto: 'x', x: 5000, y: 10, largura: 100 }, ip.Bruno)
+  confere('item fora do quadro é recusado', !foraDoQuadro.ok, foraDoQuadro.status)
+  const fingeAutorItem = await criarItem(Bruno, { campanha: mesa.id, tipo: 'nota', texto: 'x', autor: contas.Ana.id, x: 10, y: 10, largura: 100 }, ip.Bruno)
+  confere('ninguém prende item em nome de outra pessoa', !fingeAutorItem.ok, fingeAutorItem.status)
+  const itemDeFora = await criarItem(Carla, { campanha: mesa.id, tipo: 'nota', texto: 'x', x: 10, y: 10, largura: 100 }, ip.Carla)
+  confere('quem está fora não prende nada no quadro', !itemDeFora.ok, itemDeFora.status)
+
+  const moveOutro = await mudarItem(Davi, pino.dados.id, { x: 1200, y: 900, z: 3 }, ip.Davi)
+  confere('qualquer um da campanha move o item de outra pessoa', moveOutro.ok && moveOutro.dados.x === 1200 && moveOutro.dados.z === 3, moveOutro.dados)
+  const redimensiona = await mudarItem(Bruno, nota.dados.id, { x: 700, largura: 260, rotacao: -1 }, ip.Bruno)
+  confere('e muda de tamanho', redimensiona.ok && redimensiona.dados.largura === 260, redimensiona.dados)
+  const editaOutro = await mudarItem(Bruno, nota.dados.id, { texto: 'O duque é inocente.' }, ip.Bruno)
+  confere('a nota de outra pessoa não é editada', !editaOutro.ok, editaOutro.status)
+  const pintaOutro = await mudarItem(Bruno, nota.dados.id, { cor: 'azul' }, ip.Bruno)
+  confere('nem muda de cor', !pintaOutro.ok, pintaOutro.status)
+  const editaMestre = await mudarItem(Ana, nota.dados.id, { texto: 'Editado pelo mestre.' }, ip.Ana)
+  confere('nem pelo mestre', !editaMestre.ok, editaMestre.status)
+  const editaAutor = await mudarItem(Davi, nota.dados.id, { texto: 'O duque mente, e a irmã sabe.', cor: 'rosa' }, ip.Davi)
+  confere('quem escreveu edita a nota e a cor', editaAutor.ok && editaAutor.dados.cor === 'rosa' && editaAutor.dados.texto.endsWith('a irmã sabe.'), editaAutor.dados)
+  const viraImagem = await mudarItem(Davi, nota.dados.id, { tipo: 'imagem' }, ip.Davi)
+  confere('nota não vira imagem', !viraImagem.ok, viraImagem.status)
+  const trocaImagem = await mudarItem(Bruno, pino.dados.id, { imagem: webp.dados.id }, ip.Bruno)
+  confere('o item não troca de imagem', !trocaImagem.ok, trocaImagem.status)
+  const trocaCampanha = await mudarItem(Bruno, pino.dados.id, { campanha: daCarla.id }, ip.Bruno)
+  confere('nem de campanha', !trocaCampanha.ok, trocaCampanha.status)
+  const trocaAutor = await mudarItem(Bruno, nota.dados.id, { autor: contas.Bruno.id }, ip.Bruno)
+  confere('nem de autor', !trocaAutor.ok, trocaAutor.status)
+  const moveDeFora = await mudarItem(Carla, pino.dados.id, { x: 10 }, ip.Carla)
+  confere('quem está fora não move nada', !moveDeFora.ok, moveDeFora.status)
+
+  confere('quem participa recebe as mudanças do quadro pelo tempo real', await esperarEvento(tempoRealBruno, 'quadro_itens/*', 'a irmã sabe'))
+  confere('e as imagens novas da biblioteca', await esperarEvento(tempoRealBruno, 'quadro_imagens/*', webp.dados.id))
+  await esperar(300)
+  // A Carla recebe o que é da mesa dela: só não pode receber nada desta.
+  confere('quem está fora não recebe nada do quadro', !tempoRealCarla.eventos.some((e) => e.event.startsWith('quadro_') && e.data.includes(mesa.id)), tempoRealCarla.eventos.map((e) => e.event))
+  await Promise.all([tempoRealBruno.fechar(), tempoRealCarla.fechar()])
+
+  console.log('\nQuadro: tirar do quadro')
+  const tiraOutro = await api('DELETE', `/api/collections/quadro_itens/records/${pino.dados.id}`, { token: Davi, ip: ip.Davi })
+  confere('jogador não tira do quadro o item de outra pessoa', !tiraOutro.ok, tiraOutro.status)
+  const tiraProprio = await api('DELETE', `/api/collections/quadro_itens/records/${pino.dados.id}`, { token: Bruno, ip: ip.Bruno })
+  confere('quem pôs tira', tiraProprio.ok, tiraProprio.status)
+  const tiraMestre = await api('DELETE', `/api/collections/quadro_itens/records/${nota.dados.id}`, { token: Ana, ip: ip.Ana })
+  confere('o mestre tira qualquer item', tiraMestre.ok, tiraMestre.status)
+  const apagaOutro = await api('DELETE', `/api/collections/quadro_imagens/records/${webp.dados.id}`, { token: Davi, ip: ip.Davi })
+  confere('jogador não apaga a imagem de outra pessoa', !apagaOutro.ok, apagaOutro.status)
+  const apagaMestre = await api('DELETE', `/api/collections/quadro_imagens/records/${carta.dados.id}`, { token: Ana, ip: ip.Ana })
+  const presosDaCarta = await contar(admin, 'quadro_itens', `imagem = "${carta.dados.id}"`)
+  confere('o mestre apaga qualquer imagem, e ela sai do quadro junto', apagaMestre.ok && presosDaCarta === 0, { status: apagaMestre.status, presosDaCarta })
+
+  console.log('\nQuadro: limite de espaço (1 MB nesta rodada)')
+  const cheia = (await api('POST', '/api/collections/campanhas/records', { token: Ana, corpo: { nome: 'Mesa cheia' } })).dados
+  const meioMega = Buffer.concat([ASSINATURA_PNG, Buffer.alloc(600 * 1024)])
+  const primeira = await enviarImagem(Ana, cheia.id, { arquivo: meioMega, ip: '198.51.100.35' })
+  const segunda = await enviarImagem(Ana, cheia.id, { arquivo: meioMega, ip: '198.51.100.35' })
+  confere('passando do limite da campanha, a imagem é recusada com o motivo', primeira.ok && !segunda.ok && String(segunda.dados?.message).includes('limite de 1 MB'), segunda.dados)
+  const outraMesa = await enviarImagem(Ana, mesa.id, { arquivo: meioMega, ip: '198.51.100.35' })
+  confere('o limite é de cada campanha', outraMesa.ok, outraMesa.status)
+
+  const apagou = await Promise.all([mesa, cheia, daCarla].map((c) => api('DELETE', `/api/collections/campanhas/records/${c.id}`, { token: c === daCarla ? Carla : Ana })))
+  const restos = [await contar(admin, 'quadro_imagens', ''), await contar(admin, 'quadro_itens', '')]
+  confere('apagar a campanha apaga a biblioteca e o quadro dela', apagou.every((r) => r.ok) && restos.every((n) => n === 0), restos)
+}
+
 /**
  * Rodada da migração e da limpeza: sobe um servidor como os de antes do mapa, com campanhas,
  * aplica a migração do mapa e confere que as campanhas antigas ganharam mapa. Depois testa a
@@ -1050,7 +1270,7 @@ async function subirServidor(dados, { migracoes = join(pasta, 'pb_migrations'), 
   let log = ''
   const servidor = spawn(executavel, ['serve', `--http=127.0.0.1:${porta}`, '--hooksWatch=false', ...argumentos], {
     // Os prazos da limpeza ficam vazios (o padrão, 7 dias) a não ser que a rodada peça outro.
-    env: { ...process.env, DISCORDVTT_DIAS_LOTES: '', DISCORDVTT_DIAS_ROLAGENS: '', ...env },
+    env: { ...process.env, DISCORDVTT_DIAS_LOTES: '', DISCORDVTT_DIAS_ROLAGENS: '', DISCORDVTT_QUADRO_LIMITE_MB: '', ...env },
   })
   servidor.stdout.on('data', (parte) => (log += parte))
   servidor.stderr.on('data', (parte) => (log += parte))
@@ -1090,7 +1310,8 @@ async function main() {
 
   let erro = null
   try {
-    const servidor = await subirServidor(dados, { env: { DISCORDVTT_COPIA_BACKUP: pastaCopias } })
+    // Limite do quadro de 1 MB nesta rodada, para o teste do limite não precisar enviar 50 MB.
+    const servidor = await subirServidor(dados, { env: { DISCORDVTT_COPIA_BACKUP: pastaCopias, DISCORDVTT_QUADRO_LIMITE_MB: '1' } })
     try {
       console.log(`PocketBase ${versao.replace(/^pocketbase version /, '')} em ${base}, com dados temporários.`)
       await testar()

@@ -4,6 +4,8 @@ import {
   horaDoServidor,
   normalizarCampanha,
   normalizarHexagonoDoServidor,
+  normalizarImagemQuadroDoServidor,
+  normalizarItemQuadroDoServidor,
   normalizarLista,
   normalizarLoteDoServidor,
   normalizarLoteMestreDoServidor,
@@ -164,5 +166,49 @@ describe('validação das rolagens', () => {
     expect(horaDoServidor('2026-11-23 04:24:00.123Z')).toBe(Date.UTC(2026, 10, 23, 4, 24, 0, 123))
     expect(horaDoServidor('')).toBeNull()
     expect(horaDoServidor(123)).toBeNull()
+  })
+})
+
+describe('validação do quadro', () => {
+  const imagem = { id: 'i1', autor: 'u1', nome: ' Carta ', arquivo: 'carta_x.webp', largura: 1200, altura: 900, bytes: 4000, created: '2026-11-24 04:00:00.000Z' }
+
+  it('imagem do servidor vira ImagemQuadro', () => {
+    expect(normalizarImagemQuadroDoServidor(imagem)).toEqual({
+      id: 'i1',
+      autorId: 'u1',
+      nome: 'Carta',
+      arquivo: 'carta_x.webp',
+      largura: 1200,
+      altura: 900,
+      bytes: 4000,
+      enviada: Date.parse('2026-11-24T04:00:00.000Z'),
+    })
+    expect(normalizarImagemQuadroDoServidor({ ...imagem, autor: '' })?.autorId).toBe('')
+  })
+
+  it('imagem sem arquivo ou com dimensões fora do contrato é descartada', () => {
+    expect(normalizarImagemQuadroDoServidor({ ...imagem, arquivo: '' })).toBeNull()
+    expect(normalizarImagemQuadroDoServidor({ ...imagem, largura: 0 })).toBeNull()
+    expect(normalizarImagemQuadroDoServidor({ ...imagem, altura: 5000 })).toBeNull()
+    expect(normalizarImagemQuadroDoServidor({ ...imagem, bytes: 0 })).toBeNull()
+  })
+
+  const nota = { id: 'n1', autor: 'u1', tipo: 'nota', texto: 'Pista', cor: 'rosa', imagem: '', x: 100, y: 200, largura: 180, rotacao: -2, z: 3 }
+
+  it('nota e imagem presas viram ItemQuadro', () => {
+    expect(normalizarItemQuadroDoServidor(nota)).toEqual({ id: 'n1', autorId: 'u1', tipo: 'nota', texto: 'Pista', cor: 'rosa', x: 100, y: 200, largura: 180, rotacao: -2, z: 3 })
+    expect(normalizarItemQuadroDoServidor({ ...nota, tipo: 'imagem', imagem: 'i1' })).toMatchObject({ tipo: 'imagem', imagemId: 'i1' })
+  })
+
+  it('cor desconhecida vira amarelo, e rotação ou camada estranhas viram zero', () => {
+    expect(normalizarItemQuadroDoServidor({ ...nota, cor: 'roxo', rotacao: 45, z: -1 })).toMatchObject({ cor: 'amarelo', rotacao: 0, z: 0 })
+  })
+
+  it('item fora do quadro, sem imagem ou de tipo desconhecido é descartado', () => {
+    expect(normalizarItemQuadroDoServidor({ ...nota, x: 3201 })).toBeNull()
+    expect(normalizarItemQuadroDoServidor({ ...nota, y: -1 })).toBeNull()
+    expect(normalizarItemQuadroDoServidor({ ...nota, largura: 20 })).toBeNull()
+    expect(normalizarItemQuadroDoServidor({ ...nota, tipo: 'imagem', imagem: '' })).toBeNull()
+    expect(normalizarItemQuadroDoServidor({ ...nota, tipo: 'barbante' })).toBeNull()
   })
 })

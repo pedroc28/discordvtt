@@ -129,3 +129,57 @@ export function mensagemDeErroDados(erro: unknown, endereco: string, secreta = f
   }
   return 'o servidor não conseguiu atender. Tente de novo daqui a pouco.'
 }
+
+// ---------- quadro ----------
+// A aba Quadro mostra estas mensagens depois do que tentava fazer ("Não consegui enviar a imagem: ..."),
+// então elas dizem só a causa e o que fazer, começando com letra minúscula.
+
+export const QUADRO_FECHADO = 'o quadro foi fechado porque você trocou de campanha ou saiu do servidor. Abra a aba Quadro de novo.'
+export const QUADRO_INVALIDO = 'o servidor respondeu com algo que o app não entendeu. Atualize a página e tente de novo.'
+
+export type AcaoQuadro = 'carregar' | 'enviar' | 'renomear' | 'apagar imagem' | 'abrir' | 'prender' | 'mover' | 'editar' | 'tirar'
+
+const SEM_PERMISSAO: Record<AcaoQuadro, string> = {
+  carregar: 'você não participa mais desta campanha, ou ela foi apagada. Confira na aba Campanha.',
+  enviar: 'você não participa mais desta campanha, ou ela foi apagada. Confira na aba Campanha.',
+  renomear: 'só quem enviou a imagem ou o mestre renomeia.',
+  'apagar imagem': 'só quem enviou a imagem ou o mestre apaga. Se já foi apagada, atualize a página.',
+  abrir: 'a imagem não está mais no servidor, ou você não participa mais da campanha.',
+  prender: 'você não participa mais desta campanha, ou ela foi apagada. Confira na aba Campanha.',
+  mover: 'o item não está mais no quadro, ou você não participa mais da campanha.',
+  editar: 'só quem escreveu a nota edita.',
+  tirar: 'só quem prendeu o item ou o mestre tira do quadro. Se já foi tirado, atualize a página.',
+}
+
+/** Erro de validação de um campo, no formato do PocketBase: { data: { campo: { code, message } } }. */
+function codigoDoCampo(resposta: Record<string, unknown>, campo: string): string {
+  const dados = ehObj(resposta.data) ? resposta.data : {}
+  const doCampo = ehObj(dados[campo]) ? dados[campo] : {}
+  return typeof doCampo.code === 'string' ? doCampo.code : ''
+}
+
+export function mensagemDeErroQuadro(erro: unknown, endereco: string, acao: AcaoQuadro): string {
+  if (erro instanceof Error && [QUADRO_FECHADO, QUADRO_INVALIDO].includes(erro.message)) return erro.message
+  if (!ehObj(erro)) return 'aconteceu um erro inesperado. Tente de novo.'
+  const status = typeof erro.status === 'number' ? erro.status : -1
+  const resposta = ehObj(erro.response) ? erro.response : {}
+  const mensagem = typeof resposta.message === 'string' ? resposta.message : ''
+
+  if (status === 0) return `o servidor em ${endereco} não respondeu. Confira se ele está ligado e tente de novo.`
+  if (status === 401) return 'sua sessão expirou. Entre de novo na aba Campanha.'
+  if (status === 429) return 'muitos pedidos seguidos. Espere alguns segundos e tente de novo.'
+  if (status === 413) return 'a imagem passou de 2 MB. Tente uma menor.'
+  // Os hooks do servidor já explicam em português o que estava errado.
+  for (const prefixo of ['Imagem recusada:', 'Item recusado:']) {
+    if (mensagem.startsWith(prefixo)) return `o servidor recusou: ${mensagem.slice(prefixo.length).trim()}`
+  }
+  if (status === 400) {
+    const arquivo = codigoDoCampo(resposta, 'arquivo')
+    if (arquivo === 'validation_file_size_limit') return 'a imagem passou de 2 MB. Tente uma menor.'
+    if (arquivo === 'validation_invalid_mime_type') return 'o arquivo não é uma imagem PNG, JPEG ou WebP.'
+    if (codigoDoCampo(resposta, 'texto')) return 'a nota passou de 500 caracteres. Encurte e tente de novo.'
+  }
+  // O PocketBase esconde o motivo de propósito: quase sempre é falta de permissão.
+  if (status === 400 || status === 403 || status === 404) return SEM_PERMISSAO[acao]
+  return 'o servidor não conseguiu atender. Tente de novo daqui a pouco.'
+}

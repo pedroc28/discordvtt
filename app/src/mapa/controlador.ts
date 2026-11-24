@@ -47,10 +47,24 @@ export interface DadosRegiao {
 export class Traco {
   private mudancas: Mudanca[] = []
   private encerrado = false
+  private contado = false
   private ctrl: ControladorMapa
 
   constructor(ctrl: ControladorMapa) {
     this.ctrl = ctrl
+  }
+
+  /** Enquanto a pincelada está aberta, ela conta como edição ainda não enviada (ver `pendente`). */
+  private abrir() {
+    if (this.contado) return
+    this.contado = true
+    this.ctrl.tracosAbertos++
+  }
+
+  private fechar() {
+    if (!this.contado) return
+    this.contado = false
+    this.ctrl.tracosAbertos--
   }
 
   pintar(hexes: readonly Hex[], terreno: string) {
@@ -83,6 +97,7 @@ export class Traco {
   confirmar(): Lote | null {
     if (this.encerrado) return null
     this.encerrado = true
+    this.fechar()
     const mudancas = fundirMudancas(this.mudancas)
     if (!mudancas.length) return null
     return this.ctrl.registrar({ mudancas })
@@ -91,6 +106,7 @@ export class Traco {
   cancelar() {
     if (this.encerrado) return
     this.encerrado = true
+    this.fechar()
     const inversas = fundirMudancas(this.mudancas).map((m) => ({ ...m, antes: m.depois, depois: m.antes }))
     this.ctrl.armazem.aplicarMudancas(inversas)
   }
@@ -102,6 +118,7 @@ export class Traco {
 
   private aplicar(mudancas: Mudanca[]) {
     if (this.encerrado || !mudancas.length) return
+    this.abrir()
     this.ctrl.armazem.aplicarMudancas(mudancas)
     this.mudancas.push(...mudancas)
   }
@@ -114,12 +131,27 @@ export class ControladorMapa {
 
   private feitos: Lote[] = []
   private desfeitos: Lote[] = []
+  /**
+   * Ids dos lotes que este cliente enviou. O id fica guardado depois do primeiro eco: para o mestre, um lote
+   * com parte pública e privada volta em dois pedaços com o mesmo id, e os dois são o próprio lote.
+   */
   private ecos = new Set<string>()
+  /** Lotes enviados cujo eco ainda não voltou, na ordem do envio. Só são usados com `reaplicarPendentes`. */
+  private naoVoltaram: Lote[] = []
   private carregamentos = new Map<string, Promise<void>>()
   /** Lotes que chegaram enquanto o chunk ainda carregava. Entram assim que ele chegar. */
   private pendentes = new Map<string, Mudanca[]>()
   private carregandoRegioes: Promise<void> | null = null
   private regioesPendentes: MudancaRegiao[] = []
+  /** Chunks e regiões que falharam: esperam um tempo e tentam de novo. Nunca viram "vazio". */
+  private falhasChunk = new Map<string, Falha>()
+  private falhaRegioes: Falha | null = null
+  private destruido = false
+  private emVoo = 0
+  /** Pinceladas abertas, contadas pelo Traço. */
+  tracosAbertos = 0
+  /** Chamado quando um chunk ou as regiões que tinham falhado finalmente chegam. */
+  aoRecuperar: () => void = () => {}
   private ultimoGrupo: { grupo: string; tempo: number; loteId: string } | null = null
   private ouvintesHistorico = new Set<() => void>()
   private ouvintesToken = new Set<() => void>()
@@ -134,12 +166,26 @@ export class ControladorMapa {
 
   readonly repo: RepositorioMapa
   readonly autor: string
+  /**
+   * Com um servidor que entrega todos os lotes na mesma ordem para todo mundo (eco inclusive), um lote de
+   * outra pessoa que chega antes do eco do meu passaria por cima da minha edição. Ligado, as edições
+   * que ainda não voltaram são reaplicadas por cima do que chegou.
+   */
+  private reaplicarPendentes: boolean
+  /** Hora (do relógio deste aparelho) da última posição do token que este cliente gravou. */
+  private tsDoMeuToken = 0
 
-  constructor(repo: RepositorioMapa, autor: string) {
+  constructor(repo: RepositorioMapa, autor: string, opcoes: { reaplicarPendentes?: boolean } = {}) {
     this.repo = repo
     this.autor = autor
+    this.reaplicarPendentes = opcoes.reaplicarPendentes ?? false
     this.cancelarAssinatura = repo.assinar((lote) => this.receber(lote))
     this.cancelarAssinaturaToken = repo.assinarToken?.((t) => this.definirToken(t, false)) ?? (() => {})
+  }
+
+  /** Há edição que ainda não está segura no repositório: pincelada aberta ou lote em envio. */
+  get pendente() {
+    return this.tracosAbertos > 0 || this.emVoo > 0
   }
 
   get podeDesfazer() {
@@ -161,10 +207,11 @@ export class ControladorMapa {
 
   /** Busca o token no repositório (uma vez, na abertura). Sem suporte do repositório, o token fica só na memória. */
   async carregarToken(): Promise<void> {
+    const versao = this.versaoToken
     try {
       const t = (await this.repo.carregarToken?.()) ?? null
-      // Se alguém moveu o token enquanto carregava, vale o mais recente.
-      if (t && (!this.token || t.ts > this.token.ts)) this.definirToken(t, false)
+      // Se o token mudou enquanto carregava, o aviso que chegou é mais novo que a leitura.
+      if (t && this.versaoToken === versao) this.definirToken(t, false)
     } catch (e) {
       this.aoErro(`Não consegui carregar o token do grupo: ${mensagemDe(e)}`)
     }
@@ -172,7 +219,8 @@ export class ControladorMapa {
 
   /** Põe o token do grupo no hexágono. Todos veem a mudança. */
   moverToken(h: Hex) {
-    this.definirToken({ q: h.q, r: h.r, ts: Date.now(), autor: this.autor }, true)
+    this.tsDoMeuToken = Math.max(Date.now(), this.tsDoMeuToken + 1)
+    this.definirToken({ q: h.q, r: h.r, ts: this.tsDoMeuToken, autor: this.autor }, true)
   }
 
   /** Tira o token do mapa. */
@@ -181,8 +229,9 @@ export class ControladorMapa {
   }
 
   private definirToken(t: TokenGrupo | null, gravar: boolean) {
-    // Um aviso atrasado de outro cliente não pode sobrepor uma posição mais nova.
-    if (!gravar && t && this.token && t.ts < this.token.ts) return
+    // O que chega vale na ordem em que o repositório entrega: o relógio de outro aparelho não decide nada.
+    // A única exceção é o eco de uma posição minha que já foi superada por outra minha (arrastei rápido).
+    if (!gravar && t && t.autor === this.autor && t.ts < this.tsDoMeuToken) return
     this.token = t
     this.versaoToken++
     for (const o of [...this.ouvintesToken]) o()
@@ -193,7 +242,9 @@ export class ControladorMapa {
 
   /** Carrega o chunk se ainda não estiver. Pode ser chamado à vontade. */
   garantirChunk(chaveDoChunk: string): Promise<void> {
-    if (this.armazem.temChunk(chaveDoChunk)) return Promise.resolve()
+    if (this.armazem.temChunk(chaveDoChunk) || this.destruido) return Promise.resolve()
+    // Falhou há pouco: espera o tempo de tentar de novo, em vez de pedir a cada quadro.
+    if (this.falhasChunk.get(chaveDoChunk)?.timer) return Promise.resolve()
     let p = this.carregamentos.get(chaveDoChunk)
     if (!p) {
       this.pendentes.set(chaveDoChunk, [])
@@ -203,13 +254,14 @@ export class ControladorMapa {
           this.armazem.definirChunk(chaveDoChunk, hexagonos)
           const atrasadas = this.pendentes.get(chaveDoChunk) ?? []
           if (atrasadas.length) this.armazem.aplicarMudancas(atrasadas)
+          if (this.falhasChunk.delete(chaveDoChunk)) this.recuperou()
         })
         .catch((e) => {
-          // Sem isto o chunk seria pedido de novo a cada quadro. Fica vazio e o mapa segue
-          // funcionando só na memória. (Com servidor, esta política precisa mudar: um chunk
-          // vazio por falha de rede não pode ser gravado por cima do verdadeiro.)
-          this.aoErro(`Não consegui carregar o mapa, o que você fizer aqui não será salvo: ${mensagemDe(e)}`)
-          this.armazem.definirChunk(chaveDoChunk, [])
+          // Um chunk vazio por falha de rede seria gravado por cima do verdadeiro. Então o chunk fica
+          // sem carregar (e sem aceitar edição) até chegar de verdade.
+          const falha = this.falhaSeguinte(this.falhasChunk.get(chaveDoChunk), () => void this.garantirChunk(chaveDoChunk))
+          this.falhasChunk.set(chaveDoChunk, falha)
+          this.aoErro(`Não consegui carregar parte do mapa, tentando de novo. Enquanto isso não dá para editar ali: ${mensagemDe(e)}`)
         })
         .finally(() => {
           this.pendentes.delete(chaveDoChunk)
@@ -220,21 +272,44 @@ export class ControladorMapa {
     return p
   }
 
+  /** Marca mais uma falha seguida e agenda a nova tentativa, com espera crescente (1 s, 2 s, 4 s... até 15 s). */
+  private falhaSeguinte(anterior: Falha | undefined, tentar: () => void): Falha {
+    const n = (anterior?.n ?? 0) + 1
+    const falha: Falha = { n, timer: null }
+    falha.timer = setTimeout(() => {
+      falha.timer = null
+      if (!this.destruido) tentar()
+    }, Math.min(15000, 1000 * 2 ** (n - 1)))
+    return falha
+  }
+
+  private recuperou() {
+    if (this.falhasChunk.size === 0 && !this.falhaRegioes) this.aoRecuperar()
+  }
+
   /** Carrega as regiões (uma vez). Edições de região só funcionam depois disto. */
   carregarRegioes(): Promise<void> {
-    if (this.armazem.regioesProntas) return Promise.resolve()
+    if (this.armazem.regioesProntas || this.destruido) return Promise.resolve()
+    if (this.falhaRegioes?.timer) return Promise.resolve()
     if (!this.carregandoRegioes) {
       this.regioesPendentes = []
       this.carregandoRegioes = this.repo
         .carregarRegioes()
-        .then((lista) => this.armazem.definirRegioes(lista))
-        .catch((e) => {
-          this.aoErro(`Não consegui carregar as regiões: ${mensagemDe(e)}`)
-          this.armazem.definirRegioes([])
-        })
-        .finally(() => {
+        .then((lista) => {
+          this.armazem.definirRegioes(lista)
           this.armazem.aplicarRegioes(this.regioesPendentes)
           this.regioesPendentes = []
+          if (this.falhaRegioes) {
+            this.falhaRegioes = null
+            this.recuperou()
+          }
+        })
+        .catch((e) => {
+          // Como nos chunks: sem as regiões de verdade, nada de editar regiões (criarRegiao devolve null).
+          this.falhaRegioes = this.falhaSeguinte(this.falhaRegioes ?? undefined, () => void this.carregarRegioes())
+          this.aoErro(`Não consegui carregar as regiões, tentando de novo: ${mensagemDe(e)}`)
+        })
+        .finally(() => {
           this.carregandoRegioes = null
         })
     }
@@ -374,28 +449,44 @@ export class ControladorMapa {
 
   /** Lote de outro cliente (ou eco do próprio, que é ignorado). */
   receber(lote: Lote) {
-    if (this.ecos.delete(lote.id)) return
+    if (this.ecos.has(lote.id)) {
+      // O eco do meu lote: o armazém já está com ele. Só deixa de contá-lo como "não voltou".
+      this.naoVoltaram = this.naoVoltaram.filter((l) => l.id !== lote.id)
+      return
+    }
+    this.aplicarDeFora(lote.mudancas, lote.regioes)
+    // Meus lotes ainda a caminho valem mais do que este, que o servidor ordenou antes deles.
+    for (const meu of this.naoVoltaram) this.aplicarDeFora(meu.mudancas, meu.regioes)
+  }
+
+  /** Aplica mudanças que não vieram de uma edição aqui, respeitando chunks e regiões ainda carregando. */
+  private aplicarDeFora(mudancas: readonly Mudanca[], regioes: readonly MudancaRegiao[]) {
     const porChunk = new Map<string, Mudanca[]>()
-    for (const m of lote.mudancas) {
+    for (const m of mudancas) {
       const ck = chaveChunk(m)
       const lista = porChunk.get(ck)
       if (lista) lista.push(m)
       else porChunk.set(ck, [m])
     }
-    for (const [ck, mudancas] of porChunk) {
+    for (const [ck, lista] of porChunk) {
       const espera = this.pendentes.get(ck)
-      if (espera) espera.push(...mudancas)
-      else this.armazem.aplicarMudancas(mudancas)
+      if (espera) espera.push(...lista)
+      else this.armazem.aplicarMudancas(lista)
     }
-    if (lote.regioes.length) {
-      if (this.armazem.regioesProntas) this.armazem.aplicarRegioes(lote.regioes)
-      else this.regioesPendentes.push(...lote.regioes)
+    if (regioes.length) {
+      if (this.armazem.regioesProntas) this.armazem.aplicarRegioes(regioes)
+      else this.regioesPendentes.push(...regioes)
     }
   }
 
   destruir() {
+    this.destruido = true
     this.cancelarAssinatura()
     this.cancelarAssinaturaToken()
+    for (const f of this.falhasChunk.values()) if (f.timer) clearTimeout(f.timer)
+    if (this.falhaRegioes?.timer) clearTimeout(this.falhaRegioes.timer)
+    this.falhasChunk.clear()
+    this.falhaRegioes = null
   }
 
   private reverter(sentido: 'desfazer' | 'refazer'): number {
@@ -424,13 +515,50 @@ export class ControladorMapa {
   private enviar(lote: Lote) {
     this.ecos.add(lote.id)
     if (this.ecos.size > LIMITE_ECOS) this.ecos.delete(this.ecos.values().next().value as string)
-    this.repo.aplicar(lote).catch((e) => this.aoErro(`Não consegui salvar: ${mensagemDe(e)}`))
+    if (this.reaplicarPendentes) {
+      this.naoVoltaram.push(lote)
+      if (this.naoVoltaram.length > LIMITE_ECOS) this.naoVoltaram.shift()
+    }
+    this.emVoo++
+    this.repo
+      .aplicar(lote)
+      .catch((e) => {
+        this.falhouEnvio(lote)
+        this.aoErro(`Não consegui salvar, então desfiz aqui: ${mensagemDe(e)}`)
+      })
+      .finally(() => {
+        this.emVoo--
+      })
+  }
+
+  /**
+   * O repositório recusou o lote (sem permissão, servidor fora, disco cheio). Deixar a edição na tela
+   * mostraria um mapa que só existe aqui, então ela é desfeita localmente, como se não tivesse acontecido.
+   */
+  private falhouEnvio(lote: Lote) {
+    this.ecos.delete(lote.id)
+    this.naoVoltaram = this.naoVoltaram.filter((l) => l.id !== lote.id)
+    this.feitos = this.feitos.filter((l) => l.id !== lote.id)
+    this.desfeitos = this.desfeitos.filter((l) => l.id !== lote.id)
+    const { lote: inverso } = reverterLote(this.armazem, lote, { id: novoId(), autor: this.autor, ts: Date.now() })
+    if (inverso) {
+      this.armazem.aplicarMudancas(inverso.mudancas)
+      this.armazem.aplicarRegioes(inverso.regioes)
+    }
+    this.mudouHistorico()
   }
 
   private mudouHistorico() {
     this.versaoHistorico++
     for (const o of [...this.ouvintesHistorico]) o()
   }
+}
+
+interface Falha {
+  /** Quantas vezes seguidas falhou. */
+  n: number
+  /** Espera pela próxima tentativa. Null quando a tentativa já está em curso. */
+  timer: ReturnType<typeof setTimeout> | null
 }
 
 const mensagemDe = (e: unknown) => (e instanceof Error ? e.message : String(e))

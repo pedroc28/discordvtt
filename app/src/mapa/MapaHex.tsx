@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { useAparencia } from '../nucleo/aparencia'
+import { abrirRepositorioMapa, useServidor } from '../servidor/conexao'
 import { carregarCamera, autorLocal, salvarCamera, metaPadrao, carregarViagem, salvarViagem, carregarPainelAberto, salvarPainelAberto, CAMERA_INICIAL } from './armazenamento'
 import { lerArquivo, nomeDoArquivo, terrenosDesconhecidos, type ArquivoMapa, type ModoImportacao, type ResumoLeitura } from './arquivo'
 import { zoomEm } from './camera'
@@ -18,6 +19,7 @@ import { CORES_REGIAO } from './operacoes'
 import { medirRegua, textoDaMedida } from './regua'
 import { EditorDeRegiao, ListaDeRegioes } from './Regioes'
 import { Renderizador, type CoresMapa } from './renderizador'
+import type { RepositorioMapa } from './repositorio'
 import { RepositorioLocal } from './repositorio-local'
 import { Tileset } from './tileset'
 
@@ -93,6 +95,18 @@ export function MapaHex() {
   const [motor, setMotor] = useState<Motor | null>(null)
   const [erroCarga, setErroCarga] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  /** O servidor avisou que o mapa ficou desatualizado e há edição que ainda não foi enviada: a pessoa decide. */
+  const [pedirRecarga, setPedirRecarga] = useState(false)
+  /** Sobe para montar o mapa de novo (recarga depois de ficar desatualizado). */
+  const [geracao, setGeracao] = useState(0)
+
+  // De onde vem o mapa: da campanha aberta, se houver login, ou deste navegador.
+  const servidor = useServidor()
+  const papelNaCampanha = servidor.campanhas.find((c) => c.id === servidor.campanhaAtualId)?.papel ?? null
+  const pronto = servidor.fase === 'conectado' || servidor.fase === 'desconectado'
+  const campanhaId = servidor.fase === 'conectado' && papelNaCampanha ? servidor.campanhaAtualId : null
+  const usuarioId = servidor.usuario?.id ?? null
+  const nomeDaCampanha = campanhaId ? (servidor.campanhas.find((c) => c.id === campanhaId)?.nome ?? '') : ''
   /** Arquivo de mapa lido e esperando o jogador escolher mesclar, substituir ou cancelar. */
   const [importando, setImportando] = useState<{
     nome: string
@@ -175,23 +189,40 @@ export function MapaHex() {
   })
 
   // ----- montar o motor -----
+  // Monta de novo quando a campanha, o papel ou a conta mudam: o repositório do servidor se fecha sozinho
+  // nesses casos, e o mapa de uma campanha não pode ficar misturado com o de outra.
   useEffect(() => {
     const canvas = canvasRef.current
     const palco = palcoRef.current
     const raiz = raizRef.current
-    if (!canvas || !palco || !raiz) return
+    if (!canvas || !palco || !raiz || !pronto) return
     let cancelado = false
     let desmontar: (() => void) | null = null
+    setPedirRecarga(false)
 
     Tileset.carregar(urlDoTileset())
       .then((tileset) => {
         if (cancelado) return
-        const repo = new RepositorioLocal(MAPA_ID)
-        const ctrl = new ControladorMapa(repo, autorLocal())
+        const doServidor = campanhaId && usuarioId ? abrirRepositorioMapa() : null
+        const repo: RepositorioMapa = doServidor ?? new RepositorioLocal(MAPA_ID)
+        const autor = doServidor && usuarioId ? usuarioId : autorLocal()
+        // Câmera e visão de cada mapa ficam separadas: o da campanha não herda a posição do mapa local.
+        const mapaChave = doServidor ? `campanha-${campanhaId}` : MAPA_ID
+        const ctrl = new ControladorMapa(repo, autor, { reaplicarPendentes: !!doServidor })
         ctrl.aoErro = setAviso
+        ctrl.aoRecuperar = () => setAviso((a) => (a?.startsWith('Não consegui carregar') ? null : a))
+        const cancelarDesatualizado = doServidor?.aoDesatualizar(() => {
+          // Sem edição a perder, recarrega sozinho. Com edição no ar, quem decide é a pessoa.
+          if (ctrl.pendente) {
+            setPedirRecarga(true)
+          } else {
+            setAviso('Mapa atualizado.')
+            setGeracao((g) => g + 1)
+          }
+        })
         void ctrl.carregarRegioes()
         void ctrl.carregarToken()
-        const camera = carregarCamera(MAPA_ID)
+        const camera = carregarCamera(mapaChave)
         const render = new Renderizador(canvas, ctrl, tileset, camera, lerCores(raiz))
         const entrada = new EntradaMapa(canvas, render, ctrl, { ferramenta: 'pintar', terreno: 'planicie', regiaoId: null, raio: 0, tirarTraco: false })
 
@@ -207,7 +238,7 @@ export function MapaHex() {
         render.aoMudarCamera = (c) => {
           setZoom(c.zoom)
           window.clearTimeout(salvar)
-          salvar = window.setTimeout(() => salvarCamera(MAPA_ID, c), 300)
+          salvar = window.setTimeout(() => salvarCamera(mapaChave, c), 300)
         }
         setZoom(camera.zoom)
         setMarcadorAtivo(tileset.def.marcadores[0]?.id ?? '')
@@ -231,12 +262,13 @@ export function MapaHex() {
 
         desmontar = () => {
           window.clearTimeout(salvar)
-          salvarCamera(MAPA_ID, render.camera)
+          salvarCamera(mapaChave, render.camera)
+          cancelarDesatualizado?.()
           observador.disconnect()
           entrada.destruir()
           render.destruir()
           ctrl.destruir()
-          repo.fechar()
+          void (doServidor ?? (repo as RepositorioLocal)).fechar()
         }
       })
       .catch((e) => !cancelado && setErroCarga(e instanceof Error ? e.message : String(e)))
@@ -246,7 +278,7 @@ export function MapaHex() {
       desmontar?.()
       setMotor(null)
     }
-  }, [])
+  }, [pronto, campanhaId, papelNaCampanha, usuarioId, geracao])
 
   // ----- stores externos: histórico, contagem, regiões, hexágonos -----
   useSyncExternalStore(
@@ -350,7 +382,7 @@ export function MapaHex() {
     if (!motor || ocupado) return
     setOcupado(true)
     try {
-      const meta = { ...metaPadrao(MAPA_ID), tileset: motor.tileset.def.id }
+      const meta = { ...metaPadrao(campanhaId ? `campanha-${campanhaId}` : MAPA_ID), tileset: motor.tileset.def.id }
       const arquivo = await motor.ctrl.exportar(meta)
       const blob = new Blob([JSON.stringify(arquivo)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -367,7 +399,7 @@ export function MapaHex() {
     } finally {
       setOcupado(false)
     }
-  }, [motor, ocupado])
+  }, [motor, ocupado, campanhaId])
 
   const escolherArquivo = useCallback(
     async (arquivo: File | undefined) => {
@@ -685,6 +717,7 @@ export function MapaHex() {
             ) : (
               <span>Passe o cursor sobre o mapa</span>
             )}
+            <span className="mapa__origem">{campanhaId ? `· Mapa da campanha${nomeDaCampanha ? ` ${nomeDaCampanha}` : ''}` : '· Mapa só neste navegador'}</span>
           </div>
 
           {importando && (
@@ -722,7 +755,15 @@ export function MapaHex() {
             </div>
           )}
 
-          {aviso && (
+          {pedirRecarga && (
+            <div className="mapa__aviso mapa__aviso--acao" role="alert">
+              <span>O mapa da campanha mudou muito enquanto você estava fora. O que você fez e não foi enviado se perde se recarregar.</span>
+              <button type="button" className="botao-topo" onClick={() => setGeracao((g) => g + 1)}>
+                Recarregar
+              </button>
+            </div>
+          )}
+          {aviso && !pedirRecarga && (
             <div className="mapa__aviso" role="status">
               {aviso}
             </div>

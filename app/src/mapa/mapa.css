@@ -1019,3 +1019,13 @@
     max-width: 100%;
   }
 }
+
+.mapa__aviso--acao {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mapa__origem {
+  opacity: 0.75;
+}

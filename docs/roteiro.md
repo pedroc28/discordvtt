@@ -20,7 +20,9 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Aba lateral recolhível de viagem e provisões, com ferramenta Rota
 - [x] Campo, geleira e cânion retrabalhados
 - [x] Exportar e importar o mapa em arquivo JSON (mesclar ou substituir, com desfazer)
-- [ ] Fase 4: mapa no servidor, papéis, camada privada do mestre e presença (depende da base no PocketBase)
+- [x] Fase 4, parte 1: mapa ligado ao servidor (repositório por campanha, conta como autor, eco, chunk que falha, token na ordem de chegada, mapa desatualizado, edição recusada)
+- [ ] Fase 4, parte 2: camada do mestre na tela (notas privadas, hexágonos ocultos, revelar), trava do mapa, levar o mapa do navegador para a campanha e viagem da campanha
+- [ ] Presença (fora por enquanto: o PocketBase não tem mensagem efêmera)
 - [x] Paleta de terrenos com pastas e pesquisa por tag (mínimo 3 tags por terreno)
 - [x] Arte final dos terrenos em pixel art (PixelLab): os 45 terrenos feitos, guia e lista em `docs/mapa/arte.md`
 - [x] Ícones de marcador em pixel art (12 ícones de 64 × 64, na pasta `pixel`)
@@ -37,7 +39,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Servidor de teste local, com mestre e jogadores, e testes do `RepositorioPocketBase` contra um PocketBase de verdade na verificação do GitHub
 - [x] Camada do mestre no servidor: notas privadas e hexágonos ocultos que só o mestre lê, revelar num lote só, importação e reversão conferidas pelo servidor e trava do mapa
 - [x] Rolagens de dados no servidor: sorteio pelo servidor, rolagens abertas e secretas com regras testadas, limpeza depois de 7 dias e o `RepositorioDadosPocketBase`
-- [ ] Ligar o mapa ao servidor, com o GrifoCaolho (lista do que combinar em `docs/servidor/README.md`)
+- [x] Ligar o mapa ao servidor, com o GrifoCaolho: parte 1 feita (lista do que combinar em `docs/servidor/README.md`). A camada do mestre na tela e o resto seguem em entregas do mapa.
 - [ ] Fichas sincronizadas: todos editando e vendo a mesma ficha em tempo real
 - [ ] Rodízio de anfitrião, se o grupo decidir: qualquer membro hospeda o servidor, um por vez, com troca de dados automática pelo Google Drive
 

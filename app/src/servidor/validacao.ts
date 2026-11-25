@@ -6,7 +6,7 @@ import type { Rolagem } from '../dados/tipos'
 import { ALTURA_QUADRO, CORES_NOTA, LARGURA_QUADRO, LIMITES_QUADRO, type CorNota, type ImagemQuadro, type ItemQuadro } from '../quadro/tipos'
 import { normalizarHexagono, normalizarRegiao } from '../mapa/armazenamento'
 import type { Hexagono, Lote, Mudanca, MudancaNota, MudancaRegiao, NotaPrivada, Regiao, TipoLote, TokenGrupo } from '../mapa/tipos'
-import type { CamadaMestreDoServidor, Campanha, LoteDoServidor, MapaDoServidor, Papel, Participacao, TokenDoServidor, Usuario } from './tipos'
+import type { CamadaMestreDoServidor, Campanha, LoteDoServidor, MapaDoServidor, Papel, Participacao, TokenDoServidor, Usuario, ViagemDoServidor } from './tipos'
 
 type Obj = Record<string, unknown>
 const ehObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -173,6 +173,22 @@ export function normalizarTokenDoServidor(bruto: unknown): TokenDoServidor | nul
     }
   }
   return { id: bruto.id, token }
+}
+
+// ---------- viagem ----------
+
+/**
+ * A viagem da campanha. Da configuração ficam só os números finitos: o mapa confere os limites de cada campo
+ * e põe o padrão no que faltar. Uma configuração que não é objeto vale como nunca gravada.
+ */
+export function normalizarViagemDoServidor(bruto: unknown): ViagemDoServidor | null {
+  if (!ehObj(bruto) || !id(bruto.id)) return null
+  let config: Record<string, number> | null = null
+  if (ehObj(bruto.config)) {
+    config = {}
+    for (const [campo, valor] of Object.entries(bruto.config)) if (typeof valor === 'number' && Number.isFinite(valor)) config[campo] = valor
+  }
+  return { id: bruto.id, config, atualizado: typeof bruto.updated === 'string' ? bruto.updated : '' }
 }
 
 // ---------- dados ----------

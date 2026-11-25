@@ -4,7 +4,7 @@
 // Cada handler roda isolado e não enxerga nada declarado fora dele, por isso as funções
 // auxiliares ficam em campanhas.js e são carregadas com require dentro de cada handler.
 
-// Toda campanha nasce com o seu mapa (e o token do grupo dele), e quem cria a campanha pelo app
+// Toda campanha nasce com o seu mapa (e o token do grupo dele) e a sua viagem, e quem cria a campanha pelo app
 // vira mestre dela, tudo na mesma transação. Sem o mestre, a campanha nasceria sem participantes,
 // e ninguém conseguiria vê-la nem gerenciá-la.
 onRecordCreateRequest((e) => {
@@ -19,6 +19,7 @@ onRecordCreateRequest((e) => {
     e.next()
 
     require(`${__hooks}/mapa.js`).criarMapa(txApp, e.record.id)
+    require(`${__hooks}/viagem.js`).criarViagem(txApp, e.record.id)
 
     if (peloApp) {
       const mestre = new Record(txApp.findCollectionByNameOrId('participantes'))

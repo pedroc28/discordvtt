@@ -65,6 +65,11 @@ describe('mensagens de erro do mapa', () => {
     expect(mensagemDeErroMapa(recusa, ENDERECO)).toBe('o servidor recusou: o hexágono (1, 2) não tem terreno.')
   })
 
+  it('repassa o motivo que o servidor deu para recusar a viagem', () => {
+    const recusa = erro(400, 'Viagem recusada: estoqueAgua precisa ser um número de 0 a 100000.')
+    expect(mensagemDeErroMapa(recusa, ENDERECO)).toBe('o servidor recusou: estoqueAgua precisa ser um número de 0 a 100000.')
+  })
+
   it('mensagens do próprio repositório passam como estão', () => {
     expect(mensagemDeErroMapa(new Error(MAPA_FECHADO), ENDERECO)).toBe(MAPA_FECHADO)
     expect(mensagemDeErroMapa(new Error('outra coisa'), ENDERECO)).toContain('Tente de novo')

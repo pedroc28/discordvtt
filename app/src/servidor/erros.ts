@@ -80,10 +80,14 @@ export const MAPA_FECHADO = 'o mapa foi fechado porque você trocou de campanha 
 export const MAPA_DESATUALIZADO =
   'o mapa ficou desatualizado enquanto a conexão estava fora, e o servidor já apagou o que faltava. Recarregue o mapa.'
 export const MAPA_SEM_REGISTRO = 'não encontrei o mapa desta campanha. Confira na aba Campanha se você ainda participa dela.'
+export const VIAGEM_SO_MESTRE = 'só o mestre da campanha muda as regras e o estoque da viagem.'
+export const VIAGEM_SEM_REGISTRO = 'não encontrei a viagem desta campanha. Confira na aba Campanha se você ainda participa dela.'
+export const VIAGEM_SERVIDOR_ANTIGO = 'o servidor ainda não guarda a viagem da campanha. Quem cuida do servidor precisa atualizá-lo e reiniciá-lo.'
 
 export function mensagemDeErroMapa(erro: unknown, endereco: string): string {
   // Erros do próprio repositório já vêm prontos.
-  if (erro instanceof Error && [MAPA_FECHADO, MAPA_DESATUALIZADO, MAPA_SEM_REGISTRO].includes(erro.message)) return erro.message
+  const prontas = [MAPA_FECHADO, MAPA_DESATUALIZADO, MAPA_SEM_REGISTRO, VIAGEM_SO_MESTRE, VIAGEM_SEM_REGISTRO, VIAGEM_SERVIDOR_ANTIGO]
+  if (erro instanceof Error && prontas.includes(erro.message)) return erro.message
   if (!ehObj(erro)) return 'aconteceu um erro inesperado. Tente de novo.'
   const status = typeof erro.status === 'number' ? erro.status : -1
   const resposta = ehObj(erro.response) ? erro.response : {}
@@ -93,8 +97,10 @@ export function mensagemDeErroMapa(erro: unknown, endereco: string): string {
   if (status === 401) return 'sua sessão expirou. Entre de novo na aba Campanha.'
   if (status === 429) return 'muitas mudanças seguidas. Espere alguns segundos e tente de novo.'
   if (status === 413) return 'o lote é grande demais para o servidor. Divida a importação em partes.'
-  // O hook do servidor já explica em português o que estava errado no lote.
-  if (mensagem.startsWith('Lote recusado:')) return `o servidor recusou: ${mensagem.slice('Lote recusado:'.length).trim()}`
+  // O hook do servidor já explica em português o que estava errado no lote ou na viagem.
+  for (const prefixo of ['Lote recusado:', 'Viagem recusada:']) {
+    if (mensagem.startsWith(prefixo)) return `o servidor recusou: ${mensagem.slice(prefixo.length).trim()}`
+  }
   if (status === 403 || status === 404) return 'você não participa mais desta campanha, ou ela foi apagada. Confira na aba Campanha.'
   if (status === 400) return 'o servidor recusou a mudança. Atualize a página e tente de novo.'
   return 'o servidor não conseguiu atender. Tente de novo daqui a pouco.'

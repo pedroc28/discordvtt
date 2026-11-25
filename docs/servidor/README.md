@@ -49,6 +49,7 @@ Cuidados:
 | `rolagens_secretas` | `campanha`, `autor`, `lados`, `resultado` | As rolagens secretas dos mestres, iguais às abertas. Apagadas depois de 7 dias. |
 | `quadro_imagens` | `campanha`, `autor`, `arquivo`, `nome`, `bytes`, `largura`, `altura` | A biblioteca de imagens do quadro de cortiça. `arquivo` é protegido. `autor` e `bytes` são dados pelo servidor. |
 | `quadro_itens` | `campanha`, `autor`, `tipo`, `imagem`, `texto`, `cor`, `x`, `y`, `largura`, `rotacao`, `z` | O que está preso no quadro: uma imagem da biblioteca ou uma nota. `autor` é dado pelo servidor. |
+| `viagens` | `campanha`, `config` | Uma por campanha (índice único), criada junto com ela. `config` guarda as regras e o estoque do painel de viagem do mapa, vazio até o mestre gravar pela primeira vez. |
 
 Todas têm `created`, e todas menos as rolagens têm `updated`. Apagar a campanha apaga o mapa e, em cascata, tudo o que é dele.
 
@@ -68,6 +69,7 @@ Todas têm `created`, e todas menos as rolagens têm `updated`. Apagar a campanh
 | `rolagens_secretas` | mestre da campanha | mestre da campanha, sem mandar `autor` nem `resultado` | ninguém | ninguém (só a limpeza) |
 | `quadro_imagens` | quem participa da campanha | quem participa, sem mandar `autor` nem `bytes` | quem enviou ou o mestre, só o nome | quem enviou ou o mestre |
 | `quadro_itens` | quem participa da campanha | quem participa, sem mandar `autor` | quem participa move. Texto e cor da nota, só quem escreveu | quem prendeu ou o mestre |
+| `viagens` | quem participa da campanha | ninguém (nasce com a campanha) | mestre, sem mudar a campanha (o hook confere a configuração) | ninguém (sai com a campanha) |
 
 Visitante sem login não vê nada. O administrador, pelo painel, passa por cima de todas as regras.
 
@@ -77,7 +79,7 @@ Quem participa da campanha lê e edita o mapa, mestre ou jogador, a não ser que
 
 Hooks, em `pocketbase/pb_hooks/campanhas.pb.js`:
 
-- Toda campanha nasce com o seu mapa e o token do grupo dele, inclusive a criada pelo painel. Quem cria uma campanha pelo app vira mestre dela. Tudo na mesma transação: ou entra tudo, ou nada.
+- Toda campanha nasce com o seu mapa, o token do grupo dele e a viagem, inclusive a criada pelo painel. Quem cria uma campanha pelo app vira mestre dela. Tudo na mesma transação: ou entra tudo, ou nada.
 - Uma campanha nunca fica sem mestre. Tirar ou rebaixar o último mestre é recusado com a mensagem "A campanha precisa de pelo menos um mestre. Torne outra pessoa mestre antes."
 
 Configurações, em `pocketbase/pb_migrations/1795321001_configuracoes.js`: nome do app e limite de tentativas ligado (padrão do PocketBase, com login limitado a 2 tentativas a cada 3 segundos por IP).
@@ -146,7 +148,7 @@ Fechado em 22/11/2026. O lado do mapa fica com o Grifo, e o do servidor, com o P
 9. **Levar o mapa do navegador para a campanha** (Grifo). Só o mestre, uma vez, com a campanha de mapa vazio, como um lote de importação. Antes, o app baixa uma cópia em JSON, e o mapa do navegador nunca é apagado.
 10. **Cor da região** (Grifo). Gravar ao soltar o seletor, em vez de a cada movimento.
 11. **Campos novos no hexágono** (Grifo avisa o Pedro). Passam pelo servidor sem validação até o Pedro validar.
-12. **Viagem e provisões** (depois da primeira entrega). As regras de viagem e o estoque do grupo passam a ser da campanha, editados só pelo mestre, num registro por campanha com um campo JSON. Cada jogador pode simular só para si. A rota continua local.
+12. **Viagem e provisões** (pronto em 24/11/2026). As regras de viagem e o estoque do grupo são da campanha, editados só pelo mestre, num registro por campanha com um campo JSON (ver a seção "Viagem"). Cada jogador pode simular só para si. A rota continua local.
 13. **Presença** (fora por enquanto). O PocketBase não tem mensagem efêmera.
 14. **Teste ao vivo com o grupo** (os dois), quando o mapa estiver ligado ao servidor.
 
@@ -192,6 +194,25 @@ O `RepositorioQuadroPocketBase` (`app/src/servidor/repositorio-quadro.ts`) imple
 - **Fechar:** trocar de campanha, sair, trocar de servidor ou mudar de papel fecha o repositório, como o do mapa e o das rolagens.
 - **Erros** dizem a causa e o que fazer, começando em minúscula. As recusas sem motivo do servidor viram uma explicação de quem pode fazer aquilo.
 
+## Viagem
+
+As regras do mundo e o estoque do grupo que o painel de viagem do mapa usa (ver `docs/mapa/manual.md`, "Viagem da campanha"). O mestre edita, e todos da campanha leem. Ficam em `pocketbase/pb_migrations/1795321007_viagem.js` e `pocketbase/pb_hooks/viagem.pb.js`.
+
+- **Coleção própria, um registro por campanha.** Nasce junto com a campanha, e as campanhas que já existiam ganharam a delas na migração. O registro `mapas` ficou de fora de propósito: ele é regravado a cada lote (o contador `ultimaOrdem`), e uma gravação da viagem nele poderia escrever um contador velho por cima. O tempo real também ficaria mandando a viagem a cada pincelada.
+- **Quem faz o quê.** Quem participa lê. Só o mestre grava, e vale a última gravação. Ninguém cria nem apaga pelo app, e a viagem não muda de campanha. Apagar a campanha apaga a viagem.
+- **O que o servidor confere.** `config` vazio (o mestre nunca gravou, ou zerou) ou um objeto com até 32 campos, cada um com um nome de letras e números, começando por letra e com até 40 caracteres, e um valor numérico de 0 a 100 mil, com até 4 KB no total. O hook não conhece os campos um por um: o mapa pode ganhar um campo numérico novo sem mudar o servidor. Fora disso, recusa com o motivo ("o servidor recusou: estoqueAgua precisa ser um número de 0 a 100000.").
+- **Limite de pedidos.** Vale o limite geral da API, 300 a cada 10 segundos por pessoa. O mestre grava 700 ms depois da última tecla, então sobra.
+
+### Lado do app
+
+O `RepositorioPocketBase` tem os três métodos do contrato `RepositorioComViagem` (ver `docs/contratos.md`), e o mapa passa a usar a viagem da campanha sozinho.
+
+- **Abrir.** No primeiro pedido, à parte do mapa: assina o tempo real da viagem da campanha e só então lê o registro. Uma falha ao abrir o mapa não fecha a viagem, e vice-versa.
+- **`carregarViagem()`** devolve só os números da configuração, ou null enquanto o mestre nunca gravou. O mapa confere os limites de cada campo e completa o que faltar com o padrão.
+- **`gravarViagem(config)`** grava para o mestre. Para quem não é mestre, falha sem ir ao servidor, com "só o mestre da campanha muda as regras e o estoque da viagem.".
+- **`assinarViagem(ouvinte)`** avisa quando a viagem muda, e de novo quando a conexão volta (lê a viagem outra vez). Um aviso mais velho que a última gravação conhecida, pela hora `updated` do servidor, é ignorado, e o eco de uma gravação já conhecida não é avisado de novo.
+- **Servidor sem a migração.** Se a coleção não existe, a leitura falha com "o servidor ainda não guarda a viagem da campanha. Quem cuida do servidor precisa atualizá-lo e reiniciá-lo.", e o mapa segue com a viagem local.
+
 ## Aba Campanha
 
 - **Entrar:** servidor, e-mail e senha. O endereço vem preenchido com o `VITE_POCKETBASE_URL` (no site de teste, `http://127.0.0.1:8090`) e pode ser trocado, por exemplo pelo endereço `.ts.net` do Funnel. Sem esquema, endereço local vira `http://` e o resto vira `https://`. O app guarda o endereço e a sessão no navegador, separados por servidor.
@@ -211,7 +232,7 @@ Arquivos em `app/src/servidor/`:
 | `validacao.ts` | Converte e valida tudo o que chega do servidor. |
 | `erros.ts` | Mensagens de erro em português, por ação. |
 | `operacoes.ts` | Funções puras: campanhas com papel, ordem dos participantes, único mestre, contas disponíveis, mapa que continua aberto. |
-| `repositorio-mapa.ts` | O `RepositorioPocketBase` do mapa (ver a seção "Mapa"). |
+| `repositorio-mapa.ts` | O `RepositorioPocketBase` do mapa e da viagem da campanha (ver as seções "Mapa" e "Viagem"). |
 | `fila-lotes.ts` | Põe os lotes do servidor na ordem antes de entregar ao mapa. |
 | `casos-chunk.json` | Casos de chunk conferidos pelo app e pelo servidor. |
 | `TelaCampanha.tsx`, `servidor.css`, `tela.ts` | A aba Campanha. |

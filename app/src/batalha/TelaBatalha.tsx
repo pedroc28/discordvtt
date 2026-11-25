@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { arrastar, telaParaMundo, zoomEm, type Camera } from '../mapa/camera'
 import { Icone, type NomeIcone } from '../mapa/Icones'
 import { useAparencia } from '../nucleo/aparencia'
+import { baixarArquivo, imagemDoArquivo, imagemParaArquivo } from './arquivo-navegador'
+import { cenaParaImportar, lerArquivo, montarArquivo, nomeDoArquivo, type ArquivoBatalha, type ResumoLeitura } from './arquivo'
 import { desenhar, type LinhaDesenhada } from './desenho'
 import { encaixar, tamanhoPorMedida } from './grade'
 import { abrirImagem, prepararFundo } from './fundo'
@@ -53,6 +55,9 @@ const REGRAS_DIAGONAL: { id: RegraDiagonal; rotulo: string }[] = [
 ]
 
 const TAMANHOS_DE_TOKEN = [0.5, 1, 2, 3, 4]
+
+/** Mais que isto não é uma cena de batalha. O arquivo carrega a imagem em base64. */
+const TAMANHO_MAXIMO_ARQUIVO = 80 * 1024 * 1024
 
 interface Arrasto {
   tipo: 'camera' | 'token' | 'grade' | 'regua' | 'calibrar'
@@ -122,6 +127,8 @@ export function TelaBatalha() {
   const [aviso, setAviso] = useState<string | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [painelAberto, setPainelAberto] = useState(true)
+  /** Arquivo lido, esperando a pessoa confirmar a troca da cena. */
+  const [importando, setImportando] = useState<{ nome: string; arquivo: ArquivoBatalha; resumo: ResumoLeitura } | null>(null)
 
   // O que os ouvintes do mouse e do toque precisam ler sem remontar.
   const cenaRef = useRef(cena)
@@ -134,6 +141,7 @@ export function TelaBatalha() {
   const linhaRef = useRef<LinhaDesenhada | null>(null)
   const quadroRef = useRef(0)
   const entradaArquivoRef = useRef<HTMLInputElement>(null)
+  const entradaCenaRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     cenaRef.current = cena
@@ -453,6 +461,65 @@ export function TelaBatalha() {
     }
   }, [repositorio])
 
+  const exportarCena = useCallback(async () => {
+    setOcupado(true)
+    try {
+      const { imagem: guardada } = await repositorio.carregar(ID_DA_CENA)
+      const naImagem = guardada ? await imagemParaArquivo(guardada) : null
+      const c = cenaRef.current
+      baixarArquivo(montarArquivo(c, naImagem), nomeDoArquivo(c.nome))
+      setAviso(`Cena exportada: ${c.tokens.length} tokens${naImagem ? ' e a imagem de fundo' : ', sem imagem de fundo'}.`)
+    } catch (e) {
+      setAviso(`Não consegui exportar a cena: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setOcupado(false)
+    }
+  }, [repositorio])
+
+  const escolherArquivoDeCena = useCallback(async (arquivo: File | undefined) => {
+    if (!arquivo) return
+    if (arquivo.size > TAMANHO_MAXIMO_ARQUIVO) {
+      setAviso('Esse arquivo é grande demais para ser uma cena (mais de 80 MB). Escolha um arquivo exportado pelo mapa de batalha.')
+      return
+    }
+    const lido = lerArquivo(await arquivo.text())
+    if (!lido.ok) {
+      setAviso(lido.erro)
+      return
+    }
+    setImportando({ nome: arquivo.name, arquivo: lido.arquivo, resumo: lido.resumo })
+  }, [])
+
+  const confirmarImportacao = useCallback(async () => {
+    if (!importando) return
+    setOcupado(true)
+    let bitmap: ImageBitmap | null = null
+    try {
+      const { arquivo } = importando
+      const blob = arquivo.imagem ? await imagemDoArquivo(arquivo.imagem) : null
+      bitmap = blob ? await abrirImagem(blob).catch(() => null) : null
+      if (blob && !bitmap) throw new Error('a imagem de fundo do arquivo não abriu. Exporte de novo, ou use um arquivo sem imagem.')
+      const nova = cenaParaImportar(arquivo.cena, ID_DA_CENA, bitmap && { largura: bitmap.width, altura: bitmap.height })
+      if (!nova) throw new Error('a imagem de fundo tem mais de 16384 pixels de lado.')
+      await repositorio.salvarImagem(ID_DA_CENA, blob)
+      imagemRef.current?.close()
+      cenaRef.current = nova
+      setImagem(bitmap)
+      setCena(nova)
+      setSelecionadoId(null)
+      setLinha(null)
+      mudarCamera(enquadrar(nova.fundo, tamanhoRef.current.largura, tamanhoRef.current.altura))
+      setImportando(null)
+      setAviso(`Cena importada: ${nova.tokens.length} tokens${bitmap ? ' e a imagem de fundo' : ''}.`)
+      bitmap = null
+    } catch (e) {
+      bitmap?.close()
+      setAviso(`Não consegui importar a cena: ${e instanceof Error ? e.message : String(e)}`)
+    } finally {
+      setOcupado(false)
+    }
+  }, [importando, repositorio, mudarCamera])
+
   const novoToken = () => {
     const { largura, altura } = tamanhoRef.current
     const centro = telaParaMundo(cameraRef.current, largura, altura, largura / 2, altura / 2)
@@ -515,6 +582,27 @@ export function TelaBatalha() {
           {!imagem && cena.tokens.length === 0 && carregada && (
             <p className="batalha__dica">Escolha uma imagem de fundo no painel, ajuste a grade por cima e adicione os tokens. Sem imagem, a grade vale do mesmo jeito.</p>
           )}
+          {importando && (
+            <div className="batalha__importar" role="dialog" aria-label="Importar cena">
+              <h2>Importar cena</h2>
+              <p>
+                <b>{importando.nome}</b>: {importando.resumo.tokens} {importando.resumo.tokens === 1 ? 'token' : 'tokens'}
+                {importando.resumo.comImagem ? ' e imagem de fundo' : ', sem imagem de fundo'}, grade {TIPOS_DE_GRADE.find((g) => g.id === importando.arquivo.cena.grade.tipo)?.rotulo.toLowerCase()}.
+              </p>
+              {importando.resumo.descartados > 0 && (
+                <p className="batalha__importar-alerta">{importando.resumo.descartados} token(s) do arquivo estavam quebrados e vão ficar de fora.</p>
+              )}
+              <p className="batalha__importar-alerta">Isto troca a cena de agora: a imagem, a grade e os tokens. Não dá para desfazer. Exporte antes se quiser guardar a atual.</p>
+              <div className="batalha__botoes">
+                <button type="button" className="botao-topo botao-topo--principal" disabled={ocupado} onClick={() => void confirmarImportacao()}>
+                  Trocar a cena
+                </button>
+                <button type="button" className="botao-topo" disabled={ocupado} onClick={() => setImportando(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
           {aviso && (
             <div className="batalha__aviso" role="status">
               {aviso}
@@ -551,6 +639,28 @@ export function TelaBatalha() {
                   {cena.fundo.largura} por {cena.fundo.altura} pixels. Ela fica guardada só neste navegador.
                 </p>
               )}
+            </section>
+
+            <section className="batalha__secao">
+              <h2>Arquivo</h2>
+              <div className="batalha__botoes">
+                <button type="button" className="botao-topo" disabled={ocupado} title="Baixa a cena, os tokens e a imagem de fundo num arquivo" onClick={() => void exportarCena()}>
+                  Exportar a cena
+                </button>
+                <button type="button" className="botao-topo" disabled={ocupado} title="Troca a cena atual pela de um arquivo exportado" onClick={() => entradaCenaRef.current?.click()}>
+                  Importar uma cena
+                </button>
+              </div>
+              <input
+                ref={entradaCenaRef}
+                type="file"
+                accept="application/json,.json"
+                hidden
+                onChange={(e) => {
+                  void escolherArquivoDeCena(e.target.files?.[0])
+                  e.target.value = ''
+                }}
+              />
             </section>
 
             <section className="batalha__secao">

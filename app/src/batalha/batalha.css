@@ -273,6 +273,38 @@
   box-shadow: 0 0 0 2px var(--ui-papel) inset;
 }
 
+.batalha__importar {
+  position: absolute;
+  left: 50%;
+  top: 14%;
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 32px));
+  box-sizing: border-box;
+  padding: 16px;
+  border: 1px solid var(--ui-linha);
+  border-radius: 10px;
+  background: var(--ui-papel);
+  color: var(--ui-tinta);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.35);
+  z-index: 5;
+}
+
+.batalha__importar h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.batalha__importar p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.batalha__importar-alerta {
+  color: var(--perigo);
+}
+
 @media (max-width: 720px) {
   .batalha__rotulo {
     display: none;

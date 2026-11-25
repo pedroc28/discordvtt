@@ -24,7 +24,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Fase 4, parte 2: camada do mestre na tela (notas privadas, hexágonos ocultos, ocultar e revelar, ver como jogador)
 - [x] Fase 4, parte 3: trava do mapa e levar o mapa do navegador para a campanha, com importação como lote do servidor
 - [x] Fase 4, parte 4a: viagem da campanha (o mestre edita regras e estoque, os jogadores leem e simulam), pronta no lado do mapa e testada com repositório falso; falta ligar ao servidor quando o `RepositorioPocketBase` ganhar os três métodos
-- [ ] Fase 4, parte 4b: exportar a camada do mestre
+- [x] Fase 4, parte 4b: exportar e importar a camada do mestre (botão próprio, arquivo à parte, ocultos e notas no mesmo lote de importação)
 - [ ] Presença (fora por enquanto: o PocketBase não tem mensagem efêmera)
 - [x] Paleta de terrenos com pastas e pesquisa por tag (mínimo 3 tags por terreno)
 - [x] Arte final dos terrenos em pixel art (PixelLab): os 45 terrenos feitos, guia e lista em `docs/mapa/arte.md`

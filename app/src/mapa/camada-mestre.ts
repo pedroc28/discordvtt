@@ -21,6 +21,11 @@ export class ArmazemNotas {
     return this.chunks.has(chaveDoChunk)
   }
 
+  /** Todas as notas carregadas, de todos os chunks. */
+  *todas(): Iterable<NotaPrivada> {
+    for (const mapa of this.chunks.values()) yield* mapa.values()
+  }
+
   notasDoChunk(chaveDoChunk: string): Iterable<NotaPrivada> {
     return this.chunks.get(chaveDoChunk)?.values() ?? []
   }

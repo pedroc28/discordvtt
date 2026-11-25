@@ -55,6 +55,13 @@ export class RepositorioMestreDeTeste extends RepositorioMemoria implements Repo
     await super.aplicar({ ...lote, privado: undefined })
   }
 
+  async exportarCamadaMestre(): Promise<{ ocultos: Hexagono[]; notas: NotaPrivada[] }> {
+    return {
+      ocultos: structuredClone([...this.ocultos.values()].flatMap((c) => [...c.values()])),
+      notas: structuredClone([...this.notas.values()]),
+    }
+  }
+
   async carregarChunkOculto(chaveDoChunk: string): Promise<Hexagono[]> {
     return structuredClone([...(this.ocultos.get(chaveDoChunk)?.values() ?? [])])
   }

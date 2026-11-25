@@ -6,7 +6,7 @@
 
 import { ArmazemMapa } from './armazem'
 import { CamadaMestre } from './camada-mestre'
-import { montarArquivo, planejarImportacao, type ArquivoMapa, type ModoImportacao } from './arquivo'
+import { montarArquivo, planejarImportacao, planejarImportacaoMestre, type ArquivoMapa, type CamadaMestreNoArquivo, type ModoImportacao } from './arquivo'
 import { chaveChunk, type Aresta, type Hex } from './hex'
 import {
   fundirMudancas,
@@ -35,6 +35,7 @@ import type {
   Mudanca,
   MudancaNota,
   MudancaRegiao,
+  NotaPrivada,
   PartePrivada,
   PatchHexagono,
   PatchRegiao,
@@ -516,7 +517,7 @@ export class ControladorMapa {
    * Monta o arquivo de exportação com o mapa inteiro. Se o repositório sabe listar tudo (`exportarTudo`),
    * leva também os chunks que ninguém abriu. Senão leva só o que está carregado.
    */
-  async exportar(meta: MapaMeta): Promise<ArquivoMapa> {
+  async exportar(meta: MapaMeta, opcoes: { comMestre?: boolean } = {}): Promise<ArquivoMapa> {
     await this.carregarRegioes()
     let hexagonos: Hexagono[]
     let regioes: Regiao[]
@@ -535,7 +536,21 @@ export class ControladorMapa {
       hexagonos = [...this.armazem.todosOsHexagonos()]
       regioes = this.armazem.listarRegioes()
     }
-    return montarArquivo(meta, hexagonos, regioes, this.token)
+    let camadaMestre: CamadaMestreNoArquivo | undefined
+    if (opcoes.comMestre && this.mestre) {
+      const ocultos = new Map<string, Hexagono>()
+      const notas = new Map<string, NotaPrivada>()
+      if (temCamadaMestre(this.repo) && this.repo.exportarCamadaMestre) {
+        const t = await this.repo.exportarCamadaMestre()
+        for (const h of t.ocultos) ocultos.set(`${h.q},${h.r}`, h)
+        for (const n of t.notas) notas.set(`${n.q},${n.r}`, n)
+      }
+      // O que está na tela e ainda não chegou ao servidor vale mais.
+      for (const h of this.mestre.ocultos.todosOsHexagonos()) ocultos.set(`${h.q},${h.r}`, h)
+      for (const n of this.mestre.notas.todas()) notas.set(`${n.q},${n.r}`, n)
+      camadaMestre = { ocultos: [...ocultos.values()], notas: [...notas.values()] }
+    }
+    return montarArquivo(meta, hexagonos, regioes, this.token, new Date(), camadaMestre)
   }
 
   /**
@@ -543,33 +558,56 @@ export class ControladorMapa {
    * arquivo por cima, `substituir` deixa o mapa igual ao arquivo (apaga o que não está nele, e põe o token
    * onde o arquivo diz). O modo `substituir` exige um repositório com `exportarTudo`.
    */
-  async importar(arquivo: ArquivoMapa, modo: ModoImportacao): Promise<{ aplicados: number; removidos: number }> {
+  async importar(arquivo: ArquivoMapa, modo: ModoImportacao): Promise<{ aplicados: number; removidos: number; ocultos?: number; notas?: number }> {
     if (this.travado) throw new Error('O mestre travou o mapa: só ele importa. Peça para destravar.')
     let existente: { hexagonos: Hexagono[]; regioes: Regiao[] } | undefined
     if (modo === 'substituir') {
       if (!this.repo.exportarTudo) throw new Error('Este mapa não consegue listar tudo o que tem, então não dá para substituir. Use mesclar.')
       existente = await this.repo.exportarTudo()
     }
+    // A camada do mestre do arquivo só entra para o mestre. Para os outros, é ignorada.
+    const mestreDoArquivo = this.mestre ? arquivo.mestre : undefined
+    let existenteMestre: CamadaMestreNoArquivo | undefined
+    if (mestreDoArquivo && modo === 'substituir' && temCamadaMestre(this.repo) && this.repo.exportarCamadaMestre) {
+      existenteMestre = await this.repo.exportarCamadaMestre()
+    }
     // Os chunks mexidos precisam estar carregados para o "antes" (e o desfazer) saírem certos.
     const chunks = new Set<string>()
+    for (const h of mestreDoArquivo?.ocultos ?? []) chunks.add(chaveChunk(h))
+    for (const n of mestreDoArquivo?.notas ?? []) chunks.add(chaveChunk(n))
+    for (const h of existenteMestre?.ocultos ?? []) chunks.add(chaveChunk(h))
+    for (const n of existenteMestre?.notas ?? []) chunks.add(chaveChunk(n))
     for (const h of arquivo.hexagonos) chunks.add(chaveChunk(h))
     for (const h of existente?.hexagonos ?? []) chunks.add(chaveChunk(h))
     await Promise.all([...chunks].map((c) => this.garantirChunk(c)))
     await this.carregarRegioes()
     const plano = planejarImportacao(this.armazem, arquivo, modo, existente)
-    const total = plano.mudancas.length + plano.regioes.length
+    const planoMestre =
+      mestreDoArquivo && this.mestre
+        ? planejarImportacaoMestre(this.mestre.ocultos, this.mestre.notas, mestreDoArquivo, modo, existenteMestre)
+        : null
+    const total = plano.mudancas.length + plano.regioes.length + (planoMestre ? planoMestre.ocultos.length + planoMestre.notas.length : 0)
     if (total > this.limiteImportacao) {
       throw new Error(
         `O arquivo muda ${total} itens, e num lote só cabem ${this.limiteImportacao}. Divida o mapa em partes menores e importe uma de cada vez.`,
       )
     }
     // Importar é um lote de importação: o servidor aceita lote maior, e só do mestre.
-    this.editar({ mudancas: plano.mudancas, regioes: plano.regioes, tipo: 'importacao' })
+    this.editar({
+      mudancas: plano.mudancas,
+      regioes: plano.regioes,
+      ...(planoMestre ? { privado: { ocultos: planoMestre.ocultos, notas: planoMestre.notas } } : {}),
+      tipo: 'importacao',
+    })
     if (modo === 'substituir') {
       if (arquivo.token) this.moverToken(arquivo.token)
       else this.tirarToken()
     }
-    return { aplicados: plano.aplicados, removidos: plano.removidos }
+    return {
+      aplicados: plano.aplicados,
+      removidos: plano.removidos,
+      ...(planoMestre ? { ocultos: planoMestre.ocultosAplicados, notas: planoMestre.notasAplicadas } : {}),
+    }
   }
 
   /** Desfaz o último lote seu. Retorna quantos itens foram pulados por conflito. */

@@ -74,8 +74,9 @@ const LIMITES: Record<Exclude<keyof ConfigViagem, 'ritmo'>, [number, number]> = 
   pesoAgua: [0, 1000],
   cargaPorViajante: [0, 100000],
   cargaPorMontaria: [0, 100000],
-  estoqueRacoes: [0, 1_000_000],
-  estoqueAgua: [0, 1_000_000],
+  // O servidor aceita até 100 mil em cada campo da viagem da campanha.
+  estoqueRacoes: [0, 100000],
+  estoqueAgua: [0, 100000],
   diasManuais: [0, 3650],
 }
 

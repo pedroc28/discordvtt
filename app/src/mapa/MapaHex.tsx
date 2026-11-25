@@ -16,11 +16,12 @@ import { InspetorHexagono } from './InspetorHexagono'
 import { PaletaTerrenos } from './PaletaTerrenos'
 import { PainelViagem, type ResultadoDaRota } from './PainelViagem'
 import { resumirViagem, rotaPorPontos, terrenosDaRota, type ConfigViagem } from './viagem'
+import { ViagemDaCampanha, aplicarCampanha, daCampanha, difereDaCampanha, type CamposDaCampanha } from './viagem-campanha'
 import { CORES_REGIAO } from './operacoes'
 import { medirRegua, textoDaMedida } from './regua'
 import { EditorDeRegiao, ListaDeRegioes } from './Regioes'
 import { Renderizador, type CoresMapa } from './renderizador'
-import type { RepositorioMapa } from './repositorio'
+import { temViagem, type RepositorioMapa } from './repositorio'
 import { RepositorioLocal } from './repositorio-local'
 import { Tileset } from './tileset'
 
@@ -68,6 +69,8 @@ interface Motor {
   render: Renderizador
   entrada: EntradaMapa
   tileset: Tileset
+  /** Regras e estoque da campanha, quando o servidor oferece. Null no mapa local. */
+  viagem: ViagemDaCampanha | null
 }
 
 const FERRAMENTAS: { id: Ferramenta; rotulo: string; icone: NomeIcone; tecla: string }[] = [
@@ -166,6 +169,8 @@ export function MapaHex() {
   const [configViagem, setConfigViagem] = useState<ConfigViagem>(carregarViagem)
   const [pontosRota, setPontosRota] = useState<Hex[]>([])
   const [comecarNoToken, setComecarNoToken] = useState(true)
+  /** O que a campanha define para a viagem. Null no mapa local, ou enquanto ainda não chegou do servidor. */
+  const [camposCampanha, setCamposCampanha] = useState<CamposDaCampanha | null>(null)
 
   // ----- ações que mexem na seleção e nos painéis -----
   const limparSelecao = useCallback(() => {
@@ -235,6 +240,7 @@ export function MapaHex() {
     let desmontar: (() => void) | null = null
     setPedirRecarga(false)
     setOferta(null)
+    setCamposCampanha(null)
     // Ao montar outro mapa (campanha, papel), a escolha de camada volta ao padrão.
     setCamada('publica')
     setVerComoJogador(false)
@@ -278,6 +284,21 @@ export function MapaHex() {
             .catch(() => undefined)
             .finally(() => local.fechar())
         }
+        // Viagem da campanha: o mestre grava, todos leem. Sem o que o servidor oferece, a viagem é local.
+        const repoViagem = doServidor ?? repoDeTeste
+        const viagem = repoViagem && temViagem(repoViagem) ? new ViagemDaCampanha(repoViagem, !!ctrl.mestre) : null
+        if (viagem) {
+          const chegou = (campos: CamposDaCampanha) => {
+            setCamposCampanha(campos)
+            setConfigViagem((local) => aplicarCampanha(local, campos))
+          }
+          viagem.ouvir(chegou)
+          viagem
+            .carregar()
+            // Campanha que o mestre ainda não configurou começa nos valores padrão.
+            .then((campos) => !cancelado && chegou(campos ?? daCampanha(null)))
+            .catch((e) => !cancelado && setAviso(`Não consegui carregar a viagem da campanha: ${e instanceof Error ? e.message : String(e)}`))
+        }
         const camera = carregarCamera(mapaChave)
         const render = new Renderizador(canvas, ctrl, tileset, camera, lerCores(raiz))
         const entrada = new EntradaMapa(canvas, render, ctrl, { ferramenta: 'pintar', terreno: 'planicie', regiaoId: null, raio: 0, tirarTraco: false })
@@ -311,7 +332,7 @@ export function MapaHex() {
         entrada.aoMudarRegua = () => setVersaoRegua((v) => v + 1)
         entrada.aoSelecionar = (h) => aoSelecionarRef.current(h)
 
-        const m = { ctrl, render, entrada, tileset }
+        const m = { ctrl, render, entrada, tileset, viagem }
         if (import.meta.env.DEV) (window as unknown as { __mapa?: Motor }).__mapa = m
         setMotor(m)
         render.pedirQuadro()
@@ -320,6 +341,7 @@ export function MapaHex() {
           window.clearTimeout(salvar)
           salvarCamera(mapaChave, render.camera)
           cancelarDesatualizado?.()
+          viagem?.destruir()
           observador.disconnect()
           entrada.destruir()
           render.destruir()
@@ -382,7 +404,28 @@ export function MapaHex() {
       pontosDaRota.length ? { pontos: pontosDaRota, caminho: calculoRota?.ok ? calculoRota.rota.caminho : [] } : null,
     )
   }, [motor, pontosDaRota, calculoRota])
-  useEffect(() => salvarViagem(configViagem), [configViagem])
+  // No mapa da campanha as regras vêm do servidor: o que é do mapa local não é sobrescrito por elas.
+  const viagemDaCampanha = motor?.viagem ?? null
+  useEffect(() => {
+    if (!viagemDaCampanha) salvarViagem(configViagem)
+  }, [configViagem, viagemDaCampanha])
+  const mudarConfigViagem = useCallback(
+    (c: ConfigViagem) => {
+      // Sem as regras da campanha na tela, mexer nelas gravaria por cima do que o mestre tem.
+      if (viagemDaCampanha && !camposCampanha) return
+      setConfigViagem(c)
+      viagemDaCampanha?.gravar(c)
+    },
+    [viagemDaCampanha, camposCampanha],
+  )
+  const voltarParaCampanha = useCallback(() => {
+    if (camposCampanha) setConfigViagem((l) => aplicarCampanha(l, camposCampanha))
+  }, [camposCampanha])
+  useSyncExternalStore(
+    useCallback((cb: () => void) => (viagemDaCampanha ? viagemDaCampanha.ouvirEstado(cb) : () => {}), [viagemDaCampanha]),
+    () => viagemDaCampanha?.versao ?? 0,
+  )
+
   useEffect(() => salvarPainelAberto(painelAberto), [painelAberto])
   const versaoRegioes = useSyncExternalStore(
     useCallback((cb: () => void) => (motor ? motor.ctrl.armazem.ouvirRegioes(cb) : () => {}), [motor]),
@@ -945,7 +988,20 @@ export function MapaHex() {
           aberto={painelAberto}
           aoAlternar={() => setPainelAberto((v) => !v)}
           config={configViagem}
-          aoMudarConfig={setConfigViagem}
+          aoMudarConfig={mudarConfigViagem}
+          campanha={
+            viagemDaCampanha
+              ? {
+                  mestre: viagemDaCampanha.podeGravar,
+                  carregada: !!camposCampanha,
+                  simulando: !viagemDaCampanha.podeGravar && !!camposCampanha && difereDaCampanha(configViagem, camposCampanha),
+                  gravacao: viagemDaCampanha.estado,
+                  erro: viagemDaCampanha.erro,
+                  aoVoltar: voltarParaCampanha,
+                  aoTentarDeNovo: () => viagemDaCampanha.tentarDeNovo(),
+                }
+              : null
+          }
           rota={resultadoRota}
           pontosMarcados={pontosRota.length}
           rotaAtiva={ferramenta === 'rota'}

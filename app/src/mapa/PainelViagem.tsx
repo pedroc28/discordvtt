@@ -2,6 +2,7 @@
 // Só desenha e repassa as mudanças. As contas ficam em viagem.ts.
 
 import { useState } from 'react'
+import type { EstadoDaGravacao } from './viagem-campanha'
 import { Icone } from './Icones'
 import {
   MULTIPLICADOR_RITMO,
@@ -17,11 +18,25 @@ export type ResultadoDaRota =
   | { ok: true; resumo: ResumoViagem; terrenos: { terreno: string; nome: string; n: number }[]; pontos: number }
   | { ok: false; trecho: number }
 
+/** Presente quando o mapa é de uma campanha com viagem no servidor. */
+export interface ViagemDaCampanhaNoPainel {
+  mestre: boolean
+  /** As regras da campanha já chegaram do servidor. */
+  carregada: boolean
+  /** Quem não é mestre mudou algo: o que vê é uma simulação sua. */
+  simulando: boolean
+  gravacao: EstadoDaGravacao
+  erro: string
+  aoVoltar: () => void
+  aoTentarDeNovo: () => void
+}
+
 interface Props {
   aberto: boolean
   aoAlternar: () => void
   config: ConfigViagem
   aoMudarConfig: (c: ConfigViagem) => void
+  campanha?: ViagemDaCampanhaNoPainel | null
   /** Null enquanto não há pelo menos dois pontos marcados. */
   rota: ResultadoDaRota | null
   pontosMarcados: number
@@ -39,6 +54,13 @@ const n1 = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1).replac
 /** Campo numérico que deixa digitar à vontade e só corrige o texto ao sair do campo. */
 function Campo({ rotulo, valor, passo = 1, sufixo, aoMudar }: { rotulo: string; valor: number; passo?: number; sufixo?: string; aoMudar: (v: number) => void }) {
   const [texto, setTexto] = useState(String(valor))
+  const [foco, setFoco] = useState(false)
+  const [visto, setVisto] = useState(valor)
+  // O valor mudou de fora (o mestre mexeu): mostra, a não ser que a pessoa esteja digitando.
+  if (valor !== visto) {
+    setVisto(valor)
+    if (!foco) setTexto(String(valor))
+  }
   return (
     <label className="viagem__campo">
       <span>{rotulo}</span>
@@ -53,11 +75,48 @@ function Campo({ rotulo, valor, passo = 1, sufixo, aoMudar }: { rotulo: string; 
             const v = parseFloat(e.target.value)
             if (Number.isFinite(v)) aoMudar(v)
           }}
-          onBlur={() => setTexto(String(valor))}
+          onFocus={() => setFoco(true)}
+          onBlur={() => {
+            setFoco(false)
+            setTexto(String(valor))
+          }}
         />
         {sufixo && <small>{sufixo}</small>}
       </span>
     </label>
+  )
+}
+
+function AvisoDaCampanha({ c }: { c: ViagemDaCampanhaNoPainel }) {
+  if (!c.carregada) return <p className="viagem__dica" role="status">Carregando as regras da campanha...</p>
+  return (
+    <div className="viagem__campanha" role="status">
+      {c.mestre ? (
+        <p>
+          Grupo, mundo, consumo, carga e estoque valem para toda a campanha. Os jogadores veem o que você mudar aqui.
+          {c.gravacao === 'salvando' && ' Salvando...'}
+          {c.gravacao === 'salvo' && ' Salvo.'}
+        </p>
+      ) : (
+        <p>
+          Estas são as regras da campanha, definidas pelo mestre. O que você mudar aqui é só uma simulação sua e não
+          chega aos outros. Se o mestre mudar algo, a simulação volta aos valores da campanha.
+        </p>
+      )}
+      {c.simulando && (
+        <button type="button" className="botao-topo" onClick={c.aoVoltar}>
+          Voltar aos valores da campanha
+        </button>
+      )}
+      {c.gravacao === 'erro' && (
+        <p className="viagem__alerta" role="alert">
+          Não consegui salvar na campanha: {c.erro} A mudança continua na sua tela.{' '}
+          <button type="button" className="botao-topo" onClick={c.aoTentarDeNovo}>
+            Tentar de novo
+          </button>
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -90,6 +149,7 @@ export function PainelViagem(p: Props) {
       </header>
 
       <div className="viagem__corpo">
+        {p.campanha && <AvisoDaCampanha c={p.campanha} />}
         <section className="viagem__secao">
           <h3>Grupo</h3>
           <div className="viagem__grade">

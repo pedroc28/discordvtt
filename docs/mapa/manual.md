@@ -63,7 +63,8 @@ Desfazer é **por jogador**: só desfaz o que você fez, e pula hexágonos que o
 - **Custo:** cada terreno tem um custo de travessia (planície 1, bosque 1,25, floresta e colina 1,5, taiga e deserto 2, floresta densa e cânion 2,5, selva, montanha, pântano e geleira 3, picos nevados, vulcão e lava 4). Água aberta (oceano, recife) não se atravessa. **Estrada** pela aresta custa 0,5 em qualquer terreno. **Rio** sem ponte soma 1 (o vau), e estrada por cima do rio é ponte. A tabela inteira está em `CUSTO_TERRENO`, e terreno que não está nela custa 1,5.
 - **Tempo:** esforço = custo total × km por hexágono. Dias = esforço ÷ (marcha normal × multiplicador do ritmo: lento 0,75, normal 1, rápido 1,25). O dia tem 8 horas de marcha. A provisão é de dias inteiros (arredonda para cima).
 - **Provisões:** rações e água por pessoa e por montaria, por dia, vezes os dias, com o peso de cada uma, a capacidade de carga do grupo, o estoque atual (quanto falta e quantos dias ele dura) e um aviso de sobrecarga. Sem rota, dá para digitar os dias.
-- Tudo é ajustável no painel (km por hexágono, marcha, consumo, pesos, cargas) e fica salvo no navegador, por pessoa, e não vai para o servidor.
+- Tudo é ajustável no painel (km por hexágono, marcha, consumo, pesos, cargas). No mapa só deste navegador, fica salvo no navegador, por pessoa, e não vai para o servidor.
+- **Viagem da campanha:** no mapa de uma campanha (quando o servidor oferece `carregarViagem`, `gravarViagem` e `assinarViagem`), as regras e o estoque do grupo são da campanha. São 14 campos: viajantes, montarias, km por hexágono, marcha normal, consumo de ração e água por pessoa e por montaria, peso da ração e da água, carga por viajante e por montaria, e o estoque de rações e de água. O **mestre** edita, e a mudança é gravada uma vez, 700 ms depois da última tecla (o painel mostra "Salvando..." e "Salvo."). Se o servidor recusar, a mudança fica na tela, o painel mostra o motivo e o botão **Tentar de novo**. Os **jogadores** leem os valores da campanha e podem mudá-los para simular: isso é só deles, não chega aos outros, e quando o mestre muda algo a simulação volta aos valores da campanha (há o botão **Voltar aos valores da campanha**). Ficam sempre locais, por pessoa: o ritmo, os dias sem rota, os pontos da rota e "Começar no token". Campanha em que o mestre nunca gravou começa nos valores padrão. Os custos de terreno continuam fixos no código.
 
 **Segredo do mestre.** Quando existir a camada privada do mestre (notas e hexágonos ocultos), ela deve ficar em **coleções separadas, protegidas no servidor** (regras de acesso do PocketBase). Esconder só na tela deixaria o dado exposto na rede.
 
@@ -84,6 +85,7 @@ entrada.ts           mouse, toque e caneta (Pointer Events)
 regua.ts             régua de distância (pura)
 viagem.ts            rota, custo de terreno, dias e provisões (puro)
 PainelViagem.tsx     aba lateral de viagem e provisões
+viagem-campanha.ts   regras e estoque da campanha: o que vai ao servidor e a espera de gravação
 arquivo.ts           arquivo de exportação: montar, ler com validação e planejar a importação (puro)
 paleta.ts            pastas e pesquisa por tag da paleta de terrenos (pura)
 PaletaTerrenos.tsx   paleta de terrenos com pastas e pesquisa
@@ -143,7 +145,7 @@ O servidor entrou como a classe `RepositorioPocketBase`, e o `MapaHex.tsx` já a
 - **Trava do mapa:** o mestre vê o botão **Travar o mapa** na barra. Travado, só o mestre edita: para os jogadores, as ferramentas que mudam o mapa (Pintar, Apagar, Região, Marcador, Rio, Estrada) ficam desativadas, o painel do hexágono não grava, desfazer e importar não funcionam e aparece "Mapa travado pelo mestre". Navegar, régua, rota e **mover o token** continuam livres. O mestre nunca é travado. Se o servidor recusar travar, o botão volta ao que era e a mensagem aparece.
 - **Levar o mapa do navegador para a campanha:** quando o mestre abre uma campanha sem mapa (sem hexágonos e sem regiões) e tem um mapa neste navegador, o app oferece **Levar**, **Agora não** ou **Não perguntar mais**. **Levar** baixa uma cópia em JSON e importa o mapa do navegador, com o token, num lote de importação só (um passo do desfazer). O mapa do navegador nunca é apagado. **Agora não** pergunta de novo na próxima vez. **Não perguntar mais** e **Levar** guardam a resposta, por campanha, neste navegador.
 - **Importar para a campanha:** a importação vai como lote `importacao`, só do mestre, com até 20 mil mudanças. Acima disso, o mapa recusa antes de mudar qualquer coisa e pede para dividir o arquivo. Jogador que tente importar leva a recusa do servidor, e a edição é desfeita na tela.
-- **Ainda não tem na tela:** exportar a camada do mestre e a viagem da campanha. O repositório já oferece o que falta, falta a interface.
+- **Ainda não tem na tela:** exportar a camada do mestre. O repositório já oferece o que falta, falta a interface.
 
 ### Camada do mestre
 

@@ -63,6 +63,21 @@ export function temPermissao(repo: RepositorioMapa): repo is RepositorioComPermi
   return typeof r.carregarPermissao === 'function' && typeof r.gravarPermissao === 'function' && typeof r.assinarPermissao === 'function'
 }
 
+/** Repositório com a viagem da campanha: regras e estoque do grupo, que o mestre edita e todos leem. O RepositorioPocketBase é um. */
+export interface RepositorioComViagem extends RepositorioMapa {
+  /** Null enquanto o mestre nunca gravou. */
+  carregarViagem(): Promise<unknown | null>
+  /** Só o mestre consegue: para os outros, o servidor recusa. Vale a última gravação. */
+  gravarViagem(config: unknown): Promise<void>
+  /** Avisa quando o mestre muda (e de novo quando a conexão volta). Devolve a função que cancela. */
+  assinarViagem(ouvinte: (config: unknown) => void): () => void
+}
+
+export function temViagem(repo: RepositorioMapa): repo is RepositorioComViagem {
+  const r = repo as Partial<RepositorioComViagem>
+  return typeof r.carregarViagem === 'function' && typeof r.gravarViagem === 'function' && typeof r.assinarViagem === 'function'
+}
+
 /** Aplica as mudanças de hexágonos de um lote a um mapa de chunks. Compartilhado pelas implementações. */
 export function aplicarNosChunks(chunks: Map<string, Map<string, Hexagono>>, mudancas: readonly Mudanca[]) {
   for (const m of mudancas) {

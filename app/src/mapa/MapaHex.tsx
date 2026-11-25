@@ -42,12 +42,12 @@ function urlDoTileset(): string {
 }
 
 /** Baixa um mapa como arquivo, pelo navegador. */
-function baixarArquivo(arquivo: ArquivoMapa) {
+function baixarArquivo(arquivo: ArquivoMapa, comMestre = false) {
   const blob = new Blob([JSON.stringify(arquivo)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = nomeDoArquivo(arquivo.meta.nome)
+  link.download = nomeDoArquivo(arquivo.meta.nome, new Date(), comMestre)
   document.body.appendChild(link)
   link.click()
   link.remove()
@@ -499,14 +499,18 @@ export function MapaHex() {
   )
 
   // ----- exportar e importar o mapa -----
-  const exportarMapa = useCallback(async () => {
+  const exportarMapa = useCallback(async (comMestre: boolean) => {
     if (!motor || ocupado) return
     setOcupado(true)
     try {
       const meta = { ...metaPadrao(campanhaId ? `campanha-${campanhaId}` : MAPA_ID), tileset: motor.tileset.def.id }
-      const arquivo = await motor.ctrl.exportar(meta)
-      baixarArquivo(arquivo)
-      setAviso(`Mapa exportado: ${arquivo.hexagonos.length} hexágonos e ${arquivo.regioes.length} regiões.`)
+      const arquivo = await motor.ctrl.exportar(meta, { comMestre })
+      baixarArquivo(arquivo, comMestre)
+      setAviso(
+        comMestre && arquivo.mestre
+          ? `Mapa exportado com a camada do mestre: ${arquivo.hexagonos.length} hexágonos, ${arquivo.regioes.length} regiões, ${arquivo.mestre.ocultos.length} ocultos e ${arquivo.mestre.notas.length} notas. Este arquivo mostra os segredos: não o compartilhe com os jogadores.`
+          : `Mapa exportado: ${arquivo.hexagonos.length} hexágonos e ${arquivo.regioes.length} regiões.`,
+      )
     } catch (e) {
       setAviso(`Não consegui exportar o mapa: ${e instanceof Error ? e.message : String(e)}`)
     } finally {
@@ -782,9 +786,20 @@ export function MapaHex() {
           <button type="button" className="botao-icone" title="Aba de viagem e provisões" aria-label="Aba de viagem e provisões" aria-pressed={painelAberto} onClick={() => setPainelAberto((v) => !v)}>
             <Icone nome="lateral" />
           </button>
-          <button type="button" className="botao-icone" title="Exportar o mapa para um arquivo" aria-label="Exportar mapa" disabled={!motor || ocupado} onClick={exportarMapa}>
+          <button type="button" className="botao-icone" title="Exportar o mapa para um arquivo" aria-label="Exportar mapa" disabled={!motor || ocupado} onClick={() => void exportarMapa(false)}>
             <Icone nome="baixar" />
           </button>
+          {motor?.ctrl.mestre && (
+            <button
+              type="button"
+              className="botao-topo"
+              title="Exporta também os hexágonos ocultos e as notas do mestre. O arquivo mostra os segredos"
+              disabled={ocupado}
+              onClick={() => void exportarMapa(true)}
+            >
+              Exportar com a camada do mestre
+            </button>
+          )}
           <button type="button" className="botao-icone" title="Importar um mapa de um arquivo" aria-label="Importar mapa" disabled={!motor || ocupado} onClick={() => entradaArquivoRef.current?.click()}>
             <Icone nome="subir" />
           </button>
@@ -910,6 +925,13 @@ export function MapaHex() {
                 <b>{importando.nome}</b>: {importando.resumo.hexagonos} hexágonos e {importando.resumo.regioes} regiões
                 {importando.arquivo.meta.nome ? ` do mapa "${importando.arquivo.meta.nome}"` : ''}.
               </p>
+              {importando.arquivo.mestre && (
+                <p className={motor?.ctrl.mestre ? undefined : 'mapa__importar-alerta'}>
+                  {motor?.ctrl.mestre
+                    ? `O arquivo traz a camada do mestre: ${importando.resumo.ocultos ?? 0} ocultos e ${importando.resumo.notas ?? 0} notas. Eles entram na sua camada, e os jogadores não veem.`
+                    : 'O arquivo traz a camada do mestre. Só o mestre da campanha a importa, então ela vai ficar de fora.'}
+                </p>
+              )}
               {importando.resumo.descartados > 0 && (
                 <p className="mapa__importar-alerta">
                   {importando.resumo.descartados} item(ns) do arquivo estavam quebrados e vão ficar de fora.

@@ -5,9 +5,15 @@
 import { normalizarHexagono, normalizarRegiao } from './armazenamento'
 import { chave } from './hex'
 import { mesmoConteudo } from './operacoes'
-import type { Hexagono, Leitor, MapaMeta, Mudanca, MudancaRegiao, Regiao } from './tipos'
+import type { Hexagono, Leitor, MapaMeta, Mudanca, MudancaNota, MudancaRegiao, NotaPrivada, PartePrivada, Regiao } from './tipos'
 
 export const VERSAO_ARQUIVO = 1
+
+/** O que só o mestre vê: hexágonos ocultos e notas privadas. Só entra no arquivo quando o mestre pede. */
+export interface CamadaMestreNoArquivo {
+  ocultos: Hexagono[]
+  notas: NotaPrivada[]
+}
 
 export interface ArquivoMapa {
   formato: 'mapa-hex'
@@ -20,6 +26,8 @@ export interface ArquivoMapa {
   regioes: Regiao[]
   /** Onde estava o token do grupo, ou null. */
   token: { q: number; r: number } | null
+  /** Só no arquivo exportado pelo mestre com a camada dele. Quem não é mestre ignora ao importar. */
+  mestre?: CamadaMestreNoArquivo
 }
 
 export function montarArquivo(
@@ -28,6 +36,7 @@ export function montarArquivo(
   regioes: readonly Regiao[],
   token: { q: number; r: number } | null,
   agora = new Date(),
+  mestre?: CamadaMestreNoArquivo,
 ): ArquivoMapa {
   return {
     formato: 'mapa-hex',
@@ -38,12 +47,23 @@ export function montarArquivo(
     hexagonos: [...hexagonos].sort((a, b) => a.r - b.r || a.q - b.q),
     regioes: [...regioes].sort((a, b) => a.id.localeCompare(b.id)),
     token: token ? { q: token.q, r: token.r } : null,
+    ...(mestre
+      ? {
+          mestre: {
+            ocultos: [...mestre.ocultos].sort((a, b) => a.r - b.r || a.q - b.q),
+            notas: [...mestre.notas].sort((a, b) => a.r - b.r || a.q - b.q),
+          },
+        }
+      : {}),
   }
 }
 
 export interface ResumoLeitura {
   hexagonos: number
   regioes: number
+  /** Só quando o arquivo traz a camada do mestre. */
+  ocultos?: number
+  notas?: number
   /** Itens do arquivo que estavam quebrados e foram deixados de fora. */
   descartados: number
 }
@@ -53,6 +73,14 @@ export type ResultadoLeitura =
   | { ok: false; erro: string }
 
 const ehObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+
+/** Nota privada vinda de fora: precisa de posição inteira e texto. */
+function lerNota(bruto: unknown): NotaPrivada | null {
+  if (!ehObj(bruto) || !Number.isInteger(bruto.q) || !Number.isInteger(bruto.r)) return null
+  if (typeof bruto.texto !== 'string' || !bruto.texto) return null
+  const rev = typeof bruto.rev === 'number' && Number.isInteger(bruto.rev) && bruto.rev > 0 ? bruto.rev : 1
+  return { q: bruto.q as number, r: bruto.r as number, texto: bruto.texto, rev }
+}
 
 /** Lê o texto de um arquivo de mapa. Itens quebrados são descartados e contados, o arquivo inteiro inválido é recusado. */
 export function lerArquivo(texto: string): ResultadoLeitura {
@@ -86,6 +114,22 @@ export function lerArquivo(texto: string): ResultadoLeitura {
     if (r) regioes.set(r.id, r)
     else descartados++
   }
+  let mestre: CamadaMestreNoArquivo | undefined
+  if (ehObj(bruto.mestre)) {
+    const ocultos = new Map<string, Hexagono>()
+    for (const item of Array.isArray(bruto.mestre.ocultos) ? bruto.mestre.ocultos : []) {
+      const h = normalizarHexagono(item)
+      if (h) ocultos.set(chave(h.q, h.r), h)
+      else descartados++
+    }
+    const notas = new Map<string, NotaPrivada>()
+    for (const item of Array.isArray(bruto.mestre.notas) ? bruto.mestre.notas : []) {
+      const n = lerNota(item)
+      if (n) notas.set(chave(n.q, n.r), n)
+      else descartados++
+    }
+    mestre = { ocultos: [...ocultos.values()], notas: [...notas.values()] }
+  }
   const t = bruto.token
   const token =
     ehObj(t) && Number.isInteger(t.q) && Number.isInteger(t.r) ? { q: t.q as number, r: t.r as number } : null
@@ -105,8 +149,18 @@ export function lerArquivo(texto: string): ResultadoLeitura {
     hexagonos: [...porChave.values()],
     regioes: [...regioes.values()],
     token,
+    ...(mestre ? { mestre } : {}),
   }
-  return { ok: true, arquivo, resumo: { hexagonos: arquivo.hexagonos.length, regioes: arquivo.regioes.length, descartados } }
+  return {
+    ok: true,
+    arquivo,
+    resumo: {
+      hexagonos: arquivo.hexagonos.length,
+      regioes: arquivo.regioes.length,
+      descartados,
+      ...(mestre ? { ocultos: mestre.ocultos.length, notas: mestre.notas.length } : {}),
+    },
+  }
 }
 
 /** Ids de terreno do arquivo que o tileset em uso não tem (esses hexágonos aparecem em cinza), com a contagem. */
@@ -185,8 +239,50 @@ export function planejarImportacao(
   return { mudancas, regioes, aplicados, removidos }
 }
 
+/**
+ * Mudanças na camada do mestre que levam a camada atual ao conteúdo do arquivo. Os ocultos e as notas do
+ * arquivo entram por cima. No modo `substituir`, o que existe e não está no arquivo é apagado (precisa de `existente`).
+ */
+export function planejarImportacaoMestre(
+  ocultosAtuais: Leitor,
+  notasAtuais: { ler(q: number, r: number): NotaPrivada | null },
+  mestre: CamadaMestreNoArquivo,
+  modo: ModoImportacao,
+  existente?: CamadaMestreNoArquivo,
+): PartePrivada & { ocultosAplicados: number; notasAplicadas: number } {
+  const ocultos: Mudanca[] = []
+  const notas: MudancaNota[] = []
+  const ocultosNoArquivo = new Set<string>()
+  const notasNoArquivo = new Set<string>()
+  for (const novo of mestre.ocultos) {
+    ocultosNoArquivo.add(chave(novo.q, novo.r))
+    const antes = ocultosAtuais.ler(novo.q, novo.r)
+    if (antes && mesmoConteudo(antes, novo)) continue
+    ocultos.push({ q: novo.q, r: novo.r, antes, depois: { ...novo, rev: Math.max(antes?.rev ?? 0, novo.rev) + 1 } })
+  }
+  for (const novo of mestre.notas) {
+    notasNoArquivo.add(chave(novo.q, novo.r))
+    const antes = notasAtuais.ler(novo.q, novo.r)
+    if (antes && antes.texto === novo.texto) continue
+    notas.push({ q: novo.q, r: novo.r, antes, depois: { ...novo, rev: Math.max(antes?.rev ?? 0, novo.rev) + 1 } })
+  }
+  const ocultosAplicados = ocultos.length
+  const notasAplicadas = notas.length
+  if (modo === 'substituir') {
+    for (const h of existente?.ocultos ?? []) {
+      if (ocultosNoArquivo.has(chave(h.q, h.r))) continue
+      ocultos.push({ q: h.q, r: h.r, antes: ocultosAtuais.ler(h.q, h.r) ?? h, depois: null })
+    }
+    for (const n of existente?.notas ?? []) {
+      if (notasNoArquivo.has(chave(n.q, n.r))) continue
+      notas.push({ q: n.q, r: n.r, antes: notasAtuais.ler(n.q, n.r) ?? n, depois: null })
+    }
+  }
+  return { ocultos, notas, ocultosAplicados, notasAplicadas }
+}
+
 /** Nome de arquivo para baixar, sem caracteres problemáticos: `mapa-mapa-do-mundo-2026-11-22.json`. */
-export function nomeDoArquivo(nomeDoMapa: string, agora = new Date()): string {
+export function nomeDoArquivo(nomeDoMapa: string, agora = new Date(), comMestre = false): string {
   const limpo = nomeDoMapa
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -194,5 +290,5 @@ export function nomeDoArquivo(nomeDoMapa: string, agora = new Date()): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
   const data = agora.toISOString().slice(0, 10)
-  return `mapa-${limpo || 'sem-nome'}-${data}.json`
+  return `mapa-${limpo || 'sem-nome'}${comMestre ? '-mestre' : ''}-${data}.json`
 }

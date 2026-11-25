@@ -41,6 +41,8 @@ export interface RepositorioComCamadaMestre extends RepositorioMapa {
   carregarChunkOculto(chaveDoChunk: string): Promise<Hexagono[]>
   /** Notas privadas de um chunk. */
   carregarNotasPrivadas(chaveDoChunk: string): Promise<NotaPrivada[]>
+  /** A camada inteira, inclusive chunks que ninguém abriu. Opcional: sem ele, a exportação leva só o que está carregado. */
+  exportarCamadaMestre?(): Promise<{ ocultos: Hexagono[]; notas: NotaPrivada[] }>
 }
 
 /** O repositório entrega a camada do mestre a quem usa: só quando a pessoa é mestre da campanha. */

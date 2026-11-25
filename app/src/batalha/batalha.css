@@ -1,0 +1,298 @@
+/* ==========================================================
+   Mapa de batalha.
+   Usa as cores da interface (--ui-*, --acento) e os botões compartilhados de nucleo/tema.css.
+   ========================================================== */
+
+.batalha {
+  --batalha-vazio: #223530;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--ui-papel);
+  color: var(--ui-tinta);
+}
+
+[data-tema='escuro'] .batalha {
+  --batalha-vazio: #121c1a;
+}
+
+.batalha__topo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: var(--ui-papel);
+  border-bottom: 1px solid var(--ui-linha);
+  flex: none;
+  overflow-x: auto;
+}
+
+.batalha__topo .modo button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 32px;
+  justify-content: center;
+}
+
+.batalha__topo .botao-icone[aria-pressed='true'] {
+  background: var(--acento-suave);
+  color: var(--acento-forte);
+}
+
+[data-tema='escuro'] .batalha__topo .botao-icone[aria-pressed='true'] {
+  color: var(--acento);
+}
+
+.batalha__calibrar {
+  flex: none;
+}
+
+.batalha__topo .botao-topo {
+  flex: none;
+  white-space: nowrap;
+}
+
+.batalha__corpo {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.batalha__palco {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--batalha-vazio);
+}
+
+.batalha__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: grab;
+}
+
+.batalha__canvas--regua,
+.batalha__canvas--calibrar,
+.batalha__canvas--alinhar {
+  cursor: crosshair;
+}
+
+.batalha__dica {
+  position: absolute;
+  left: 50%;
+  top: 16px;
+  transform: translateX(-50%);
+  max-width: min(520px, 92%);
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgb(20 20 20 / 0.7);
+  color: #fff;
+  font-size: 13px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.batalha__aviso {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  max-width: min(520px, 92%);
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--ui-papel);
+  border: 1px solid var(--ui-linha);
+  color: var(--ui-tinta);
+  font-size: 13px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.3);
+}
+
+/* ---------- painel ---------- */
+
+.batalha__painel {
+  flex: none;
+  width: 300px;
+  overflow-y: auto;
+  background: var(--ui-papel);
+  border-left: 1px solid var(--ui-linha);
+}
+
+.batalha__secao {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--ui-linha);
+}
+
+.batalha__secao h2 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ui-tinta-2);
+}
+
+.batalha__botoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.batalha__tipos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.batalha__tipos button {
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid var(--ui-linha);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ui-tinta);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.batalha__tipos button[aria-checked='true'] {
+  background: var(--acento-suave);
+  border-color: var(--acento);
+  color: var(--acento-forte);
+}
+
+[data-tema='escuro'] .batalha__tipos button[aria-checked='true'] {
+  color: var(--acento);
+}
+
+.batalha__grade-campos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.batalha__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--ui-tinta-2);
+}
+
+.batalha__entrada {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.batalha__entrada input,
+.batalha__campo select,
+.batalha__linha select {
+  width: 100%;
+  min-height: 32px;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  border: 1px solid var(--ui-linha);
+  border-radius: 8px;
+  background: var(--ui-papel);
+  color: var(--ui-tinta);
+  font: inherit;
+  font-size: 14px;
+}
+
+.batalha__entrada small {
+  color: var(--ui-tinta-2);
+  white-space: nowrap;
+}
+
+.batalha__marca {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  font-size: 14px;
+}
+
+.batalha__linha {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  font-size: 12px;
+  color: var(--ui-tinta-2);
+}
+
+.batalha__linha label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.batalha__dica-painel {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ui-tinta-2);
+}
+
+.batalha__token {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.batalha__cores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.batalha__cores button {
+  width: 32px;
+  height: 32px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.batalha__cores button[aria-checked='true'] {
+  border-color: var(--ui-tinta);
+  box-shadow: 0 0 0 2px var(--ui-papel) inset;
+}
+
+@media (max-width: 720px) {
+  .batalha__rotulo {
+    display: none;
+  }
+
+  .batalha__corpo {
+    flex-direction: column;
+  }
+
+  .batalha__painel {
+    width: auto;
+    max-height: 45%;
+    border-left: 0;
+    border-top: 1px solid var(--ui-linha);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .batalha * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

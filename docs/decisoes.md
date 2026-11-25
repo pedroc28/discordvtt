@@ -2,6 +2,11 @@
 
 Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em cima. Cada entrada diz o que foi decidido e por quê.
 
+## 2026-11-25
+
+- **Mapa de batalha na área `mapa`, em `app/src/batalha/`.** O GrifoCaolho pediu um mapa de combate com imagem de fundo, grades de vários formatos, tokens e régua, a partir do que o mapa hexagonal já tinha. É a mesma dona e o mesmo tipo de trabalho, então não virou área nova: a linha `mapa` da tabela do `CLAUDE.md` ganhou a pasta, e `scripts/comecar.sh` continua igual. A tela é uma aba nova (Batalha), registrada pelo `tela.ts` da pasta. Começa só local (IndexedDB), e o servidor entra depois, com a mesma ideia de `RepositorioBatalha` atrás da tela.
+- **Tamanho da célula hexagonal é lado a lado.** Um número só serve para a grade quadrada e as hexagonais, e a calibragem na imagem funciona igual.
+
 ## 2026-11-24
 
 - **Viagem da campanha em coleção própria, `viagens`.** O GrifoCaolho pediu um registro por campanha com a configuração em JSON. Ficou fora do registro `mapas` porque ele é regravado a cada lote: uma gravação da viagem nele poderia escrever um contador de lotes velho por cima, e o tempo real mandaria a viagem a cada pincelada. A validação no servidor é genérica (até 32 campos numéricos de 0 a 100 mil, 4 KB), para o mapa ganhar campos novos sem mudar o servidor.

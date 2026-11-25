@@ -16,7 +16,7 @@ Site de teste, atualizado sozinho a cada mudança na `main`: https://pedroc28.gi
 
 | Área | O que é dela | Dono |
 | --- | --- | --- |
-| `mapa` | `app/src/mapa/`, `app/public/tilesets/`, `app/tools/gerar-tileset.mjs`, `docs/mapa/` | GrifoCaolho |
+| `mapa` | `app/src/mapa/`, `app/src/batalha/`, `app/public/tilesets/`, `app/tools/gerar-tileset.mjs`, `docs/mapa/` | GrifoCaolho |
 | `servidor` | `pocketbase/`, `app/src/servidor/`, `docs/servidor/`, hospedagem | Pedro (pedroc28) |
 | `dados` | `app/src/dados/`, `docs/dados.md` | Pedro (pedroc28) |
 | `quadro` | `app/src/quadro/`, `docs/quadro.md` | Pedro (pedroc28) |

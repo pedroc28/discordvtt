@@ -25,6 +25,9 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Fase 4, parte 3: trava do mapa e levar o mapa do navegador para a campanha, com importação como lote do servidor
 - [x] Fase 4, parte 4a: viagem da campanha (o mestre edita regras e estoque, os jogadores leem e simulam), ligada ao servidor desde que o `RepositorioPocketBase` ganhou os três métodos (24/11/2026)
 - [x] Fase 4, parte 4b: exportar e importar a camada do mestre (botão próprio, arquivo à parte, ocultos e notas no mesmo lote de importação)
+- [x] Mapa de batalha, parte 1: aba Batalha com imagem de fundo, grade quadrada, hexagonal pontuda, hexagonal chata ou nenhuma (tamanho e deslocamento ajustáveis, medir e alinhar na imagem), tokens livres ou encaixados e régua, tudo local (`docs/mapa/batalha.md`)
+- [ ] Mapa de batalha, parte 2: exportar e importar a cena em arquivo
+- [ ] Mapa de batalha, parte 3: ligar ao servidor (cena por campanha, só o mestre muda fundo e grade) e várias cenas
 - [ ] Presença (fora por enquanto: o PocketBase não tem mensagem efêmera)
 - [x] Paleta de terrenos com pastas e pesquisa por tag (mínimo 3 tags por terreno)
 - [x] Arte final dos terrenos em pixel art (PixelLab): os 45 terrenos feitos, guia e lista em `docs/mapa/arte.md`

@@ -43,12 +43,15 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Camada do mestre no servidor: notas privadas e hexágonos ocultos que só o mestre lê, revelar num lote só, importação e reversão conferidas pelo servidor e trava do mapa
 - [x] Rolagens de dados no servidor: sorteio pelo servidor, rolagens abertas e secretas com regras testadas, limpeza depois de 7 dias e o `RepositorioDadosPocketBase`
 - [x] Ligar o mapa ao servidor, com o GrifoCaolho: parte 1 feita (lista do que combinar em `docs/servidor/README.md`). A camada do mestre na tela e o resto seguem em entregas do mapa.
+- [ ] Viagem da campanha no servidor, pedida pelo GrifoCaolho: coleção `viagens`, um registro por campanha que só o mestre grava, e `carregarViagem`, `gravarViagem` e `assinarViagem` no `RepositorioPocketBase`. O lado do mapa já está pronto (fase 4, parte 4a) e espera estes métodos
 - [ ] Fichas sincronizadas: todos editando e vendo a mesma ficha em tempo real
+- [ ] Ensaio de restauração do backup com um clique: um script no PC do anfitrião que confere se o último backup volta, sem seguir passos à mão
 - [ ] Rodízio de anfitrião, se o grupo decidir: qualquer membro hospeda o servidor, um por vez, com troca de dados automática pelo Google Drive
 
 ## Dados (Pedro)
 
 - [x] Aba Dados: um botão para cada dado (d2 a d20), sorteio no servidor, histórico da campanha e rolagem secreta do mestre
+- [ ] Dados 3D na aba Dados: o dado cai no feltro e para na face que o servidor sorteou (precisa do ok para a dependência Three.js)
 - [ ] Dados 3D caindo sobre o mapa (depende do GrifoCaolho aprovar o visual)
 
 ## Quadro (Pedro)
@@ -56,7 +59,8 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Servidor do quadro: imagens protegidas da campanha, itens e notas, com regras testadas e limite de espaço, e o `RepositorioQuadroPocketBase`
 - [x] Aba Quadro: quadro de cortiça por campanha, biblioteca de imagens e notas, em tempo real
 - [x] Imagens de exemplo para testar o quadro, e a Mesa de teste com o quadro montado
-- [ ] Barbante ligando itens e itens secretos do mestre (depois)
+- [ ] Itens secretos do mestre: imagens enviadas antes de serem achadas, numa parte que só o mestre vê, reveladas na hora certa
+- [ ] Barbante ligando itens
 
 ## Fichas (os dois, congelada)
 
@@ -67,4 +71,5 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 
 - [ ] Ordem de iniciativa
 - [ ] Relógios de ameaça do mestre compartilhados
-- [ ] Imagens e anotações da campanha
+- [x] Imagens e anotações da campanha: feito como a aba Quadro
+- [ ] Abas baixadas sob demanda: o pacote principal do app está perto do aviso de 500 KB do Vite, e cada aba baixada só ao abrir deixa o app mais rápido no celular

@@ -1,6 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { ControladorMapa } from '../mapa/controlador'
 import type { Hexagono, Lote } from '../mapa/tipos'
+import { normalizarConfig } from '../mapa/viagem'
+import { ViagemDaCampanha, type CamposDaCampanha } from '../mapa/viagem-campanha'
 import casos from './casos-chunk.json'
 import type { ConexaoServidor } from './conexao'
 import type { RepositorioPocketBase } from './repositorio-mapa'
@@ -141,6 +143,31 @@ describe.skipIf(!ENDERECO_DE_TESTE)('RepositorioPocketBase com o servidor de ver
     expect(await esperarAte(() => vistas.at(-1) === 'todos')).toBe(true)
     await daJogadora.aplicar(lote([{ q: 0, r: 0, antes: null, depois: hexagono(0, 0, 'campo') }]))
     await Promise.all([doMestre.fechar(), daJogadora.fechar()])
+  }, 20000)
+
+  it('o mestre grava a viagem, a jogadora recebe e não grava', async () => {
+    await campanhaDeTeste(mestre, [jogadora])
+    const doMestre = new ViagemDaCampanha(abrir(mestre), true, 0)
+    const repoDaJogadora = abrir(jogadora)
+    const daJogadora = new ViagemDaCampanha(repoDaJogadora, false)
+    const vistas: CamposDaCampanha[] = []
+    daJogadora.ouvir((campos) => vistas.push(campos))
+    // Campanha nova: o mestre nunca gravou, e o mapa usa os valores padrão.
+    expect(await daJogadora.carregar()).toBeNull()
+    expect(await doMestre.carregar()).toBeNull()
+
+    doMestre.gravar({ ...normalizarConfig(null), viajantes: 5, estoqueAgua: 42.5 })
+    await doMestre.descarregar()
+    expect(doMestre.estado).toBe('salvo')
+    expect(await esperarAte(() => vistas.some((c) => c.viajantes === 5 && c.estoqueAgua === 42.5))).toBe(true)
+    expect(await daJogadora.carregar()).toMatchObject({ viajantes: 5, estoqueAgua: 42.5 })
+
+    await expect(repoDaJogadora.gravarViagem({ viajantes: 1 })).rejects.toThrow('só o mestre da campanha muda as regras e o estoque da viagem.')
+    const repoDoMestre = abrir(mestre)
+    await expect(repoDoMestre.gravarViagem({ estoqueAgua: -1 })).rejects.toThrow('o servidor recusou: estoqueAgua precisa ser um número de 0 a 100000.')
+    doMestre.destruir()
+    daJogadora.destruir()
+    await Promise.all([repoDaJogadora.fechar(), repoDoMestre.fechar()])
   }, 20000)
 
   it('trocar de campanha fecha o mapa, e o próximo pedido explica', async () => {

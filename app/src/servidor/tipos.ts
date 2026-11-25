@@ -88,3 +88,12 @@ export interface TokenDoServidor {
   id: string
   token: TokenGrupo | null
 }
+
+/** A viagem da campanha no servidor. `config` é null enquanto o mestre nunca gravou. */
+export interface ViagemDoServidor {
+  id: string
+  /** Só os campos numéricos: o resto o mapa valida e completa com os padrões (app/src/mapa/viagem-campanha.ts). */
+  config: Record<string, number> | null
+  /** Quando foi gravada, no formato do servidor ("2026-11-24 12:00:00.123Z"). Vazio se o servidor não mandou. */
+  atualizado: string
+}

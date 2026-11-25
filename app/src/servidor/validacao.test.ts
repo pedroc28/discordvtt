@@ -16,6 +16,7 @@ import {
   normalizarRolagemDoServidor,
   normalizarTokenDoServidor,
   normalizarUsuario,
+  normalizarViagemDoServidor,
 } from './validacao'
 
 describe('validação dos dados do servidor', () => {
@@ -112,6 +113,23 @@ describe('validação dos dados do mapa no servidor', () => {
     expect(normalizarMapaDoServidor({ id: 'm1', permissao: 'ninguem' })?.permissao).toBe('todos')
     expect(normalizarTokenDoServidor({ id: 't1', q: 2, r: 3, ts: 5, autor: 'u', presente: true })).toEqual({ id: 't1', token: { q: 2, r: 3, ts: 5, autor: 'u' } })
     expect(normalizarTokenDoServidor({ id: 't1', q: 2, r: 3, ts: 5, presente: false })).toEqual({ id: 't1', token: null })
+  })
+
+  it('viagem: só os números finitos da configuração, e null enquanto o mestre nunca gravou', () => {
+    const hora = '2026-11-24 12:00:00.123Z'
+    expect(normalizarViagemDoServidor({ id: 'v1', config: { viajantes: 4, estoqueAgua: 60.5 }, updated: hora })).toEqual({
+      id: 'v1',
+      config: { viajantes: 4, estoqueAgua: 60.5 },
+      atualizado: hora,
+    })
+    expect(normalizarViagemDoServidor({ id: 'v1', config: { viajantes: '4', montarias: 2, kmPorHex: null } })).toEqual({
+      id: 'v1',
+      config: { montarias: 2 },
+      atualizado: '',
+    })
+    expect(normalizarViagemDoServidor({ id: 'v1', config: null, updated: hora })?.config).toBeNull()
+    expect(normalizarViagemDoServidor({ id: 'v1', config: [1, 2], updated: hora })?.config).toBeNull()
+    expect(normalizarViagemDoServidor({ config: {} })).toBeNull()
   })
 })
 

@@ -306,6 +306,7 @@ async function testar() {
   await testarMapa({ admin, contas, Ana, Bruno, Carla, mesaBruno })
   await testarDados({ admin, contas, Ana, Bruno, Carla, Davi })
   await testarQuadro({ admin, contas, Ana, Bruno, Carla, Davi })
+  await testarViagem({ admin, contas, Ana, Bruno, Carla, Davi })
 
   console.log('\nTrocar senha')
   const NOVA = 'nova-senha-123'
@@ -969,6 +970,89 @@ async function testarDados({ admin, contas, Ana, Bruno, Carla, Davi }) {
   confere('apagar a campanha apaga as rolagens dela, abertas e secretas', apagou.ok && restos.every((n) => n === 0), restos)
 }
 
+// ---------- viagem ----------
+
+/** A configuração que o mapa grava hoje (app/src/mapa/viagem-campanha.ts): 14 números. */
+const VIAGEM = {
+  viajantes: 4,
+  montarias: 2,
+  kmPorHex: 10,
+  kmPorDia: 30,
+  racaoPorPessoa: 1,
+  aguaPorPessoa: 2,
+  racaoPorMontaria: 2,
+  aguaPorMontaria: 8,
+  pesoRacao: 1,
+  pesoAgua: 1,
+  cargaPorViajante: 25,
+  cargaPorMontaria: 100,
+  estoqueRacoes: 40,
+  estoqueAgua: 60,
+}
+
+async function testarViagem({ admin, contas, Ana, Bruno, Carla, Davi }) {
+  console.log('\nViagem da campanha')
+  const mesa = (await api('POST', '/api/collections/campanhas/records', { token: Ana, corpo: { nome: 'Mesa da viagem' } })).dados
+  for (const [nome, papel] of [['Bruno', 'jogador'], ['Davi', 'mestre']]) {
+    await api('POST', '/api/collections/participantes/records', { token: Ana, corpo: { campanha: mesa.id, usuario: contas[nome].id, papel } })
+  }
+  const daMesa = registros('viagens', `campanha = "${mesa.id}"`)
+  const vista = await api('GET', daMesa, { token: Bruno })
+  const viagem = vista.dados?.items?.[0]
+  confere('campanha nova nasce com a viagem, vazia, e quem participa lê', vista.dados?.items?.length === 1 && viagem?.config === null, vista.dados)
+  const deFora = await api('GET', daMesa, { token: Carla })
+  confere('quem está fora não lê a viagem', deFora.ok && deFora.dados.items.length === 0, deFora.dados)
+  const tempoRealBruno = await abrirTempoReal(Bruno, ['viagens/*'])
+  const tempoRealCarla = await abrirTempoReal(Carla, ['viagens/*'])
+
+  const gravar = (token, corpo) => api('PATCH', `/api/collections/viagens/records/${viagem.id}`, { token, corpo })
+  const doJogador = await gravar(Bruno, { config: VIAGEM })
+  confere('jogador não grava a viagem', !doJogador.ok, doJogador.status)
+  const doMestre = await gravar(Ana, { config: VIAGEM })
+  confere('o mestre grava as regras e o estoque', doMestre.ok && doMestre.dados.config?.estoqueAgua === 60, doMestre.dados)
+  const doOutroMestre = await gravar(Davi, { config: { ...VIAGEM, estoqueAgua: 55 } })
+  const deNovo = await gravar(Ana, { config: { ...VIAGEM, estoqueAgua: 50.5 } })
+  const final = (await api('GET', daMesa, { token: Bruno })).dados?.items?.[0]?.config
+  confere('qualquer mestre da campanha grava, e vale a última gravação', doOutroMestre.ok && deNovo.ok && final?.estoqueAgua === 50.5, final)
+  const campoNovo = await gravar(Ana, { config: { ...VIAGEM, kmPorHexEstrada: 15 } })
+  confere('campo numérico novo é aceito, sem mudar o servidor', campoNovo.ok, campoNovo.status)
+
+  const recusadas = {
+    'número negativo': { ...VIAGEM, estoqueRacoes: -1 },
+    'número acima de 100 mil': { ...VIAGEM, estoqueRacoes: 100001 },
+    'texto no lugar de número': { ...VIAGEM, viajantes: '4' },
+    'lista no lugar do objeto': [1, 2, 3],
+    'número no lugar do objeto': 5,
+    'nome de campo estranho': { ...VIAGEM, 'peso-extra': 1 },
+    'mais de 32 campos': Object.fromEntries(Array.from({ length: 33 }, (_, i) => [`campo${i}`, i])),
+    'mais de 4 KB': { ...VIAGEM, nota: 'x'.repeat(5000) },
+  }
+  const resultados = {}
+  for (const [caso, config] of Object.entries(recusadas)) resultados[caso] = (await gravar(Ana, { config })).status
+  confere('configuração fora do formato é recusada', Object.values(resultados).every((status) => status >= 400), resultados)
+  const motivo = await gravar(Ana, { config: { ...VIAGEM, estoqueRacoes: -1 } })
+  confere('com o motivo', String(motivo.dados?.message).startsWith('Viagem recusada:'), motivo.dados)
+  const zerada = await gravar(Ana, { config: null })
+  confere('o mestre pode zerar a viagem, que volta aos valores padrão', zerada.ok && zerada.dados.config === null, zerada.dados)
+
+  const daCarla = (await api('POST', '/api/collections/campanhas/records', { token: Carla, corpo: { nome: 'Mesa da Carla, viagem' } })).dados
+  const mudaCampanha = await gravar(Ana, { campanha: daCarla.id })
+  confere('a viagem não muda de campanha', !mudaCampanha.ok, mudaCampanha.status)
+  const cria = await api('POST', '/api/collections/viagens/records', { token: Ana, corpo: { campanha: mesa.id } })
+  confere('ninguém cria viagem pelo app', !cria.ok, cria.status)
+  const apaga = await api('DELETE', `/api/collections/viagens/records/${viagem.id}`, { token: Ana })
+  confere('ninguém apaga a viagem pelo app', !apaga.ok, apaga.status)
+
+  confere('quem participa recebe as mudanças pelo tempo real', await esperarEvento(tempoRealBruno, 'viagens/*', viagem.id))
+  await esperar(300)
+  confere('quem está fora não recebe a viagem desta mesa', !tempoRealCarla.eventos.some((e) => e.data.includes(mesa.id)), tempoRealCarla.eventos.map((e) => e.event))
+  await Promise.all([tempoRealBruno.fechar(), tempoRealCarla.fechar()])
+
+  const apagou = await api('DELETE', `/api/collections/campanhas/records/${mesa.id}`, { token: Ana })
+  await api('DELETE', `/api/collections/campanhas/records/${daCarla.id}`, { token: Carla })
+  confere('apagar a campanha apaga a viagem', apagou.ok && (await contar(admin, 'viagens', `campanha = "${mesa.id}"`)) === 0)
+}
+
 // ---------- quadro ----------
 
 /** PNG de verdade, de uma cor só: o servidor precisa conseguir abrir para fazer a miniatura. */
@@ -1221,6 +1305,8 @@ async function testarMigracaoELimpeza(dados) {
     const camadas = await Promise.all(mapas.map((m) => contar(admin, 'mapas_mestre', `mapa = "${m.id}"`)))
     confere('e a camada do mestre, vazia', camadas.every((n) => n === 1), camadas)
     confere('e a trava aberta', mapas.every((m) => m.permissao === 'todos'), mapas.map((m) => m.permissao))
+    const viagens = await Promise.all(campanhas.map((c) => contar(admin, 'viagens', `campanha = "${c}"`)))
+    confere('e a viagem, vazia', viagens.every((n) => n === 1), viagens)
 
     console.log('\nMapa: limpeza dos lotes antigos')
     const mapa = mapas[0].id

@@ -4,6 +4,8 @@ Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em ci
 
 ## 2026-11-24
 
+- **Viagem da campanha em coleção própria, `viagens`.** O GrifoCaolho pediu um registro por campanha com a configuração em JSON. Ficou fora do registro `mapas` porque ele é regravado a cada lote: uma gravação da viagem nele poderia escrever um contador de lotes velho por cima, e o tempo real mandaria a viagem a cada pincelada. A validação no servidor é genérica (até 32 campos numéricos de 0 a 100 mil, 4 KB), para o mapa ganhar campos novos sem mudar o servidor.
+
 - **No quadro, o arraste chega aos outros quando a pessoa solta.** O item pula para o lugar novo na tela dos outros, em vez de deslizar. Mandar a posição durante o arraste seria uma gravação no servidor a cada fração de segundo, porque o PocketBase não tem mensagem que passe sem gravar. O Pedro preferiu deixar o servidor mais leve.
 - **Imagens de exemplo desenhadas para o projeto.** Para testar o quadro sem escolher arquivos, o app traz seis desenhos de RPG feitos aqui, sem imagens de terceiros. Elas só entram na campanha em que o mestre pede.
 

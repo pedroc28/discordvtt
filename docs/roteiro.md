@@ -23,7 +23,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Fase 4, parte 1: mapa ligado ao servidor (repositório por campanha, conta como autor, eco, chunk que falha, token na ordem de chegada, mapa desatualizado, edição recusada)
 - [x] Fase 4, parte 2: camada do mestre na tela (notas privadas, hexágonos ocultos, ocultar e revelar, ver como jogador)
 - [x] Fase 4, parte 3: trava do mapa e levar o mapa do navegador para a campanha, com importação como lote do servidor
-- [x] Fase 4, parte 4a: viagem da campanha (o mestre edita regras e estoque, os jogadores leem e simulam), pronta no lado do mapa e testada com repositório falso; falta ligar ao servidor quando o `RepositorioPocketBase` ganhar os três métodos
+- [x] Fase 4, parte 4a: viagem da campanha (o mestre edita regras e estoque, os jogadores leem e simulam), ligada ao servidor desde que o `RepositorioPocketBase` ganhou os três métodos (24/11/2026)
 - [x] Fase 4, parte 4b: exportar e importar a camada do mestre (botão próprio, arquivo à parte, ocultos e notas no mesmo lote de importação)
 - [ ] Presença (fora por enquanto: o PocketBase não tem mensagem efêmera)
 - [x] Paleta de terrenos com pastas e pesquisa por tag (mínimo 3 tags por terreno)
@@ -43,7 +43,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Camada do mestre no servidor: notas privadas e hexágonos ocultos que só o mestre lê, revelar num lote só, importação e reversão conferidas pelo servidor e trava do mapa
 - [x] Rolagens de dados no servidor: sorteio pelo servidor, rolagens abertas e secretas com regras testadas, limpeza depois de 7 dias e o `RepositorioDadosPocketBase`
 - [x] Ligar o mapa ao servidor, com o GrifoCaolho: parte 1 feita (lista do que combinar em `docs/servidor/README.md`). A camada do mestre na tela e o resto seguem em entregas do mapa.
-- [ ] Viagem da campanha no servidor, pedida pelo GrifoCaolho: coleção `viagens`, um registro por campanha que só o mestre grava, e `carregarViagem`, `gravarViagem` e `assinarViagem` no `RepositorioPocketBase`. O lado do mapa já está pronto (fase 4, parte 4a) e espera estes métodos
+- [x] Viagem da campanha no servidor, pedida pelo GrifoCaolho: coleção `viagens`, um registro por campanha que só o mestre grava, com regras testadas, e `carregarViagem`, `gravarViagem` e `assinarViagem` no `RepositorioPocketBase`
 - [ ] Fichas sincronizadas: todos editando e vendo a mesma ficha em tempo real
 - [ ] Ensaio de restauração do backup com um clique: um script no PC do anfitrião que confere se o último backup volta, sem seguir passos à mão
 - [ ] Rodízio de anfitrião, se o grupo decidir: qualquer membro hospeda o servidor, um por vez, com troca de dados automática pelo Google Drive

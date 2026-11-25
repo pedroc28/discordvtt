@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ControladorMapa } from '../mapa/controlador'
 import { chaveChunk } from '../mapa/hex'
+import { temViagem } from '../mapa/repositorio'
 import type { Hexagono, Lote, NotaPrivada, Regiao, TokenGrupo } from '../mapa/tipos'
 import { RepositorioPocketBase, type Cancelar, type ClienteMapa, type ColecaoMapa, type EventoTempoReal, type FiltroServidor } from './repositorio-mapa'
 
@@ -42,6 +43,10 @@ class ServidorFalso implements ClienteMapa {
   regioes = new Map<string, Registro>()
   lotesMestre: Registro[] = []
   token: Registro = { id: 'token1', mapa: 'mapa1', q: 0, r: 0, ts: 0, autor: '', presente: false }
+  viagem: Registro = { id: 'viagem1', campanha: 'campanha1', config: null, updated: '2026-11-24 10:00:00.000Z' }
+  /** Com true, o servidor é de antes da migração da viagem: a coleção não existe. */
+  semViagem = false
+  private relogio = 0
   lotes: Registro[] = []
   assinaturas = new Map<number, { colecao: ColecaoMapa; ouvinte: (e: EventoTempoReal) => void }>()
   reconexoes = new Set<() => void>()
@@ -90,6 +95,10 @@ class ServidorFalso implements ClienteMapa {
     if (colecao === 'mapas') return v.campanha === this.mapa.campanha || v.id === this.mapa.id ? copia(this.mapa) : null
     if (colecao === 'tokens_grupo') return v.mapa === this.token.mapa ? copia(this.token) : null
     if (colecao === 'mapas_mestre') return v.mapa === this.camadaMestre.mapa || v.id === this.camadaMestre.id ? copia(this.camadaMestre) : null
+    if (colecao === 'viagens') {
+      if (this.semViagem) throw erroDoServidor(404, 'Missing collection context.')
+      return v.campanha === this.viagem.campanha || v.id === this.viagem.id ? copia(this.viagem) : null
+    }
     return null
   }
 
@@ -106,6 +115,7 @@ class ServidorFalso implements ClienteMapa {
       this.emitir('mapas', { acao: 'update', registro: copia(this.mapa) })
       return copia(this.mapa)
     }
+    if (colecao === 'viagens' && id === this.viagem.id) return this.gravarViagem(dados.config)
     if (colecao !== 'tokens_grupo' || id !== this.token.id) throw erroDoServidor(404)
     if ((dados.ts as number) < (this.token.ts as number)) return copia(this.token)
     this.token = { ...this.token, ...dados, autor: 'eu' }
@@ -186,6 +196,14 @@ class ServidorFalso implements ClienteMapa {
     this.emitir('lotes', { acao: 'create', registro: copia(registro) })
     this.emitir('mapas', { acao: 'update', registro: copia(this.mapa) })
     return copia(registro)
+  }
+
+  /** O que o servidor faz ao gravar a viagem: guarda, marca a hora e avisa pelo tempo real. */
+  gravarViagem(config: unknown): Registro {
+    this.relogio++
+    this.viagem = { ...this.viagem, config: copia(config), updated: `2026-11-24 10:00:${String(this.relogio).padStart(2, '0')}.000Z` }
+    this.emitir('viagens', { acao: 'update', registro: copia(this.viagem) })
+    return copia(this.viagem)
   }
 
   /** Lote gravado por outra pessoa. */
@@ -553,6 +571,110 @@ describe('RepositorioPocketBase: trava do mapa', () => {
     servidor.emitir('mapas', { acao: 'update', registro: copia(servidor.mapa) })
     expect(vistas).toEqual(['mestre', 'todos'])
     expect(await repo.carregarPermissao()).toBe('todos')
+  })
+})
+
+describe('RepositorioPocketBase: viagem da campanha', () => {
+  const config = { viajantes: 4, montarias: 2, estoqueRacoes: 40, estoqueAgua: 60 }
+  const viagem = (papel: 'mestre' | 'jogador', servidor: ServidorFalso) => {
+    const repo = new RepositorioPocketBase(servidor, 'campanha1', { papel })
+    const vistas: Array<Record<string, number> | null> = []
+    repo.assinarViagem((c) => vistas.push(c))
+    return { repo, vistas }
+  }
+
+  it('o mapa reconhece que o repositório tem a viagem', () => {
+    expect(temViagem(new RepositorioPocketBase(new ServidorFalso(), 'campanha1'))).toBe(true)
+  })
+
+  it('vem null enquanto o mestre nunca gravou, e a gravação do mestre chega a quem participa', async () => {
+    const servidor = new ServidorFalso()
+    const mestre = viagem('mestre', servidor)
+    const jogadora = viagem('jogador', servidor)
+    expect(await jogadora.repo.carregarViagem()).toBeNull()
+    expect(await mestre.repo.carregarViagem()).toBeNull()
+    // A resposta da gravação chega antes do eco: o eco não é avisado de novo a quem gravou.
+    servidor.segurar = true
+    await mestre.repo.gravarViagem(config)
+    servidor.soltar()
+    expect(servidor.viagem.config).toEqual(config)
+    expect(jogadora.vistas).toEqual([config])
+    expect(mestre.vistas).toEqual([])
+    expect(await jogadora.repo.carregarViagem()).toEqual(config)
+  })
+
+  it('aviso atrasado não volta a configuração atrás', async () => {
+    const servidor = new ServidorFalso()
+    const jogadora = viagem('jogador', servidor)
+    await jogadora.repo.carregarViagem()
+    servidor.segurar = true
+    servidor.gravarViagem({ ...config, estoqueAgua: 50 })
+    servidor.gravarViagem({ ...config, estoqueAgua: 45 })
+    servidor.presos.reverse()
+    servidor.soltar()
+    expect(jogadora.vistas).toEqual([{ ...config, estoqueAgua: 45 }])
+    expect(await jogadora.repo.carregarViagem()).toEqual({ ...config, estoqueAgua: 45 })
+  })
+
+  it('avisa de novo quando a conexão volta, com o que mudou enquanto ela estava fora', async () => {
+    const servidor = new ServidorFalso()
+    const jogadora = viagem('jogador', servidor)
+    await jogadora.repo.carregarViagem()
+    servidor.segurar = true
+    servidor.gravarViagem(config)
+    servidor.perder()
+    expect(jogadora.vistas).toEqual([])
+    servidor.reconectar()
+    await esperar()
+    expect(jogadora.vistas).toEqual([config])
+  })
+
+  it('quem não é mestre não grava: falha explicando, sem ir ao servidor', async () => {
+    const servidor = new ServidorFalso()
+    const { repo } = viagem('jogador', servidor)
+    await expect(repo.gravarViagem(config)).rejects.toThrow('só o mestre da campanha muda as regras e o estoque da viagem.')
+    expect(servidor.viagem.config).toBeNull()
+  })
+
+  it('repassa o motivo de o servidor recusar a configuração', async () => {
+    const servidor = new ServidorFalso()
+    const { repo } = viagem('mestre', servidor)
+    await repo.carregarViagem()
+    servidor.falha = erroDoServidor(400, 'Viagem recusada: estoqueAgua precisa ser um número de 0 a 100000.')
+    await expect(repo.gravarViagem({ ...config, estoqueAgua: -1 })).rejects.toThrow('o servidor recusou: estoqueAgua precisa ser um número de 0 a 100000.')
+  })
+
+  it('servidor sem a migração da viagem explica o que fazer, e não deixa assinatura pendurada', async () => {
+    const servidor = new ServidorFalso()
+    servidor.semViagem = true
+    const { repo } = viagem('jogador', servidor)
+    await expect(repo.carregarViagem()).rejects.toThrow('o servidor ainda não guarda a viagem da campanha')
+    expect(servidor.assinaturas.size).toBe(0)
+    expect(servidor.reconexoes.size).toBe(0)
+    // Depois de o servidor ser atualizado, a próxima tentativa abre do zero.
+    servidor.semViagem = false
+    expect(await repo.carregarViagem()).toBeNull()
+  })
+
+  it('a viagem não depende do mapa: uma falha num não fecha as assinaturas do outro', async () => {
+    const servidor = new ServidorFalso()
+    const { repo, vistas } = viagem('jogador', servidor)
+    await repo.carregarViagem()
+    servidor.mapa.campanha = 'outra'
+    await expect(repo.carregarRegioes()).rejects.toThrow('não encontrei o mapa desta campanha')
+    servidor.gravarViagem(config)
+    expect(vistas).toEqual([config])
+  })
+
+  it('fechar cancela também as assinaturas da viagem', async () => {
+    const servidor = new ServidorFalso()
+    const { repo } = viagem('mestre', servidor)
+    await repo.carregarViagem()
+    expect(servidor.assinaturas.size).toBe(1)
+    await repo.fechar()
+    expect(servidor.assinaturas.size).toBe(0)
+    expect(servidor.reconexoes.size).toBe(0)
+    await expect(repo.gravarViagem(config)).rejects.toThrow('você trocou de campanha ou saiu do servidor')
   })
 })
 

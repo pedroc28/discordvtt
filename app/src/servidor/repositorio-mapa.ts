@@ -11,16 +11,18 @@
 // - Camada do mestre: a parte privada de um lote (hexágonos ocultos e notas privadas) fica em coleções
 //   que só o mestre lê, com numeração própria. Para o mestre, o repositório tem uma segunda fila e entrega
 //   essa parte como um lote à parte, com o mesmo id. Para jogadores, ela simplesmente não existe.
+// - Viagem da campanha: as regras e o estoque do painel de viagem, num registro da coleção `viagens`. Abre à
+//   parte do mapa, só quando alguém pede, e um aviso atrasado nunca volta a configuração atrás.
 //
 // O repositório não usa o SDK do PocketBase direto: recebe um ClienteMapa, que o conexao.ts cria para
 // a sessão atual. Assim os testes usam um servidor falso, e o SDK continua num arquivo só.
 
 import { chaveChunk } from '../mapa/hex'
-import type { OuvinteLote, OuvinteToken, RepositorioMapa } from '../mapa/repositorio'
+import type { OuvinteLote, OuvinteToken, RepositorioComViagem } from '../mapa/repositorio'
 import type { Hexagono, Lote, NotaPrivada, Regiao, TokenGrupo } from '../mapa/tipos'
-import { MAPA_DESATUALIZADO, MAPA_FECHADO, MAPA_SEM_REGISTRO, mensagemDeErroMapa } from './erros'
+import { MAPA_DESATUALIZADO, MAPA_FECHADO, MAPA_SEM_REGISTRO, mensagemDeErroMapa, VIAGEM_SEM_REGISTRO, VIAGEM_SERVIDOR_ANTIGO, VIAGEM_SO_MESTRE } from './erros'
 import { definirInicio, filaVazia, receberLote, temBuraco, type FilaLotes } from './fila-lotes'
-import type { LoteDoServidor, Papel, PermissaoMapa } from './tipos'
+import type { LoteDoServidor, Papel, PermissaoMapa, ViagemDoServidor } from './tipos'
 import {
   normalizarCamadaMestreDoServidor,
   normalizarHexagonoDoServidor,
@@ -31,6 +33,7 @@ import {
   normalizarNotaDoServidor,
   normalizarRegiaoDoServidor,
   normalizarTokenDoServidor,
+  normalizarViagemDoServidor,
 } from './validacao'
 
 export type ColecaoMapa =
@@ -43,6 +46,7 @@ export type ColecaoMapa =
   | 'hexagonos_ocultos'
   | 'notas_mestre'
   | 'lotes_mestre'
+  | 'viagens'
 
 /** Filtro do PocketBase com os valores à parte, para o cliente escapar (nunca montar o texto com os valores). */
 export interface FiltroServidor {
@@ -82,6 +86,10 @@ export interface OpcoesRepositorio {
 }
 
 export type OuvintePermissao = (permissao: PermissaoMapa) => void
+export type OuvinteViagem = (config: Record<string, number> | null) => void
+
+/** De onde veio a viagem que chegou: decide se quem assinou é avisado. */
+type OrigemViagem = 'carga' | 'aviso' | 'reconexao' | 'gravacao'
 
 const ESPERA_BURACO = 500
 // Se a busca dos lotes que faltam falhar, tenta de novo com espera crescente, até este máximo.
@@ -99,7 +107,7 @@ interface Camada {
   fila: FilaLotes
 }
 
-export class RepositorioPocketBase implements RepositorioMapa {
+export class RepositorioPocketBase implements RepositorioComViagem {
   readonly campanhaId: string
   readonly papel: Papel
   private cliente: ClienteMapa
@@ -123,6 +131,11 @@ export class RepositorioPocketBase implements RepositorioMapa {
   private falhasSeguidas = 0
   private estaFechado = false
   private estaDesatualizado = false
+  // A viagem tem abertura e assinaturas próprias: uma falha ao abrir o mapa não derruba a viagem, e vice-versa.
+  private aberturaViagem: Promise<string> | null = null
+  private viagem: ViagemDoServidor | null = null
+  private ouvintesViagem = new Set<OuvinteViagem>()
+  private cancelamentosViagem: Cancelar[] = []
 
   constructor(cliente: ClienteMapa, campanhaId: string, opcoes: OpcoesRepositorio = {}) {
     this.cliente = cliente
@@ -306,6 +319,36 @@ export class RepositorioPocketBase implements RepositorioMapa {
     return () => this.ouvintesPermissao.delete(ouvinte)
   }
 
+  // ---------- viagem da campanha (RepositorioComViagem) ----------
+
+  /** A configuração que o mestre gravou, ou null enquanto ele nunca gravou. */
+  carregarViagem(): Promise<Record<string, number> | null> {
+    return this.pedir(async () => {
+      await this.abrirViagem()
+      return this.copiaDaViagem()
+    })
+  }
+
+  /** Grava a configuração. Só o mestre: para os outros, falha sem ir ao servidor. Vale a última gravação. */
+  gravarViagem(config: unknown): Promise<void> {
+    return this.pedir(async () => {
+      if (!this.ehMestre) throw new Error(VIAGEM_SO_MESTRE)
+      const id = await this.abrirViagem()
+      const registro = await this.cliente.atualizar('viagens', id, { config: config ?? null })
+      this.receberViagem(registro, 'gravacao')
+    })
+  }
+
+  /**
+   * Avisa quando outra pessoa (ou o mesmo mestre em outra aba) muda a viagem, e de novo quando a conexão
+   * volta, porque algo pode ter mudado enquanto ela estava fora. Devolve a função que cancela.
+   */
+  assinarViagem(ouvinte: OuvinteViagem): () => void {
+    this.ouvintesViagem.add(ouvinte)
+    this.abrirViagem().catch(() => undefined)
+    return () => this.ouvintesViagem.delete(ouvinte)
+  }
+
   // ---------- além do contrato ----------
 
   /** Chamado uma vez, se o mapa ficar desatualizado (ver `desatualizado`). Devolve a função que cancela. */
@@ -323,7 +366,7 @@ export class RepositorioPocketBase implements RepositorioMapa {
     if (this.estaFechado) return
     this.estaFechado = true
     this.pararBusca()
-    await this.cancelarAssinaturas()
+    await Promise.all([this.cancelarAssinaturas(), this.cancelarAssinaturas(this.cancelamentosViagem)])
   }
 
   // ---------- abertura ----------
@@ -414,17 +457,64 @@ export class RepositorioPocketBase implements RepositorioMapa {
   }
 
   /** Guarda a função que cancela uma assinatura. Se o repositório fechou enquanto assinava, cancela na hora. */
-  private async guardar(assinatura: Promise<Cancelar>) {
+  private async guardar(assinatura: Promise<Cancelar>, lista = this.cancelamentos) {
     const cancelar = await assinatura
     if (this.estaFechado) {
       await cancelar().catch(() => undefined)
       throw new Error(MAPA_FECHADO)
     }
-    this.cancelamentos.push(cancelar)
+    lista.push(cancelar)
   }
 
-  private async cancelarAssinaturas() {
-    await Promise.all(this.cancelamentos.splice(0).map((cancelar) => cancelar().catch(() => undefined)))
+  private async cancelarAssinaturas(lista = this.cancelamentos) {
+    await Promise.all(lista.splice(0).map((cancelar) => cancelar().catch(() => undefined)))
+  }
+
+  /** Acha a viagem da campanha e assina as mudanças. Uma vez só, como o mapa. */
+  private abrirViagem(): Promise<string> {
+    if (this.estaFechado) return Promise.reject(new Error(MAPA_FECHADO))
+    if (!this.aberturaViagem) {
+      this.aberturaViagem = this.conectarViagem().catch(async (erro: unknown) => {
+        // Falhou ao abrir: o próximo pedido tenta de novo do zero.
+        this.aberturaViagem = null
+        this.viagem = null
+        await this.cancelarAssinaturas(this.cancelamentosViagem)
+        throw erro
+      })
+    }
+    return this.aberturaViagem
+  }
+
+  private async conectarViagem(): Promise<string> {
+    const filtro = { expressao: 'campanha = {:campanha}', valores: { campanha: this.campanhaId } }
+    // Assina antes de ler, para nenhuma gravação do mestre no meio do caminho se perder.
+    await this.guardar(
+      this.cliente.assinar('viagens', filtro, (evento) => {
+        if (evento.acao === 'update') this.receberViagem(evento.registro, 'aviso')
+      }),
+      this.cancelamentosViagem,
+    )
+    await this.guardar(this.cliente.aoReconectar(() => void this.recarregarViagem()), this.cancelamentosViagem)
+    const bruto = await this.cliente.primeiro('viagens', filtro).catch((erro: unknown) => {
+      // A lista só responde 404 quando a coleção não existe: o servidor não rodou a migração da viagem.
+      throw statusDoErro(erro) === 404 ? new Error(VIAGEM_SERVIDOR_ANTIGO, { cause: erro }) : erro
+    })
+    this.exigirAberto()
+    const achada = normalizarViagemDoServidor(bruto)
+    if (!achada) throw new Error(VIAGEM_SEM_REGISTRO)
+    this.receberViagem(bruto, 'carga')
+    return achada.id
+  }
+
+  /** Depois de a conexão voltar, lê a viagem de novo e avisa quem assinou. */
+  private async recarregarViagem() {
+    const id = this.viagem?.id
+    if (!id || this.estaFechado) return
+    try {
+      this.receberViagem(await this.cliente.primeiro('viagens', { expressao: 'id = {:id}', valores: { id } }), 'reconexao')
+    } catch {
+      // Sem resposta agora: a próxima mudança do mestre, ou a próxima reconexão, traz a viagem.
+    }
   }
 
   private async buscarIdDoToken(mapa: string): Promise<string> {
@@ -497,6 +587,35 @@ export class RepositorioPocketBase implements RepositorioMapa {
     this.tsToken = bruto.ts
     this.tokenId = registro.id
     for (const ouvinte of [...this.ouvintesToken]) ouvinte(registro.token ? { ...registro.token } : null)
+  }
+
+  private receberViagem(bruto: unknown, origem: OrigemViagem) {
+    if (this.estaFechado) return
+    const recebida = normalizarViagemDoServidor(bruto)
+    const atual = this.viagem
+    if (!recebida || (atual && recebida.id !== atual.id)) return
+    // A hora da gravação só anda para frente: um aviso atrasado não volta a configuração atrás.
+    const comHora = atual !== null && atual.atualizado !== '' && recebida.atualizado !== ''
+    if (comHora && recebida.atualizado < atual.atualizado) return
+    const mesmaGravacao = comHora && recebida.atualizado === atual.atualizado
+    this.viagem = recebida
+    // Quem carregou ou gravou já recebeu o resultado como resposta, e o eco de uma gravação já conhecida
+    // não é avisado de novo. Depois de a conexão voltar, avisa sempre.
+    const avisar = origem === 'reconexao' || (origem === 'aviso' && !mesmaGravacao)
+    if (!avisar) return
+    for (const ouvinte of [...this.ouvintesViagem]) {
+      try {
+        ouvinte(this.copiaDaViagem())
+      } catch (erro) {
+        queueMicrotask(() => {
+          throw erro
+        })
+      }
+    }
+  }
+
+  private copiaDaViagem(): Record<string, number> | null {
+    return this.viagem?.config ? { ...this.viagem.config } : null
   }
 
   private ehObjetoComTs(bruto: unknown): bruto is { ts: number } {
@@ -593,4 +712,8 @@ export class RepositorioPocketBase implements RepositorioMapa {
       throw new Error(mensagemDeErroMapa(erro, this.cliente.endereco), { cause: erro })
     }
   }
+}
+
+function statusDoErro(erro: unknown): number | null {
+  return typeof erro === 'object' && erro !== null && 'status' in erro && typeof erro.status === 'number' ? erro.status : null
 }

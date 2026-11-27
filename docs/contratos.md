@@ -214,6 +214,47 @@ abrirRepositorioQuadro(): RepositorioQuadroPocketBase | null   // da campanha ab
 - Os erros dizem a causa e o que fazer, começando em minúscula. Quem mostra põe antes o que tentava: "Não consegui mover: ...".
 - Trocar de campanha, sair, trocar de servidor ou mudar de papel fecha o repositório. Quem usa abre outro.
 
+## Batalha e servidor
+
+Arquivos: `app/src/batalha/` (área do mapa, do GrifoCaolho), `app/src/servidor/repositorio-batalha.ts`, `app/src/servidor/tipos.ts` e `abrirRepositorioBatalha()` em `app/src/servidor/conexao.ts` (área do servidor, do Pedro).
+
+```ts
+interface ResumoCenaBatalha { id, nome, ativa: boolean }
+interface TokenBatalhaDoServidor { id, nome, x, y, tamanho, cor, dono: string | null }   // id é o idLocal
+interface CenaBatalhaDoServidor { nome, config: unknown, tokens: TokenBatalhaDoServidor[], imagemUrl: string | null }
+interface ConfigDaCenaBatalha { nome, config: unknown, imagemUrl: string | null }
+type EventoTokenBatalha = { tipo: 'gravado', token: TokenBatalhaDoServidor } | { tipo: 'removido', idLocal }
+
+class RepositorioBatalhaPocketBase {
+  readonly ehMestre: boolean
+  readonly usuarioId: string                       // o token com este dono pode ser movido por quem usa
+  listarCenas(): Promise<ResumoCenaBatalha[]>      // o jogador recebe só a ativa, ou nenhuma
+  carregarCena(id): Promise<CenaBatalhaDoServidor>
+  criarCena(nome): Promise<string>                 // devolve o id. Nasce sem configuração: o mapa usa os padrões
+  renomearCena(id, nome), apagarCena(id)
+  ativarCena(id | null)                            // null: nenhuma cena ativa
+  gravarConfig(id, config: unknown)                // { grade, medida, encaixar, fundo: { largura, altura } | null }
+  gravarImagem(id, imagem: Blob | null)
+  gravarToken(cenaId, token: unknown)              // cria ou atualiza pelo id. Com `dono` (string ou null), o mestre troca o dono
+  removerToken(cenaId, idLocal)
+  importarCena(cenaId, { config, tokens: unknown[], imagem?: Blob | null })   // tudo ou nada. imagem undefined mantém o fundo
+  assinarCenas(ouvinte: (cenas: ResumoCenaBatalha[]) => void): () => void
+  assinarConfig(cenaId, ouvinte: (c: ConfigDaCenaBatalha) => void): () => void
+  assinarTokens(cenaId, ouvinte: (e: EventoTokenBatalha) => void): () => void
+  fechar(): Promise<void>
+}
+
+abrirRepositorioBatalha(): RepositorioBatalhaPocketBase | null   // da campanha aberta, ou null
+```
+
+- `config` e os tokens chegam como estão no servidor: o mapa passa tudo pelo `normalizarCena` e pelo `normalizarToken` dele. Os tokens que o mapa manda gravar usam o formato do `TokenBatalha` dele (`id`, `nome`, `x`, `y`, `tamanho`, `cor`), mais `dono` quando o mestre quer trocar.
+- Só o mestre cria, muda e apaga cenas e tokens. O jogador só move (x e y) os tokens em que é o dono, na cena ativa. O que não pode falha antes de ir ao servidor, com a mensagem pronta.
+- Limites que o servidor confere: 20 cenas por campanha, 200 tokens por cena, nome de cena de até 60 caracteres, configuração de até 2 KB com os campos nas faixas do `operacoes.ts` do mapa, fundo PNG, JPEG ou WebP de até 15 MB, token com id de até 64 caracteres, nome de até 40, x e y de -1.000.000 a 1.000.000, tamanho de 0,5 a 10 e cor `#rrggbb`. Fora disso: "o servidor recusou: ...".
+- `gravarToken` e `gravarConfig` podem ser chamados a cada movimento: o repositório manda um de cada vez e pula os do meio. A promessa de cada chamada resolve quando a gravação dela, ou uma mais nova, entra.
+- Os `assinar...` não avisam o que esta pessoa acabou de gravar, nem aviso velho. Avisam de novo quando a conexão volta, e `assinarTokens` avisa também os tokens que saíram nesse meio-tempo. `assinarCenas` avisa quando uma cena entra, sai ou muda de nome e quando a cena ativa muda. Mudar a grade avisa só `assinarConfig`.
+- `imagemUrl` é um endereço `blob:` que vale até o fundo mudar ou o repositório fechar.
+- Trocar de campanha, sair, trocar de servidor ou mudar de papel fecha o repositório. Quem usa abre outro.
+
 ## Configuração
 
 - `VITE_POCKETBASE_URL`: endereço padrão do PocketBase (modelo em `app/.env.example`). A pessoa pode trocar na tela de login, e o app guarda o endereço escolhido no navegador.

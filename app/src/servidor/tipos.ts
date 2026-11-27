@@ -97,3 +97,41 @@ export interface ViagemDoServidor {
   /** Quando foi gravada, no formato do servidor ("2026-11-24 12:00:00.123Z"). Vazio se o servidor não mandou. */
   atualizado: string
 }
+
+// ---------- batalha ----------
+
+/** Uma cena na lista do seletor do mapa de batalha. `ativa` é a que os jogadores veem. */
+export interface ResumoCenaBatalha {
+  id: string
+  nome: string
+  ativa: boolean
+}
+
+/** Um token como o mapa de batalha usa (`id` é o idLocal), com quem pode movê-lo além do mestre. */
+export interface TokenBatalhaDoServidor {
+  id: string
+  nome: string
+  x: number
+  y: number
+  tamanho: number
+  cor: string
+  dono: string | null
+}
+
+/** O que o mapa de batalha recebe ao abrir uma cena. `config` e os tokens passam pelo normalizarCena do mapa. */
+export interface CenaBatalhaDoServidor {
+  nome: string
+  config: unknown
+  tokens: TokenBatalhaDoServidor[]
+  /** Endereço local (blob:) do fundo, ou null sem fundo. Vale até o repositório fechar ou o fundo mudar. */
+  imagemUrl: string | null
+}
+
+/** A grade, a medida e o fundo de uma cena, quando o mestre muda. */
+export interface ConfigDaCenaBatalha {
+  nome: string
+  config: unknown
+  imagemUrl: string | null
+}
+
+export type EventoTokenBatalha = { tipo: 'gravado'; token: TokenBatalhaDoServidor } | { tipo: 'removido'; idLocal: string }

@@ -3,8 +3,8 @@
 // Funções do quadro de cortiça, usadas por quadro.pb.js com require. O porquê está em
 // docs/servidor/README.md, seção "Quadro".
 
-// Espaço de imagens de cada campanha. Cada backup copia todas as imagens, e o servidor guarda 24
-// backups no PC e 48 na pasta da nuvem: 50 MB por campanha viram até 2,4 GB na nuvem.
+// Espaço de imagens de cada campanha. Cada backup copia todas as imagens (ver pb_hooks/backup.js):
+// com uma cópia por dia na nuvem, por 7 dias, 50 MB por campanha viram até 350 MB lá.
 const LIMITE_PADRAO_MB = 50
 
 function limiteEmBytes() {

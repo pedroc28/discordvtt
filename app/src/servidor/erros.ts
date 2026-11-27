@@ -189,3 +189,57 @@ export function mensagemDeErroQuadro(erro: unknown, endereco: string, acao: Acao
   if (status === 400 || status === 403 || status === 404) return SEM_PERMISSAO[acao]
   return 'o servidor não conseguiu atender. Tente de novo daqui a pouco.'
 }
+
+// ---------- batalha ----------
+
+// O mapa de batalha mostra estas mensagens depois do que tentava fazer, então elas dizem só a causa e o
+// que fazer, começando com letra minúscula.
+
+export const BATALHA_FECHADA = 'o mapa de batalha foi fechado porque você trocou de campanha ou saiu do servidor. Abra a aba Batalha de novo.'
+export const BATALHA_INVALIDA = 'o servidor respondeu com algo que o app não entendeu. Atualize a página e tente de novo.'
+export const BATALHA_SO_MESTRE = 'só o mestre da campanha muda as cenas e põe ou tira tokens.'
+export const BATALHA_TOKEN_INVALIDO = 'o token não está num formato que o servidor aceita. Atualize a página e tente de novo.'
+export const BATALHA_SO_DONO = 'você só move os tokens que o mestre deu a você, na cena ativa.'
+
+export type AcaoBatalha = 'listar' | 'abrir' | 'criar' | 'mudar cena' | 'apagar' | 'ativar' | 'fundo' | 'mover' | 'tirar' | 'importar'
+
+const SEM_PERMISSAO_BATALHA: Record<AcaoBatalha, string> = {
+  listar: 'você não participa mais desta campanha, ou ela foi apagada. Confira na aba Campanha.',
+  abrir: 'a cena não está mais ativa, ou foi apagada. Escolha outra cena.',
+  criar: BATALHA_SO_MESTRE,
+  'mudar cena': `${BATALHA_SO_MESTRE} Se a cena foi apagada, atualize a página.`,
+  apagar: `${BATALHA_SO_MESTRE} Se a cena já foi apagada, atualize a página.`,
+  ativar: BATALHA_SO_MESTRE,
+  fundo: BATALHA_SO_MESTRE,
+  mover: BATALHA_SO_DONO,
+  tirar: `${BATALHA_SO_MESTRE} Se o token já saiu, atualize a página.`,
+  importar: BATALHA_SO_MESTRE,
+}
+
+const MENSAGENS_PRONTAS_BATALHA = [BATALHA_FECHADA, BATALHA_INVALIDA, BATALHA_SO_MESTRE, BATALHA_TOKEN_INVALIDO, BATALHA_SO_DONO]
+
+export function mensagemDeErroBatalha(erro: unknown, endereco: string, acao: AcaoBatalha): string {
+  if (erro instanceof Error && MENSAGENS_PRONTAS_BATALHA.includes(erro.message)) return erro.message
+  if (!ehObj(erro)) return 'aconteceu um erro inesperado. Tente de novo.'
+  const status = typeof erro.status === 'number' ? erro.status : -1
+  const resposta = ehObj(erro.response) ? erro.response : {}
+  const mensagem = typeof resposta.message === 'string' ? resposta.message : ''
+
+  if (status === 0) return `o servidor em ${endereco} não respondeu. Confira se ele está ligado e tente de novo.`
+  if (status === 401) return 'sua sessão expirou. Entre de novo na aba Campanha.'
+  if (status === 429) return 'muitos pedidos seguidos. Espere alguns segundos e tente de novo.'
+  if (status === 413) return 'o fundo passou de 15 MB. Reduza a imagem e tente de novo.'
+  // Os hooks do servidor já explicam em português o que estava errado.
+  for (const prefixo of ['Cena recusada:', 'Token recusado:']) {
+    if (mensagem.startsWith(prefixo)) return `o servidor recusou: ${mensagem.slice(prefixo.length).trim()}`
+  }
+  if (status === 400) {
+    const fundo = codigoDoCampo(resposta, 'fundo')
+    if (fundo === 'validation_file_size_limit') return 'o fundo passou de 15 MB. Reduza a imagem e tente de novo.'
+    if (fundo === 'validation_invalid_mime_type') return 'o fundo não é uma imagem PNG, JPEG ou WebP.'
+    if (codigoDoCampo(resposta, 'idLocal') === 'validation_not_unique') return 'já existe um token com esse id nesta cena. Atualize a página e tente de novo.'
+  }
+  // O PocketBase esconde o motivo de propósito: quase sempre é falta de permissão.
+  if (status === 400 || status === 403 || status === 404) return SEM_PERMISSAO_BATALHA[acao]
+  return 'o servidor não conseguiu atender. Tente de novo daqui a pouco.'
+}

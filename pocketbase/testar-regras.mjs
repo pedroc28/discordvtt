@@ -309,6 +309,7 @@ async function testar() {
   await testarDados({ admin, contas, Ana, Bruno, Carla, Davi })
   await testarQuadro({ admin, contas, Ana, Bruno, Carla, Davi })
   await testarViagem({ admin, contas, Ana, Bruno, Carla, Davi })
+  await testarBatalha({ admin, contas, Ana, Bruno, Carla, Davi })
 
   console.log('\nTrocar senha')
   const NOVA = 'nova-senha-123'
@@ -422,6 +423,9 @@ async function testarBackup({ admin, Ana }) {
   }
   const mudarAlgo = (nome) => api('POST', '/api/collections/campanhas/records', { token: Ana, corpo: { nome } })
 
+  // Uma mudança antes: se o backup de cada hora rodou sozinho há pouco (o teste passou por uma hora cheia),
+  // ainda há o que copiar.
+  await mudarAlgo('Mesa do backup 0')
   const primeiro = await rodarBackup()
   confere('com mudanças desde o último, o backup automático sai', primeiro.ok && primeiro.novos.length === 1, primeiro)
   const parado = await rodarBackup(1500)
@@ -1377,6 +1381,229 @@ async function testarQuadro({ admin, contas, Ana, Bruno, Carla, Davi }) {
  * aplica a migração do mapa e confere que as campanhas antigas ganharam mapa. Depois testa a
  * limpeza dos lotes, com o prazo zerado só nesta rodada.
  */
+// ---------- batalha ----------
+
+const CONFIG_CENA = {
+  grade: { tipo: 'quadrada', tamanho: 70, x: 0, y: 0, visivel: true, cor: 'clara', opacidade: 0.4 },
+  medida: { valorPorCelula: 1.5, unidade: 'm', diagonal: 'simples' },
+  encaixar: true,
+  fundo: { largura: 40, altura: 30 },
+}
+
+/** Cada pedido de um IP diferente, para o limite de criações por IP não atrapalhar o teste. */
+let ipDaBatalha = 0
+const outroIp = () => `198.51.100.${150 + (ipDaBatalha++ % 100)}`
+
+const criarCena = (token, campanha, corpo = {}) =>
+  api('POST', '/api/collections/cenas_batalha/records', { token, corpo: { campanha, nome: 'Cena', config: CONFIG_CENA, ...corpo }, ip: outroIp() })
+const mudarCena = (token, id, corpo) => api('PATCH', `/api/collections/cenas_batalha/records/${id}`, { token, corpo, ip: outroIp() })
+const novoToken = (idLocal, extra = {}) => ({ idLocal, nome: idLocal, x: 105, y: 35, tamanho: 1, cor: '#c2185b', ...extra })
+const criarTokenBatalha = (token, cena, corpo) => api('POST', '/api/collections/tokens_batalha/records', { token, corpo: { cena, ...corpo }, ip: outroIp() })
+const mudarTokenBatalha = (token, id, corpo) => api('PATCH', `/api/collections/tokens_batalha/records/${id}`, { token, corpo, ip: outroIp() })
+
+function enviarFundo(token, cena, arquivo = pngDeVerdade(40, 30), tipo = 'image/png', nomeArquivo = 'fundo.png') {
+  const formulario = new FormData()
+  formulario.append('fundo', new Blob([arquivo], { type: tipo }), nomeArquivo)
+  return api('PATCH', `/api/collections/cenas_batalha/records/${cena}`, { token, corpo: formulario, ip: outroIp() })
+}
+
+function importarCena(token, cena, dados, { fundo, removerFundo = false } = {}) {
+  const formulario = new FormData()
+  formulario.append('cena', cena)
+  formulario.append('dados', typeof dados === 'string' ? dados : JSON.stringify(dados))
+  if (removerFundo) formulario.append('removerFundo', '1')
+  if (fundo) formulario.append('fundo', new Blob([fundo.arquivo], { type: fundo.tipo }), fundo.nome)
+  return api('POST', '/api/batalha/importar', { token, corpo: formulario, ip: outroIp() })
+}
+
+async function testarBatalha({ admin, contas, Ana, Bruno, Carla, Davi }) {
+  console.log('\nBatalha: cenas')
+  const mesa = (await api('POST', '/api/collections/campanhas/records', { token: Ana, corpo: { nome: 'Mesa da batalha' } })).dados
+  for (const nome of ['Bruno', 'Davi']) {
+    await api('POST', '/api/collections/participantes/records', { token: Ana, corpo: { campanha: mesa.id, usuario: contas[nome].id, papel: 'jogador' } })
+  }
+  const daCarla = (await api('POST', '/api/collections/campanhas/records', { token: Carla, corpo: { nome: 'Mesa da Carla, batalha' } })).dados
+  const tempoRealBruno = await abrirTempoReal(Bruno, ['cenas_batalha/*', 'tokens_batalha/*', `campanhas/${mesa.id}`])
+  const tempoRealCarla = await abrirTempoReal(Carla, ['cenas_batalha/*', 'tokens_batalha/*'])
+
+  const taverna = await criarCena(Ana, mesa.id, { nome: 'Taverna' })
+  confere('o mestre cria uma cena com a grade e a medida', taverna.ok && taverna.dados.config?.grade?.tamanho === 70, taverna.dados)
+  const masmorra = (await criarCena(Ana, mesa.id, { nome: 'Masmorra', config: null })).dados
+  confere('cena nova pode vir sem configuração: o app usa os padrões', masmorra?.config === null, masmorra)
+  const doJogador = await criarCena(Bruno, mesa.id)
+  confere('jogador não cria cena', !doJogador.ok, doJogador.status)
+  const deFora = await criarCena(Carla, mesa.id)
+  confere('quem está fora não cria cena na campanha', !deFora.ok, deFora.status)
+
+  const configsRuins = {
+    'tamanho da grade fora da faixa': { ...CONFIG_CENA, grade: { ...CONFIG_CENA.grade, tamanho: 5 } },
+    'tipo de grade que não existe': { ...CONFIG_CENA, grade: { ...CONFIG_CENA.grade, tipo: 'triangular' } },
+    'opacidade zero': { ...CONFIG_CENA, grade: { ...CONFIG_CENA.grade, opacidade: 0 } },
+    'unidade longa demais': { ...CONFIG_CENA, medida: { ...CONFIG_CENA.medida, unidade: 'metros e meio' } },
+    'diagonal que não existe': { ...CONFIG_CENA, medida: { ...CONFIG_CENA.medida, diagonal: 'torta' } },
+    'fundo sem largura': { ...CONFIG_CENA, fundo: { largura: 0, altura: 30 } },
+    'encaixar como texto': { ...CONFIG_CENA, encaixar: 'sim' },
+    'lista no lugar do objeto': [1, 2],
+    'mais de 2 KB': { ...CONFIG_CENA, nota: 'x'.repeat(2100) },
+  }
+  const recusas = {}
+  for (const [caso, config] of Object.entries(configsRuins)) recusas[caso] = (await mudarCena(Ana, taverna.dados.id, { config })).status
+  confere('configuração fora do formato é recusada', Object.values(recusas).every((status) => status >= 400), recusas)
+  const motivo = await mudarCena(Ana, taverna.dados.id, { config: configsRuins['tamanho da grade fora da faixa'] })
+  confere('com o motivo', String(motivo.dados?.message).startsWith('Cena recusada:'), motivo.dados)
+  const semNome = await mudarCena(Ana, taverna.dados.id, { nome: '   ' })
+  confere('cena sem nome é recusada', !semNome.ok, semNome.status)
+  const renomeia = await mudarCena(Ana, taverna.dados.id, { nome: 'Taverna do Pônei' })
+  confere('o mestre renomeia a cena', renomeia.ok && renomeia.dados.nome === 'Taverna do Pônei', renomeia.dados)
+  const jogadorMuda = await mudarCena(Bruno, taverna.dados.id, { nome: 'Minha' })
+  confere('jogador não muda a cena', !jogadorMuda.ok, jogadorMuda.status)
+  const muda = await mudarCena(Ana, taverna.dados.id, { campanha: daCarla.id })
+  confere('a cena não muda de campanha', !muda.ok, muda.status)
+
+  console.log('\nBatalha: cena ativa')
+  const daMesa = registros('cenas_batalha', `campanha = "${mesa.id}"`)
+  confere('sem cena ativa, o jogador não vê nenhuma cena', (await api('GET', daMesa, { token: Bruno })).dados?.items?.length === 0)
+  confere('o mestre vê todas', (await api('GET', daMesa, { token: Ana })).dados?.items?.length === 2)
+  const ativa = await api('PATCH', `/api/collections/campanhas/records/${mesa.id}`, { token: Ana, corpo: { cenaAtiva: taverna.dados.id } })
+  confere('o mestre ativa uma cena', ativa.ok && ativa.dados.cenaAtiva === taverna.dados.id, ativa.dados)
+  const vistas = (await api('GET', daMesa, { token: Bruno })).dados?.items ?? []
+  confere('o jogador vê só a cena ativa', vistas.length === 1 && vistas[0].id === taverna.dados.id, vistas.map((c) => c.nome))
+  const espia = await api('GET', `/api/collections/cenas_batalha/records/${masmorra.id}`, { token: Bruno })
+  confere('nem abrindo pelo id ele vê a cena que o mestre prepara', !espia.ok, espia.status)
+  confere('quem está fora não vê a cena ativa', (await api('GET', daMesa, { token: Carla })).dados?.items?.length === 0)
+  const cenaDaCarla = (await criarCena(Carla, daCarla.id, { nome: 'Outra' })).dados
+  const ativaDeOutra = await api('PATCH', `/api/collections/campanhas/records/${mesa.id}`, { token: Ana, corpo: { cenaAtiva: cenaDaCarla.id } })
+  confere('a cena ativa precisa ser desta campanha', !ativaDeOutra.ok && String(ativaDeOutra.dados?.message).startsWith('Cena recusada:'), ativaDeOutra.dados)
+  const jogadorAtiva = await api('PATCH', `/api/collections/campanhas/records/${mesa.id}`, { token: Bruno, corpo: { cenaAtiva: masmorra.id } })
+  confere('jogador não troca a cena ativa', !jogadorAtiva.ok, jogadorAtiva.status)
+  confere('trocar a cena ativa chega ao jogador pelo tempo real da campanha', await esperarEvento(tempoRealBruno, `campanhas/${mesa.id}`, taverna.dados.id))
+
+  console.log('\nBatalha: fundo')
+  const fundo = await enviarFundo(Ana, taverna.dados.id)
+  confere('o mestre envia o fundo', fundo.ok && Boolean(fundo.dados?.fundo), fundo.dados)
+  const fundoMasmorra = (await enviarFundo(Ana, masmorra.id, WEBP_PEQUENO, 'image/webp', 'fundo.webp')).dados
+  confere('WebP também serve de fundo', Boolean(fundoMasmorra?.fundo), fundoMasmorra)
+  const jogadorFundo = await enviarFundo(Bruno, taverna.dados.id)
+  confere('jogador não envia fundo', !jogadorFundo.ok, jogadorFundo.status)
+  const html = await enviarFundo(Ana, taverna.dados.id, Buffer.from('<html><script>alert(1)</script></html>'), 'image/png', 'falso.png')
+  confere('arquivo que não é imagem é recusado como fundo', !html.ok, html.status)
+  const svg = await enviarFundo(Ana, taverna.dados.id, Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>'), 'image/svg+xml', 'fundo.svg')
+  confere('SVG é recusado como fundo', !svg.ok, svg.status)
+  const enorme = await enviarFundo(Ana, taverna.dados.id, Buffer.concat([ASSINATURA_PNG, Buffer.alloc(15.2 * 1024 * 1024)]))
+  confere('fundo de mais de 15 MB é recusado', !enorme.ok, enorme.status)
+  const baixar = async (registro, busca = '') => (await fetch(`${base}/api/files/cenas_batalha/${registro.id}/${registro.fundo}${busca}`)).status
+  confere('o fundo não abre sem token, nem com o link', (await baixar(fundo.dados)) >= 400)
+  const tokenBruno = await tokenDeArquivo(Bruno)
+  confere('o jogador abre o fundo da cena ativa', (await baixar(fundo.dados, `?token=${tokenBruno}`)) === 200)
+  confere('e não abre o fundo da cena que o mestre prepara', (await baixar(fundoMasmorra, `?token=${tokenBruno}`)) >= 400)
+  confere('quem está fora não abre o fundo', (await baixar(fundo.dados, `?token=${await tokenDeArquivo(Carla)}`)) >= 400)
+
+  console.log('\nBatalha: tokens')
+  const cena = taverna.dados.id
+  const guerreiro = await criarTokenBatalha(Ana, cena, novoToken('guerreiro', { dono: contas.Bruno.id }))
+  confere('o mestre põe um token com dono', guerreiro.ok && guerreiro.dados.dono === contas.Bruno.id, guerreiro.dados)
+  const orc = (await criarTokenBatalha(Ana, cena, novoToken('orc', { x: 0, y: 0 }))).dados
+  confere('token sem dono, na posição zero', orc?.x === 0 && orc?.dono === '', orc)
+  const dragao = (await criarTokenBatalha(Ana, masmorra.id, novoToken('dragao', { tamanho: 3, dono: contas.Bruno.id }))).dados
+  const repetido = await criarTokenBatalha(Ana, cena, novoToken('orc'))
+  confere('o id do token não se repete na mesma cena', !repetido.ok, repetido.status)
+  const outraCena = await criarTokenBatalha(Ana, masmorra.id, novoToken('orc'))
+  confere('mas pode repetir em outra cena', outraCena.ok, outraCena.dados)
+  const donoDeFora = await criarTokenBatalha(Ana, cena, novoToken('espiao', { dono: contas.Carla.id }))
+  confere('o dono precisa participar da campanha', !donoDeFora.ok && String(donoDeFora.dados?.message).startsWith('Token recusado:'), donoDeFora.dados)
+  const jogadorCria = await criarTokenBatalha(Bruno, cena, novoToken('meu'))
+  confere('jogador não cria token', !jogadorCria.ok, jogadorCria.status)
+  const ruins = {
+    tamanho: await criarTokenBatalha(Ana, cena, novoToken('gigante', { tamanho: 20 })),
+    cor: await criarTokenBatalha(Ana, cena, novoToken('colorido', { cor: 'vermelho' })),
+    posicao: await criarTokenBatalha(Ana, cena, novoToken('longe', { x: 2000000 })),
+  }
+  confere('token fora do formato é recusado', Object.values(ruins).every((r) => !r.ok), Object.fromEntries(Object.entries(ruins).map(([k, r]) => [k, r.status])))
+
+  const daTaverna = registros('tokens_batalha', `cena = "${cena}"`)
+  confere('o jogador vê os tokens da cena ativa', (await api('GET', daTaverna, { token: Bruno })).dados?.items?.length === 2)
+  confere('e não vê os da cena que o mestre prepara', (await api('GET', registros('tokens_batalha', `cena = "${masmorra.id}"`), { token: Bruno })).dados?.items?.length === 0)
+  confere('quem está fora não vê token nenhum', (await api('GET', daTaverna, { token: Carla })).dados?.items?.length === 0)
+
+  const move = await mudarTokenBatalha(Bruno, guerreiro.dados.id, { x: 175, y: 105 })
+  confere('o dono move o próprio token', move.ok && move.dados.x === 175 && move.dados.y === 105, move.dados)
+  const renomeiaToken = await mudarTokenBatalha(Bruno, guerreiro.dados.id, { nome: 'Herói' })
+  confere('o dono só move: não muda o nome', !renomeiaToken.ok, renomeiaToken.status)
+  const passaDono = await mudarTokenBatalha(Bruno, guerreiro.dados.id, { dono: contas.Davi.id })
+  confere('nem passa o token para outra pessoa', !passaDono.ok, passaDono.status)
+  const cresce = await mudarTokenBatalha(Bruno, guerreiro.dados.id, { x: 10, tamanho: 3 })
+  confere('nem muda o tamanho junto com a posição', !cresce.ok, cresce.status)
+  const moveDoOutro = await mudarTokenBatalha(Bruno, orc.id, { x: 10 })
+  confere('jogador não move o token de outro', !moveDoOutro.ok, moveDoOutro.status)
+  const outroJogador = await mudarTokenBatalha(Davi, guerreiro.dados.id, { x: 10 })
+  confere('nem o token de outro jogador', !outroJogador.ok, outroJogador.status)
+  const foraDaAtiva = await mudarTokenBatalha(Bruno, dragao.id, { x: 10 })
+  confere('nem o próprio token numa cena que não está ativa', !foraDaAtiva.ok, foraDaAtiva.status)
+  const mestreMuda = await mudarTokenBatalha(Ana, orc.id, { nome: 'Chefe orc', tamanho: 2, cor: '#455a64', dono: contas.Davi.id })
+  confere('o mestre muda tudo, inclusive o dono', mestreMuda.ok && mestreMuda.dados.dono === contas.Davi.id && mestreMuda.dados.tamanho === 2, mestreMuda.dados)
+  const mudaCena = await mudarTokenBatalha(Ana, orc.id, { cena: masmorra.id })
+  confere('o token não muda de cena', !mudaCena.ok, mudaCena.status)
+  const jogadorTira = await api('DELETE', `/api/collections/tokens_batalha/records/${guerreiro.dados.id}`, { token: Bruno, ip: outroIp() })
+  confere('jogador não tira token', !jogadorTira.ok, jogadorTira.status)
+
+  confere('mover chega ao jogador pelo tempo real', await esperarEvento(tempoRealBruno, 'tokens_batalha/*', '"x":175'))
+  await mudarTokenBatalha(Ana, dragao.id, { x: 777 })
+  await esperar(300)
+  confere('o que acontece na cena que o mestre prepara não chega ao jogador', !tempoRealBruno.eventos.some((e) => e.data?.includes(dragao.id)))
+  confere('nem quem está fora recebe nada desta mesa', !tempoRealCarla.eventos.some((e) => e.data?.includes(mesa.id) || e.data?.includes(cena)))
+
+  console.log('\nBatalha: importar')
+  const tokensImportados = [novoToken('dragao', { x: 999, tamanho: 3, dono: contas.Bruno.id }), novoToken('kobold', { nome: 'Kobold' })]
+  const novaConfig = { ...CONFIG_CENA, grade: { ...CONFIG_CENA.grade, tipo: 'hex-pontudo', tamanho: 50 } }
+  const importa = await importarCena(Ana, masmorra.id, { config: novaConfig, tokens: tokensImportados }, { fundo: { arquivo: pngDeVerdade(40, 30), tipo: 'image/png', nome: 'mapa.png' } })
+  const depoisDaImportacao = (await api('GET', registros('tokens_batalha', `cena = "${masmorra.id}"`), { token: Ana })).dados?.items ?? []
+  const cenaImportada = (await api('GET', `/api/collections/cenas_batalha/records/${masmorra.id}`, { token: Ana })).dados
+  confere('o mestre importa uma cena inteira num passo', importa.ok && cenaImportada?.config?.grade?.tipo === 'hex-pontudo' && cenaImportada.fundo.endsWith('.png'), importa.dados)
+  const dragaoDepois = depoisDaImportacao.find((t) => t.idLocal === 'dragao')
+  confere('o token que já existia é atualizado pelo id, os que não vieram saem', depoisDaImportacao.length === 2 && dragaoDepois?.id === dragao.id && dragaoDepois.x === 999, depoisDaImportacao.map((t) => t.idLocal))
+
+  const antes = JSON.stringify(depoisDaImportacao.map((t) => [t.idLocal, t.x]).sort())
+  const meioRuim = await importarCena(Ana, masmorra.id, { config: CONFIG_CENA, tokens: [novoToken('dragao', { x: 1 }), novoToken('ruim', { cor: 'azul' })] })
+  const depoisDoRuim = (await api('GET', registros('tokens_batalha', `cena = "${masmorra.id}"`), { token: Ana })).dados?.items ?? []
+  confere('com um token errado, nada entra', !meioRuim.ok && JSON.stringify(depoisDoRuim.map((t) => [t.idLocal, t.x]).sort()) === antes, meioRuim.dados)
+  const fundoRuim = await importarCena(Ana, masmorra.id, { config: CONFIG_CENA, tokens: [] }, { fundo: { arquivo: Buffer.from('<html></html>'), tipo: 'image/png', nome: 'x.png' } })
+  const aindaHex = (await api('GET', `/api/collections/cenas_batalha/records/${masmorra.id}`, { token: Ana })).dados?.config?.grade?.tipo
+  confere('com um fundo que não é imagem, nada entra', !fundoRuim.ok && aindaHex === 'hex-pontudo', fundoRuim.dados)
+  const jogadorImporta = await importarCena(Bruno, cena, { config: CONFIG_CENA, tokens: [] })
+  confere('jogador não importa', jogadorImporta.status === 403, jogadorImporta.status)
+  const donoDeForaImporta = await importarCena(Ana, masmorra.id, { config: CONFIG_CENA, tokens: [novoToken('x', { dono: contas.Carla.id })] })
+  confere('na importação, o dono também precisa participar', !donoDeForaImporta.ok, donoDeForaImporta.dados)
+  const duzentosEUm = Array.from({ length: 201 }, (_, i) => novoToken(`t${i}`))
+  const demais = await importarCena(Ana, masmorra.id, { config: CONFIG_CENA, tokens: duzentosEUm })
+  confere('a importação aceita até 200 tokens', !demais.ok, demais.status)
+  const duzentos = await importarCena(Ana, masmorra.id, { config: CONFIG_CENA, tokens: duzentosEUm.slice(0, 200) }, { removerFundo: true })
+  const semFundo = (await api('GET', `/api/collections/cenas_batalha/records/${masmorra.id}`, { token: Ana })).dados
+  confere('200 tokens entram, e a importação pode tirar o fundo', duzentos.ok && semFundo?.fundo === '' && (await contar(admin, 'tokens_batalha', `cena = "${masmorra.id}"`)) === 200, duzentos.dados)
+  const mais = await criarTokenBatalha(Ana, masmorra.id, novoToken('t200'))
+  confere('a cena tem no máximo 200 tokens', !mais.ok && String(mais.dados?.message).startsWith('Token recusado:'), mais.dados)
+
+  console.log('\nBatalha: limites e apagar')
+  for (let i = 0; i < 18; i++) await criarCena(Ana, mesa.id, { nome: `Extra ${i}` })
+  const vigesimaPrimeira = await criarCena(Ana, mesa.id, { nome: 'Uma a mais' })
+  confere('a campanha tem no máximo 20 cenas', !vigesimaPrimeira.ok && String(vigesimaPrimeira.dados?.message).includes('20 cenas'), vigesimaPrimeira.dados)
+  const jogadorApaga = await api('DELETE', `/api/collections/cenas_batalha/records/${cena}`, { token: Bruno, ip: outroIp() })
+  confere('jogador não apaga cena', !jogadorApaga.ok, jogadorApaga.status)
+  const apagaAtiva = await api('DELETE', `/api/collections/cenas_batalha/records/${cena}`, { token: Ana, ip: outroIp() })
+  const campanhaDepois = (await api('GET', `/api/collections/campanhas/records/${mesa.id}`, { token: Ana })).dados
+  confere('apagar a cena ativa limpa a cena ativa da campanha', apagaAtiva.ok && campanhaDepois?.cenaAtiva === '', campanhaDepois)
+  confere('e apaga os tokens dela', (await contar(admin, 'tokens_batalha', `cena = "${cena}"`)) === 0)
+
+  await api('PATCH', `/api/collections/campanhas/records/${mesa.id}`, { token: Ana, corpo: { cenaAtiva: masmorra.id } })
+  await Promise.all([tempoRealBruno.fechar(), tempoRealCarla.fechar()])
+  const apagaCampanha = await api('DELETE', `/api/collections/campanhas/records/${mesa.id}`, { token: Ana })
+  await api('DELETE', `/api/collections/campanhas/records/${daCarla.id}`, { token: Carla })
+  confere(
+    'apagar a campanha, com uma cena ativa, apaga as cenas e os tokens',
+    apagaCampanha.ok && (await contar(admin, 'cenas_batalha', `campanha = "${mesa.id}"`)) === 0 && (await contar(admin, 'tokens_batalha', `cena = "${masmorra.id}"`)) === 0,
+    apagaCampanha.dados,
+  )
+}
+
 async function testarMigracaoELimpeza(dados) {
   console.log('\nMapa: migração num servidor que já tinha campanhas')
   const antigas = join(dados, 'migracoes-antigas')

@@ -1,16 +1,18 @@
-// Conexão do app com o PocketBase: login, campanhas, participantes e os clientes do mapa, dos dados e do quadro.
+// Conexão do app com o PocketBase: login, campanhas, participantes e os clientes do mapa, dos dados, do quadro e da batalha.
 // É o único lugar do app que usa o SDK do servidor (ver o CLAUDE.md da área). A tela só lê
 // o estado com useServidor() e chama os métodos de `conexao`. O mapa recebe um RepositorioPocketBase
 // pronto, por abrirRepositorioMapa(), a aba Dados, um RepositorioDadosPocketBase, por abrirRepositorioDados(),
-// e a aba Quadro, um RepositorioQuadroPocketBase, por abrirRepositorioQuadro().
+// a aba Quadro, um RepositorioQuadroPocketBase, por abrirRepositorioQuadro(), e o mapa de batalha, um
+// RepositorioBatalhaPocketBase, por abrirRepositorioBatalha().
 
 import PocketBase, { LocalAuthStore } from 'pocketbase'
 import { useEffect, useSyncExternalStore } from 'react'
 import { ENDERECO_PADRAO, enderecoDoLink, normalizarEndereco, semParametroDoServidor } from './endereco'
-import { DADOS_FECHADO, MAPA_FECHADO, mensagemDeErro, QUADRO_FECHADO, type Acao } from './erros'
+import { BATALHA_FECHADA, DADOS_FECHADO, MAPA_FECHADO, mensagemDeErro, QUADRO_FECHADO, type Acao } from './erros'
 import { campanhaValida, limparNomeCampanha, mapaContinuaAberto, montarCampanhas, montarParticipantes, problemaNaNovaSenha } from './operacoes'
 import { RepositorioDadosPocketBase, type ClienteDados } from './repositorio-dados'
 import { RepositorioPocketBase, type ClienteMapa, type FiltroServidor } from './repositorio-mapa'
+import { RepositorioBatalhaPocketBase, type ClienteBatalha } from './repositorio-batalha'
 import { RepositorioQuadroPocketBase, type ClienteQuadro } from './repositorio-quadro'
 import type { EstadoServidor, FaseConexao, Papel } from './tipos'
 import { emailDaConta, normalizarCampanha, normalizarLista, normalizarParticipacao, normalizarUsuario } from './validacao'
@@ -535,6 +537,15 @@ export class ConexaoServidor {
     return repositorio
   }
 
+  /** O mapa de batalha da campanha aberta: as cenas, os tokens e a cena ativa. Null sem login ou sem campanha aberta. */
+  abrirRepositorioBatalha(): RepositorioBatalhaPocketBase | null {
+    const aberta = this.campanhaAberta()
+    if (!aberta) return null
+    const repositorio = new RepositorioBatalhaPocketBase(this.clienteBatalha(this.geracao), aberta.campanhaId, { papel: aberta.papel })
+    this.abertos.push({ repositorio, geracao: this.geracao })
+    return repositorio
+  }
+
   private fecharForaDaSessao() {
     if (!this.abertos.length) return
     const sessao = { fase: this.atual.fase, campanhaAtualId: this.atual.campanhaAtualId, geracao: this.geracao, campanhas: this.atual.campanhas }
@@ -635,6 +646,45 @@ export class ConexaoServidor {
     }
   }
 
+  /** O que o RepositorioBatalhaPocketBase precisa do SDK, preso à sessão atual. */
+  private clienteBatalha(geracao: number): ClienteBatalha {
+    const pb = this.pb
+    const daSessao = this.daSessao(geracao, BATALHA_FECHADA)
+    // O token de arquivo vale 3 minutos no PocketBase: um token serve a vários downloads seguidos.
+    let token: { valor: string; ate: number } | null = null
+    const tokenDeArquivo = async () => {
+      if (!token || Date.now() > token.ate) token = { valor: await pb.files.getToken(), ate: Date.now() + 120_000 }
+      return token.valor
+    }
+    return {
+      endereco: this.atual.endereco,
+      usuarioId: this.atual.usuario?.id ?? '',
+      listar: (colecao, f, ordem) =>
+        daSessao(pb.collection(colecao).getFullList({ filter: pb.filter(f.expressao, f.valores), batch: 500, ...(ordem ? { sort: ordem } : {}) })),
+      ler: (colecao, id) => daSessao(pb.collection(colecao).getOne(id)),
+      criar: (colecao, dados) => daSessao(pb.collection(colecao).create(dados)),
+      atualizar: (colecao, id, dados) => daSessao(pb.collection(colecao).update(id, dados)),
+      apagar: async (colecao, id) => {
+        await daSessao(pb.collection(colecao).delete(id))
+      },
+      importar: (formulario) => daSessao(pb.send('/api/batalha/importar', { method: 'POST', body: formulario })),
+      baixarFundo: async (id, arquivo) => {
+        const url = pb.files.getURL({ id, collectionName: 'cenas_batalha', collectionId: 'cenas_batalha' }, arquivo, { token: await tokenDeArquivo() })
+        let resposta: Response
+        try {
+          resposta = await fetch(url)
+        } catch {
+          // Mesmo formato de erro do SDK, para a mensagem dizer que o servidor não respondeu.
+          throw Object.assign(new Error('sem resposta'), { status: 0 })
+        }
+        if (!resposta.ok) throw Object.assign(new Error(`download ${resposta.status}`), { status: resposta.status })
+        return daSessao(resposta.blob())
+      },
+      assinar: (colecao, f, ouvinte) => this.assinarColecao(geracao, colecao, f, ouvinte),
+      aoReconectar: (ouvinte) => this.aoReconectar(geracao, ouvinte),
+    }
+  }
+
   private assinarColecao(geracao: number, colecao: string, f: FiltroServidor, ouvinte: (evento: { acao: string; registro: unknown }) => void) {
     return this.pb.collection(colecao).subscribe(
       '*',
@@ -685,6 +735,14 @@ export function abrirRepositorioDados(): RepositorioDadosPocketBase | null {
  */
 export function abrirRepositorioQuadro(): RepositorioQuadroPocketBase | null {
   return conexao.abrirRepositorioQuadro()
+}
+
+/**
+ * O mapa de batalha da campanha aberta, guardado no servidor: cenas, tokens e cena ativa. Null sem login ou
+ * sem campanha aberta. Fecha sozinho como o mapa. Detalhes em docs/contratos.md.
+ */
+export function abrirRepositorioBatalha(): RepositorioBatalhaPocketBase | null {
+  return conexao.abrirRepositorioBatalha()
 }
 
 /**

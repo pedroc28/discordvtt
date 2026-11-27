@@ -1,11 +1,23 @@
 /// <reference path="../pb_data/types.d.ts" />
 
-// Copia cada backup para uma pasta fora do PocketBase, de preferência sincronizada com a nuvem
-// (Google Drive, OneDrive). Assim um disco que estraga ou um PC perdido não leva os dados junto.
-// A pasta vem da variável DISCORDVTT_COPIA_BACKUP, que o iniciar.bat lê do arquivo
-// copia-backup.txt (fora do Git). Sem a variável, os backups ficam só em pb_data/backups.
+// Backups: quando saem e para onde vão (ver pb_hooks/backup.js e docs/servidor/README.md, "Backup").
+// As pastas de fora vêm das variáveis DISCORDVTT_COPIA_BACKUP (nuvem) e DISCORDVTT_COPIA_HD (HD externo),
+// que o iniciar.bat lê dos arquivos copia-backup.txt e copia-hd.txt, fora do Git. Sem elas, os backups
+// ficam só em pb_data/backups.
 
+// Todo backup, automático ou feito pelo painel, vai para a pasta da nuvem.
 onBackupCreate((e) => {
   e.next()
-  require(`${__hooks}/backup.js`).copiarBackup(e.app, e.name)
+  require(`${__hooks}/backup.js`).copiarParaNuvem(e.app, e.name)
+})
+
+// Backup automático a cada hora em que o servidor estiver ligado, só se algo mudou desde o último.
+// Faz o papel do agendamento do próprio PocketBase, que fica desligado (migração 1795321008_backup.js).
+cronAdd('backup', '0 * * * *', () => {
+  require(`${__hooks}/backup.js`).backupAutomatico($app)
+})
+
+// A cada 5 minutos, leva para o HD externo o que ainda não está nele, se ele estiver conectado.
+cronAdd('copiar_hd', '*/5 * * * *', () => {
+  require(`${__hooks}/backup.js`).copiarParaHd($app)
 })

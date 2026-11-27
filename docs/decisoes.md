@@ -2,6 +2,10 @@
 
 Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em cima. Cada entrada diz o que foi decidido e por quê.
 
+## 2026-11-26
+
+- **Backup só quando algo mudou, com o histórico num HD externo.** O backup de cada hora era um zip com tudo, feito mesmo com o servidor parado. Medido no servidor do grupo: de 0,9 MB, só 28 KB eram o banco, o resto eram imagens, miniaturas, logs e um arquivo de tipos. Com os fundos de batalha, cada cópia passaria a ter centenas de MB. Agora o hook só faz backup se os dados mudaram, o PC guarda os 72 mais novos, o Drive fica com um por dia por 7 dias e um HD externo de 500 GB guarda o histórico de 6 meses. O servidor não depende do HD: o PC guarda os backups e a cópia sai quando o HD é conectado. Ficou de fora um backup que separa o banco das imagens e copia cada imagem uma vez só: economizaria mais, mas a restauração seria feita por nós, e um erro nela é perigoso. Com o HD, não compensa.
+
 ## 2026-11-25
 
 - **Mapa de batalha na área `mapa`, em `app/src/batalha/`.** O GrifoCaolho pediu um mapa de combate com imagem de fundo, grades de vários formatos, tokens e régua, a partir do que o mapa hexagonal já tinha. É a mesma dona e o mesmo tipo de trabalho, então não virou área nova: a linha `mapa` da tabela do `CLAUDE.md` ganhou a pasta, e `scripts/comecar.sh` continua igual. A tela é uma aba nova (Batalha), registrada pelo `tela.ts` da pasta. Começa só local (IndexedDB), e o servidor entra depois, com a mesma ideia de `RepositorioBatalha` atrás da tela.

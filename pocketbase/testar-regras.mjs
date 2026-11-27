@@ -11,7 +11,7 @@
 // recebendo a migração do mapa e testa a limpeza dos lotes e das rolagens.
 
 import { execFileSync, spawn } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -30,6 +30,8 @@ const CASOS_CHUNK = JSON.parse(readFileSync(join(pasta, '..', 'app', 'src', 'ser
 
 let base = ''
 let pastaCopias = ''
+let pastaHd = ''
+let dadosDoServidor = ''
 const falhas = []
 let total = 0
 
@@ -361,7 +363,7 @@ async function testar() {
   const config = await api('GET', '/api/settings', { token: admin })
   confere('administrador no próprio PC usa o painel', config.ok, config.dados)
   confere('o IP de quem acessa vem do X-Forwarded-For, pela direita', config.dados?.trustedProxy?.headers?.includes('X-Forwarded-For') && config.dados?.trustedProxy?.useLeftmostIP === false, config.dados?.trustedProxy)
-  confere('backup automático a cada hora', config.dados?.backups?.cron === '0 * * * *', config.dados?.backups)
+  confere('o agendamento de backup do próprio PocketBase fica desligado (o do hook só copia quando algo mudou)', config.dados?.backups?.cron === '', config.dados?.backups)
 
   const adminDeFora = await api('GET', '/api/settings', { token: admin, ip: '203.0.113.9' })
   confere('sessão de administrador não funciona vinda de fora do PC', !adminDeFora.ok, adminDeFora.status)
@@ -380,6 +382,107 @@ async function testar() {
     if (!copiado) await esperar(250)
   }
   confere('o backup é copiado para a pasta de fora', copiado)
+
+  await testarBackup({ admin, Ana })
+}
+
+// ---------- backup ----------
+
+/** Nome de backup automático com o carimbo em UTC, como os do PocketBase. */
+function nomeAutomatico(ms) {
+  return `@auto_pb_backup_teste_${new Date(ms).toISOString().replace(/\D/g, '').slice(0, 14)}.zip`
+}
+
+/** Uma hora do dia, no fuso deste PC, de k dias atrás. O servidor agrupa os backups pelo dia nesse mesmo fuso. */
+function diaAtras(k, hora = 12) {
+  const hoje = new Date()
+  return new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - k, hora).getTime()
+}
+
+const zipsEm = (dir) => readdirSync(dir).filter((n) => n.endsWith('.zip')).sort()
+
+async function testarBackup({ admin, Ana }) {
+  console.log('\nBackup')
+  const crons = await api('GET', '/api/crons', { token: admin })
+  const expressao = (id) => (Array.isArray(crons.dados) ? crons.dados.find((c) => c.id === id)?.expression : undefined)
+  confere('backup a cada hora e cópia para o HD a cada 5 minutos, pelo hook', expressao('backup') === '0 * * * *' && expressao('copiar_hd') === '*/5 * * * *', crons.dados)
+
+  const listar = async () => ((await api('GET', '/api/backups', { token: admin })).dados ?? []).map((b) => b.key).sort()
+  const automaticos = async () => (await listar()).filter((k) => k.startsWith('@auto_'))
+  // O job roda em segundo plano: espera a lista de backups automáticos mudar, ou o tempo acabar.
+  const rodarBackup = async (espera = 3000) => {
+    const antes = await automaticos()
+    const pedido = await api('POST', '/api/crons/backup', { token: admin })
+    let depois = antes
+    for (let t = 0; t < espera && depois.join() === antes.join(); t += 100) {
+      await esperar(100)
+      depois = await automaticos()
+    }
+    return { ok: pedido.ok, novos: depois.filter((k) => !antes.includes(k)), depois }
+  }
+  const mudarAlgo = (nome) => api('POST', '/api/collections/campanhas/records', { token: Ana, corpo: { nome } })
+
+  const primeiro = await rodarBackup()
+  confere('com mudanças desde o último, o backup automático sai', primeiro.ok && primeiro.novos.length === 1, primeiro)
+  const parado = await rodarBackup(1500)
+  confere('sem nenhuma mudança, a hora seguinte não faz outro backup', parado.ok && parado.novos.length === 0, parado)
+
+  // Pasta da nuvem com cópias de 9 dias atrás, duas por dia, e um arquivo que não é backup.
+  for (let k = 1; k <= 9; k++) {
+    for (const hora of [12, 15]) writeFileSync(join(pastaCopias, nomeAutomatico(diaAtras(k, hora))), 'backup antigo')
+  }
+  writeFileSync(join(pastaCopias, 'leia-me.txt'), 'não é backup')
+
+  await mudarAlgo('Mesa do backup 1')
+  const mudou = await rodarBackup()
+  confere('qualquer mudança faz a hora seguinte ter backup', mudou.ok && mudou.novos.length === 1, mudou)
+  const esperadoNuvem = [mudou.novos[0], ...[1, 2, 3, 4, 5, 6].map((k) => nomeAutomatico(diaAtras(k, 15)))].sort()
+  confere('na nuvem fica a cópia mais nova de cada dia, nos 7 dias mais recentes', zipsEm(pastaCopias).join() === esperadoNuvem.join(), zipsEm(pastaCopias))
+  confere('o que não é backup na pasta da nuvem não é tocado', existsSync(join(pastaCopias, 'leia-me.txt')) && !readdirSync(pastaCopias).some((n) => n.endsWith('.parcial')))
+
+  for (let i = 2; i <= 4; i++) {
+    await mudarAlgo(`Mesa do backup ${i}`)
+    await rodarBackup()
+  }
+  const finais = await automaticos()
+  confere('no PC ficam só os automáticos mais novos', finais.length === 3 && finais.includes(mudou.novos[0]) === false, finais)
+  confere('e os manuais ficam', (await listar()).includes('teste_copia.zip'))
+
+  // HD desconectado: a pasta não existe e não é criada.
+  await api('POST', '/api/crons/copiar_hd', { token: admin })
+  await esperar(1000)
+  confere('sem o HD, a cópia não cria a pasta', !existsSync(pastaHd))
+
+  mkdirSync(pastaHd)
+  const noHdAntes = []
+  for (let k = 1; k <= 9; k++) for (const hora of [12, 15]) noHdAntes.push(nomeAutomatico(diaAtras(k, hora)))
+  noHdAntes.push(nomeAutomatico(diaAtras(30, 12)), nomeAutomatico(diaAtras(30, 15)), nomeAutomatico(diaAtras(200, 12)))
+  for (const nome of noHdAntes) writeFileSync(join(pastaHd, nome), 'backup antigo')
+  writeFileSync(join(pastaHd, 'leia-me.txt'), 'não é backup')
+  writeFileSync(join(pastaHd, 'velho.zip.parcial'), 'cópia interrompida')
+  const duasHoras = new Date(Date.now() - 2 * 60 * 60 * 1000)
+  utimesSync(join(pastaHd, 'velho.zip.parcial'), duasHoras, duasHoras)
+  writeFileSync(join(pastaHd, 'novo.zip.parcial'), 'cópia em andamento')
+
+  const noPc = (await listar()).filter((k) => k.endsWith('.zip'))
+  await api('POST', '/api/crons/copiar_hd', { token: admin })
+  for (let t = 0; t < 5000 && !noPc.every((n) => existsSync(join(pastaHd, n))); t += 100) await esperar(100)
+  await esperar(300)
+  const esperadoHd = [
+    ...noPc,
+    ...[1, 2, 3, 4, 5, 6].flatMap((k) => [nomeAutomatico(diaAtras(k, 12)), nomeAutomatico(diaAtras(k, 15))]),
+    ...[7, 8, 9, 30].map((k) => nomeAutomatico(diaAtras(k, 15))),
+  ].sort()
+  confere('HD conectado: recebe o que está no PC, com o mesmo tamanho', noPc.every((n) => existsSync(join(pastaHd, n)) && statSync(join(pastaHd, n)).size === statSync(join(dadosDoServidor, 'backups', n)).size), noPc)
+  confere('no HD fica tudo dos 7 dias mais recentes e, antes, o mais novo de cada dia por 6 meses', zipsEm(pastaHd).join() === esperadoHd.join(), { tem: zipsEm(pastaHd), esperado: esperadoHd })
+  confere('o que não é backup no HD não é tocado', existsSync(join(pastaHd, 'leia-me.txt')))
+  confere('resto de cópia interrompida sai, a cópia em andamento fica', !existsSync(join(pastaHd, 'velho.zip.parcial')) && existsSync(join(pastaHd, 'novo.zip.parcial')))
+
+  const datas = () => zipsEm(pastaHd).map((n) => `${n}:${statSync(join(pastaHd, n)).mtimeMs}`).join()
+  const antesDaSegunda = datas()
+  await api('POST', '/api/crons/copiar_hd', { token: admin })
+  await esperar(1500)
+  confere('a rodada seguinte não copia de novo o que já está no HD', datas() === antesDaSegunda)
 }
 
 // ---------- mapa ----------
@@ -1356,7 +1459,7 @@ async function subirServidor(dados, { migracoes = join(pasta, 'pb_migrations'), 
   let log = ''
   const servidor = spawn(executavel, ['serve', `--http=127.0.0.1:${porta}`, '--hooksWatch=false', ...argumentos], {
     // Os prazos da limpeza ficam vazios (o padrão, 7 dias) a não ser que a rodada peça outro.
-    env: { ...process.env, DISCORDVTT_DIAS_LOTES: '', DISCORDVTT_DIAS_ROLAGENS: '', DISCORDVTT_QUADRO_LIMITE_MB: '', ...env },
+    env: { ...process.env, DISCORDVTT_DIAS_LOTES: '', DISCORDVTT_DIAS_ROLAGENS: '', DISCORDVTT_QUADRO_LIMITE_MB: '', DISCORDVTT_COPIA_BACKUP: '', DISCORDVTT_COPIA_HD: '', DISCORDVTT_BACKUPS_NO_PC: '', ...env },
   })
   servidor.stdout.on('data', (parte) => (log += parte))
   servidor.stderr.on('data', (parte) => (log += parte))
@@ -1393,11 +1496,15 @@ async function main() {
   const dados = mkdtempSync(join(tmpdir(), 'discordvtt-pb-'))
   const dadosMigracao = mkdtempSync(join(tmpdir(), 'discordvtt-pb-'))
   pastaCopias = join(dados, 'copias')
+  pastaHd = join(dados, 'hd')
+  dadosDoServidor = join(dados, 'pb_data')
 
   let erro = null
   try {
     // Limite do quadro de 1 MB nesta rodada, para o teste do limite não precisar enviar 50 MB.
-    const servidor = await subirServidor(dados, { env: { DISCORDVTT_COPIA_BACKUP: pastaCopias, DISCORDVTT_QUADRO_LIMITE_MB: '1' } })
+    const servidor = await subirServidor(dados, {
+      env: { DISCORDVTT_COPIA_BACKUP: pastaCopias, DISCORDVTT_COPIA_HD: pastaHd, DISCORDVTT_BACKUPS_NO_PC: '3', DISCORDVTT_QUADRO_LIMITE_MB: '1' },
+    })
     try {
       console.log(`PocketBase ${versao.replace(/^pocketbase version /, '')} em ${base}, com dados temporários.`)
       await testar()

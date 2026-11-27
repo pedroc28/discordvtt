@@ -6,7 +6,18 @@ import type { Rolagem } from '../dados/tipos'
 import { ALTURA_QUADRO, CORES_NOTA, LARGURA_QUADRO, LIMITES_QUADRO, type CorNota, type ImagemQuadro, type ItemQuadro } from '../quadro/tipos'
 import { normalizarHexagono, normalizarRegiao } from '../mapa/armazenamento'
 import type { Hexagono, Lote, Mudanca, MudancaNota, MudancaRegiao, NotaPrivada, Regiao, TipoLote, TokenGrupo } from '../mapa/tipos'
-import type { CamadaMestreDoServidor, Campanha, LoteDoServidor, MapaDoServidor, Papel, Participacao, TokenDoServidor, Usuario, ViagemDoServidor } from './tipos'
+import type {
+  CamadaMestreDoServidor,
+  Campanha,
+  LoteDoServidor,
+  MapaDoServidor,
+  Papel,
+  Participacao,
+  TokenBatalhaDoServidor,
+  TokenDoServidor,
+  Usuario,
+  ViagemDoServidor,
+} from './tipos'
 
 type Obj = Record<string, unknown>
 const ehObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -249,4 +260,93 @@ export function normalizarItemQuadroDoServidor(bruto: unknown): ItemQuadro | nul
     return { ...base, tipo: 'nota', texto: textoNota, cor: ehCorNota(bruto.cor) ? bruto.cor : 'amarelo' }
   }
   return null
+}
+
+// ---------- batalha ----------
+
+/** Limites do servidor para o mapa de batalha (pocketbase/pb_hooks/batalha.js). */
+export const LIMITES_BATALHA = { idLocal: 64, nomeToken: 40, nomeCena: 60, coordenada: 1_000_000, tamanhoMin: 0.5, tamanhoMax: 10 }
+const COR_HEX = /^#[0-9a-fA-F]{6}$/
+
+/** Registro de `cenas_batalha`, com o que o repositório guarda dele. */
+export interface RegistroCenaBatalha {
+  id: string
+  campanha: string
+  nome: string
+  /** O objeto de configuração, ou null. Quem confere cada campo é o normalizarCena do mapa. */
+  config: Record<string, unknown> | null
+  /** Nome do arquivo do fundo no servidor, ou vazio sem fundo. */
+  fundo: string
+  /** Quando foi gravada, no formato do servidor, para descartar aviso atrasado. Vazio se o servidor não mandou. */
+  atualizado: string
+}
+
+export function normalizarCenaBatalhaDoServidor(bruto: unknown): RegistroCenaBatalha | null {
+  if (!ehObj(bruto) || !id(bruto.id) || !id(bruto.campanha)) return null
+  return {
+    id: bruto.id,
+    campanha: bruto.campanha,
+    nome: texto(bruto.nome, 'Batalha').slice(0, LIMITES_BATALHA.nomeCena),
+    config: ehObj(bruto.config) ? bruto.config : null,
+    fundo: idOuVazio(bruto.fundo),
+    atualizado: idOuVazio(bruto.updated),
+  }
+}
+
+/** Registro de `tokens_batalha`. */
+export interface RegistroTokenBatalha {
+  registroId: string
+  cena: string
+  atualizado: string
+  token: TokenBatalhaDoServidor
+}
+
+export function normalizarTokenBatalhaDoServidor(bruto: unknown): RegistroTokenBatalha | null {
+  if (!ehObj(bruto) || !id(bruto.id) || !id(bruto.cena) || !id(bruto.idLocal)) return null
+  const limite = LIMITES_BATALHA.coordenada
+  if (!numeroEntre(bruto.x ?? 0, -limite, limite) || !numeroEntre(bruto.y ?? 0, -limite, limite)) return null
+  const tamanho = numeroEntre(bruto.tamanho, LIMITES_BATALHA.tamanhoMin, LIMITES_BATALHA.tamanhoMax) ? bruto.tamanho : 1
+  return {
+    registroId: bruto.id,
+    cena: bruto.cena,
+    atualizado: idOuVazio(bruto.updated),
+    token: {
+      id: bruto.idLocal,
+      nome: typeof bruto.nome === 'string' ? bruto.nome.slice(0, LIMITES_BATALHA.nomeToken) : '',
+      x: typeof bruto.x === 'number' ? bruto.x : 0,
+      y: typeof bruto.y === 'number' ? bruto.y : 0,
+      tamanho,
+      cor: typeof bruto.cor === 'string' && COR_HEX.test(bruto.cor) ? bruto.cor : '#c2185b',
+      dono: id(bruto.dono) ? bruto.dono : null,
+    },
+  }
+}
+
+/** Um token que o mapa quer gravar, já nos campos do servidor. `dono` só vai se o token disser. */
+export interface TokenBatalhaParaServidor {
+  idLocal: string
+  nome: string
+  x: number
+  y: number
+  tamanho: number
+  cor: string
+  dono?: string
+}
+
+/** Confere o token que o mapa manda gravar. Null se ele não estiver num formato que o servidor aceite. */
+export function tokenBatalhaParaServidor(bruto: unknown): TokenBatalhaParaServidor | null {
+  if (!ehObj(bruto)) return null
+  const idLocal = bruto.idLocal ?? bruto.id
+  if (typeof idLocal !== 'string' || !idLocal || idLocal.length > LIMITES_BATALHA.idLocal) return null
+  const limite = LIMITES_BATALHA.coordenada
+  if (!numeroEntre(bruto.x, -limite, limite) || !numeroEntre(bruto.y, -limite, limite)) return null
+  const nome = bruto.nome ?? ''
+  if (typeof nome !== 'string' || nome.length > LIMITES_BATALHA.nomeToken) return null
+  const tamanho = bruto.tamanho ?? 1
+  if (!numeroEntre(tamanho, LIMITES_BATALHA.tamanhoMin, LIMITES_BATALHA.tamanhoMax)) return null
+  if (typeof bruto.cor !== 'string' || !COR_HEX.test(bruto.cor)) return null
+  const token: TokenBatalhaParaServidor = { idLocal, nome, x: bruto.x, y: bruto.y, tamanho, cor: bruto.cor }
+  if (bruto.dono === null) token.dono = ''
+  else if (typeof bruto.dono === 'string') token.dono = bruto.dono
+  return token
 }

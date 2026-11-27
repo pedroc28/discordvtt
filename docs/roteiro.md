@@ -48,6 +48,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Rolagens de dados no servidor: sorteio pelo servidor, rolagens abertas e secretas com regras testadas, limpeza depois de 7 dias e o `RepositorioDadosPocketBase`
 - [x] Ligar o mapa ao servidor, com o GrifoCaolho: parte 1 feita (lista do que combinar em `docs/servidor/README.md`). A camada do mestre na tela e o resto seguem em entregas do mapa.
 - [x] Viagem da campanha no servidor, pedida pelo GrifoCaolho: coleção `viagens`, um registro por campanha que só o mestre grava, com regras testadas, e `carregarViagem`, `gravarViagem` e `assinarViagem` no `RepositorioPocketBase`
+- [x] Mapa de batalha no servidor, pedido pelo GrifoCaolho: várias cenas por campanha, cena ativa na campanha (o jogador só vê ela), um registro por token, o jogador movendo só os próprios tokens, importação num passo e o `RepositorioBatalhaPocketBase`. Falta o GrifoCaolho ligar a tela
 - [ ] Fichas sincronizadas: todos editando e vendo a mesma ficha em tempo real
 - [ ] Ensaio de restauração do backup com um clique: um script no PC do anfitrião que confere se o último backup volta, sem seguir passos à mão
 - [ ] Rodízio de anfitrião, se o grupo decidir: qualquer membro hospeda o servidor, um por vez, com troca de dados automática pelo Google Drive

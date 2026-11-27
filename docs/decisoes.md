@@ -4,6 +4,7 @@ Registro curto das decisões que mudam o rumo do projeto. A mais nova fica em ci
 
 ## 2026-11-26
 
+- **Mapa de batalha no servidor, com a cena ativa na campanha e o jogador vendo só ela.** O GrifoCaolho pediu várias cenas por campanha, com a marca de ativa na cena e todos lendo todas. A marca foi para a campanha (`campanhas.cenaAtiva`) e o jogador passou a ver só a cena ativa: o mestre prepara a próxima luta sem spoiler, e trocar de cena chega a todos pelo tempo real da campanha. Com a marca na cena, o jogador não seria avisado quando a dele fosse desligada. A importação de uma cena inteira usa uma rota própria, e não a API de lotes do PocketBase, que valeria para todas as coleções e furaria os limites de pedidos.
 - **Backup só quando algo mudou, com o histórico num HD externo.** O backup de cada hora era um zip com tudo, feito mesmo com o servidor parado. Medido no servidor do grupo: de 0,9 MB, só 28 KB eram o banco, o resto eram imagens, miniaturas, logs e um arquivo de tipos. Com os fundos de batalha, cada cópia passaria a ter centenas de MB. Agora o hook só faz backup se os dados mudaram, o PC guarda os 72 mais novos, o Drive fica com um por dia por 7 dias e um HD externo de 500 GB guarda o histórico de 6 meses. O servidor não depende do HD: o PC guarda os backups e a cópia sai quando o HD é conectado. Ficou de fora um backup que separa o banco das imagens e copia cada imagem uma vez só: economizaria mais, mas a restauração seria feita por nós, e um erro nela é perigoso. Com o HD, não compensa.
 
 ## 2026-11-25

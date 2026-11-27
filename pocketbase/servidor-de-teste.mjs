@@ -1,5 +1,5 @@
 // Sobe um PocketBase local para testes, com uma campanha pronta: uma conta de mestre e duas de jogador,
-// e o quadro da campanha montado com as imagens de exemplo do app.
+// o quadro da campanha montado com as imagens de exemplo do app e duas cenas de batalha, uma ativa.
 //
 // Uso, na raiz do repositório: node pocketbase/servidor-de-teste.mjs [caminho-do-pocketbase] [--porta=8092]
 // Sem caminho, usa o pocketbase.exe (Windows) ou o pocketbase desta pasta.
@@ -74,6 +74,7 @@ async function prepararCampanha() {
   }
   const mapas = await api('GET', `/api/collections/mapas/records?filter=${encodeURIComponent(`campanha = "${campanha.id}"`)}`, admin)
   await montarQuadro(admin, campanha.id, ids)
+  await montarBatalha(admin, campanha.id, ids)
   return { campanha: campanha.id, mapa: mapas.items[0]?.id ?? '' }
 }
 
@@ -116,6 +117,37 @@ async function montarQuadro(admin, campanha, ids) {
     rotacao: 3,
     z: 10,
   })
+}
+
+/**
+ * Duas cenas de batalha montadas pelo mestre: a "Ponte do rio", ativa, com o mapa do tesouro de fundo e um
+ * token para cada jogador, e o "Covil", que só o mestre vê, com um dragão.
+ */
+async function montarBatalha(admin, campanha, ids) {
+  const mestre = (await api('POST', `/api/collections/users/impersonate/${ids.mestre}`, admin, { duration: 3600 })).token
+  const { imagens } = JSON.parse(readFileSync(join(pastaExemplos, 'lista.json'), 'utf8'))
+  const mapa = imagens.find((imagem) => imagem.arquivo.startsWith('mapa')) ?? imagens[0]
+  const config = (fundo) => ({
+    grade: { tipo: 'quadrada', tamanho: 70, x: 0, y: 0, visivel: true, cor: 'clara', opacidade: 0.4 },
+    medida: { valorPorCelula: 1.5, unidade: 'm', diagonal: 'simples' },
+    encaixar: true,
+    fundo,
+  })
+  const ponte = await api('POST', '/api/collections/cenas_batalha/records', mestre, { campanha, nome: 'Ponte do rio', config: config({ largura: mapa.largura, altura: mapa.altura }) })
+  const formulario = new FormData()
+  formulario.append('fundo', new Blob([readFileSync(join(pastaExemplos, mapa.arquivo))], { type: 'image/webp' }), mapa.arquivo)
+  const resposta = await fetch(`${base}/api/collections/cenas_batalha/records/${ponte.id}`, { method: 'PATCH', headers: { Authorization: mestre }, body: formulario })
+  if (!resposta.ok) throw new Error(`Não consegui pôr o fundo na cena de batalha (${resposta.status}): ${await resposta.text()}`)
+  const tokens = [
+    { idLocal: 'guerreira', nome: 'Guerreira', x: 105, y: 105, cor: '#1565c0', dono: ids.jogadora },
+    { idLocal: 'ladino', nome: 'Ladino', x: 175, y: 105, cor: '#2e7d32', dono: ids.jogador },
+    { idLocal: 'orc-1', nome: 'Orc', x: 315, y: 175, cor: '#c2185b' },
+    { idLocal: 'orc-2', nome: 'Orc', x: 385, y: 175, cor: '#c2185b' },
+  ]
+  for (const token of tokens) await api('POST', '/api/collections/tokens_batalha/records', mestre, { cena: ponte.id, tamanho: 1, ...token })
+  const covil = await api('POST', '/api/collections/cenas_batalha/records', mestre, { campanha, nome: 'Covil', config: config(null) })
+  await api('POST', '/api/collections/tokens_batalha/records', mestre, { cena: covil.id, idLocal: 'dragao', nome: 'Dragão', x: 245, y: 245, tamanho: 3, cor: '#6a1b9a' })
+  await api('PATCH', `/api/collections/campanhas/records/${campanha}`, mestre, { cenaAtiva: ponte.id })
 }
 
 async function main() {
@@ -180,7 +212,7 @@ async function main() {
 
     console.log(`Servidor de teste em ${base} (PocketBase ${versao.replace(/^pocketbase version /, '')}, dados temporários).`)
     console.log(`Painel: ${base}/_/ com ${teste.administrador.email} e a senha ${teste.administrador.senha}`)
-    console.log(`Campanha "${teste.campanha}": ${campanha}, mapa ${mapa}, quadro com as imagens de exemplo`)
+    console.log(`Campanha "${teste.campanha}": ${campanha}, mapa ${mapa}, quadro com as imagens de exemplo, batalha com a Ponte do rio ativa`)
     for (const conta of teste.contas) console.log(`  ${conta.papel.padEnd(7)} ${conta.email}, senha ${conta.senha}`)
     console.log('No app (npm run dev, em app/), entre com uma dessas contas e este endereço de servidor.')
     console.log(`Testes do repositório contra este servidor, em app/: DISCORDVTT_SERVIDOR_TESTE=${base} npx vitest run src/servidor/repositorio-mapa.servidor.test.ts`)

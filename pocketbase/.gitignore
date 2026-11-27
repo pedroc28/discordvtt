@@ -8,5 +8,6 @@ pocketbase_*.zip
 CHANGELOG.md
 LICENSE.md
 
-# Pasta da cópia dos backups, própria de cada PC
+# Pastas das cópias dos backups (nuvem e HD externo), próprias de cada PC
 copia-backup.txt
+copia-hd.txt

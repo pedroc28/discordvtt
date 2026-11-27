@@ -41,6 +41,7 @@ O que já está pronto e o que vem depois. O Claude marca os itens ao terminar c
 - [x] Base no PocketBase: contas, campanhas, mestres e jogadores, com regras de acesso testadas
 - [x] Login no app e escolha da campanha, com gerenciamento de participantes e tempo real
 - [x] Hospedagem: no ar para o grupo, de graça, com Tailscale Funnel no PC do Pedro e backup copiado para o Google Drive, com a restauração ensaiada
+- [x] Backup só quando algo muda, com uma cópia por dia no Google Drive e o histórico de 6 meses num HD externo, copiado sozinho quando ele é conectado
 - [x] Base do mapa no servidor: um mapa por campanha, hexágonos, regiões, token e lotes, com regras testadas, limpeza de lotes antigos e o `RepositorioPocketBase`
 - [x] Servidor de teste local, com mestre e jogadores, e testes do `RepositorioPocketBase` contra um PocketBase de verdade na verificação do GitHub
 - [x] Camada do mestre no servidor: notas privadas e hexágonos ocultos que só o mestre lê, revelar num lote só, importação e reversão conferidas pelo servidor e trava do mapa

@@ -29,6 +29,12 @@ if exist copia-backup.txt set /p DISCORDVTT_COPIA_BACKUP=<copia-backup.txt
 if defined DISCORDVTT_COPIA_BACKUP echo Cópia dos backups em: %DISCORDVTT_COPIA_BACKUP%
 if not defined DISCORDVTT_COPIA_BACKUP echo Os backups ficam só neste PC, em pb_data\backups.
 
+rem Pasta do HD externo para o histórico dos backups. Fica no arquivo copia-hd.txt, fora do Git.
+rem O servidor liga sem o HD: a cópia sai sozinha quando ele for conectado.
+set DISCORDVTT_COPIA_HD=
+if exist copia-hd.txt set /p DISCORDVTT_COPIA_HD=<copia-hd.txt
+if defined DISCORDVTT_COPIA_HD echo Histórico dos backups no HD: %DISCORDVTT_COPIA_HD%
+
 echo Servidor do DiscordVtt ligado. Para desligar, feche esta janela.
 pocketbase.exe serve --http=127.0.0.1:8090
 pause

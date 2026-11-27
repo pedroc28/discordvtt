@@ -423,6 +423,9 @@ async function testarBackup({ admin, Ana }) {
   }
   const mudarAlgo = (nome) => api('POST', '/api/collections/campanhas/records', { token: Ana, corpo: { nome } })
 
+  // Uma mudança antes: se o backup de cada hora rodou sozinho há pouco (o teste passou por uma hora cheia),
+  // ainda há o que copiar.
+  await mudarAlgo('Mesa do backup 0')
   const primeiro = await rodarBackup()
   confere('com mudanças desde o último, o backup automático sai', primeiro.ok && primeiro.novos.length === 1, primeiro)
   const parado = await rodarBackup(1500)
